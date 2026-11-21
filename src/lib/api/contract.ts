@@ -2092,6 +2092,21 @@ export const PlayAppRowSchema = z.object({
         })
         .nullable(),
     isEngine: z.boolean(),
+    /**
+     * Players per hour over the last 24 hours, oldest first (the website's
+     * `history24h`). `/play/page` does not send it yet, so it is null until the
+     * site does; the card draws its chart only when it is there.
+     */
+    history24h: z
+        .array(
+            z.object({
+                ts: z.string(),
+                players: z.number().int().nonnegative(),
+                serversOnline: z.number().int().nonnegative(),
+            })
+        )
+        .nullable()
+        .default(null),
 })
 
 export const PlayServerRowSchema = z.object({

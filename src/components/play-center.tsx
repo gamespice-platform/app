@@ -31,6 +31,7 @@ import type {
 } from '~/lib/api/contract'
 import { MODE_LABELS, compact, fill, players } from '~/lib/api/play'
 import { canonicalSlug, gameHeadingStyle, gameLook } from '~/lib/gamespice/games'
+import { GameCardStats } from '~/components/game-card-stats'
 import { GameIcon } from '~/components/game-icon'
 import { useDialog } from '~/components/use-dialog'
 import type { z } from 'zod'
@@ -247,6 +248,8 @@ export function GameCard({
                 <p className="line-clamp-2 min-h-[2rem] text-[11px] leading-relaxed text-muted">
                     {app.description ?? 'No description yet.'}
                 </p>
+
+                <GameCardStats app={app} />
 
                 <div className="flex flex-wrap gap-1">
                     <ModePills modes={app.modes} />

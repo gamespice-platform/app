@@ -1,5 +1,9 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.12
+
+- Changed: the game cards on the Play page now carry the numbers the website's Games cards show: players now, the 24 hour peak and servers up as tiles, with a players-per-hour chart under them. The chart appears once the site sends the hourly history in the play page; until then the card says so instead of guessing.
+
 ## 0.5.11
 
 - Fixed: starting a solo game with an installed game build that is too old no longer ends in a refusal after pressing Play. The chooser says so up front and defaults to the web build.
