@@ -461,6 +461,9 @@ pub fn show_card(app: &AppHandle, notice: Notice) {
         .always_on_top(true)
         .skip_taskbar(true)
         .focused(false)
+        // Never take focus: a focus change minimises or de-fullscreens the game
+        // the player is in. Clicks on the card still land.
+        .focusable(false)
         .shadow(true)
         .visible(false)
         .initialization_script(script.as_str())
