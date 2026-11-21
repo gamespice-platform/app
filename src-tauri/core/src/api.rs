@@ -25,9 +25,14 @@ pub const PROD_API_BASE: &str = "https://moddingcommunity.com";
 /// This is the only mechanism available to a release build, and it is the one
 /// mobile uses — an Android or iOS process has no shell to inherit an
 /// environment variable from, but the machine that compiles it does.
+///
+/// An EMPTY value counts as unset. CI passes `${{ vars.TMC_API_BASE }}`, which is
+/// an empty string when the repository variable does not exist, and an empty
+/// base would send every request to nowhere (the mobile builds showed "could
+/// not be loaded" on every screen).
 const BUILT_API_BASE: &str = match option_env!("TMC_API_BASE") {
-    Some(v) => v,
-    None => PROD_API_BASE,
+    Some(v) if !v.is_empty() => v,
+    _ => PROD_API_BASE,
 };
 
 /// Whether `TMC_API_BASE` is consulted at RUN time as well as at build time.

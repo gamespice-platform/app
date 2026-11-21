@@ -144,6 +144,17 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 
+    /*
+     * START ON BOOT. Registered always on desktop, but nothing is installed
+     * until the user turns it on in Settings: the OS entry is the only state,
+     * read and written through `autostart_get` / `autostart_set`.
+     */
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_autostart::init(
+        tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+        None,
+    ));
+
     builder
         .setup(|app| {
             let handle = app.handle().clone();
@@ -383,6 +394,10 @@ pub fn run() {
             #[cfg(desktop)]
             commands::api::update_install,
             commands::api::updater_status,
+            #[cfg(desktop)]
+            commands::autostart::autostart_get,
+            #[cfg(desktop)]
+            commands::autostart::autostart_set,
             commands::settings::settings_get,
             commands::settings::settings_patch,
             commands::settings::settings_set_game_dir,

@@ -1,5 +1,10 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.10
+
+- Fixed: 0.5.9 shipped without the start-on-login backend; it is included here.
+- Fixed: the mobile app loaded nothing ("The play center could not be loaded") when the build's API base variable was empty; an empty base now means the live site.
+
 ## 0.5.9
 
 - Added: Settings → Startup → "Start GameSpice when I log in". Off by default.
