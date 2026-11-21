@@ -21,6 +21,7 @@
 
 pub mod api;
 pub mod auth;
+#[cfg(desktop)]
 pub mod autostart;
 pub mod avatar;
 pub mod config;
