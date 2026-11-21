@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Skeleton } from '~/components/skeleton'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@modcommunity/shared'
 
 import { ipc } from '~/lib/ipc/commands'
@@ -142,6 +142,19 @@ export default function AppSettingsRoute() {
     const downloads = useDownloads()
     const env = useApiEnv()
     const desktop = useIsDesktop()
+    const queryClient = useQueryClient()
+
+    // The OS holds this one, not settings.json: a login entry can be removed
+    // from outside the app, and the toggle should show what is really there.
+    const startOnBoot = useQuery({
+        queryKey: ['autostart'],
+        queryFn: ipc.autostartGet,
+        enabled: desktop,
+    })
+    const startOnBootSet = useMutation({
+        mutationFn: ipc.autostartSet,
+        onSuccess: (on) => queryClient.setQueryData(['autostart'], on),
+    })
 
     // Theme plugins extend the theme picker, so the list has to be live.
     const plugins = useQuery({
@@ -464,6 +477,21 @@ export default function AppSettingsRoute() {
                             />
                         </>
                     )}
+                </Section>
+            )}
+
+            {desktop && (
+                <Section title="Startup">
+                    <Row
+                        label="Start GameSpice when I log in"
+                        control={
+                            <Toggle
+                                label="Start GameSpice when I log in"
+                                checked={startOnBoot.data ?? false}
+                                onChange={(on) => startOnBootSet.mutate(on)}
+                            />
+                        }
+                    />
                 </Section>
             )}
 

@@ -196,6 +196,11 @@ export const ipc = {
     settingsSetDownloadDir: (dir: string | null) =>
         call('settings_set_download_dir', AppSettingsSchema, { dir }),
 
+    /** Whether the app starts when you log in. Off by default; the OS holds it. */
+    autostartGet: () => call('autostart_get', z.boolean()),
+    autostartSet: (enabled: boolean) =>
+        call('autostart_set', z.boolean(), { enabled }),
+
     settingsReset: () => call('settings_reset', AppSettingsSchema),
 
     /** Show a sample notification card (desktop only). */

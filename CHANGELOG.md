@@ -1,5 +1,9 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.9
+
+- Added: Settings → Startup → "Start GameSpice when I log in". Off by default.
+
 ## 0.5.8
 
 - Fixed: a GameSpice notification card no longer takes focus, so it stops minimising the game you are playing.
