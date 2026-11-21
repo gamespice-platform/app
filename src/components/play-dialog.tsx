@@ -478,6 +478,21 @@ export default function PlayDialog({
     const canNative = native != null && !desktopClosed
 
     /*
+     * A shell built before `--solo` (1.YYYYMMDD.HHMM, dated before
+     * SOLO_SHELL_SINCE in `games/build.rs`) opens its menu and ignores a pack, so
+     * Rust refuses a solo launch with it. Say so BEFORE Play: the web build is
+     * the default for a solo start until the library has a newer shell.
+     */
+    const nativeStale =
+        !server &&
+        native != null &&
+        (() => {
+            const day = Number(native.version.split('.')[1])
+
+            return day >= 20000101 && day < 20261031
+        })()
+
+    /*
      * What Install would install: the game's own build, or its engine's shell
      * for a TMC pack game (the two cases `native_target` decides in Rust).
      * Null when TMC publishes nothing this machine can run.
@@ -519,7 +534,7 @@ export default function PlayDialog({
         (!!target.app || !looked.isPending)
 
     if (mode === null && factsIn) {
-        const best = canNative
+        const best = canNative && !(nativeStale && canWeb)
             ? 'native'
             : canInstall
               ? 'install'
@@ -885,7 +900,9 @@ export default function PlayDialog({
                                     body={
                                         server
                                             ? `Starts version ${native.version} on this machine and joins the server.`
-                                            : `Starts version ${native.version} installed on this machine.`
+                                            : nativeStale
+                                              ? `Version ${native.version} is too old to start a solo game. Update it in your library, or use the web build.`
+                                              : `Starts version ${native.version} installed on this machine.`
                                     }
                                 >
                                     {options.length > 0 && (

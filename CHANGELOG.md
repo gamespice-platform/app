@@ -1,5 +1,9 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.11
+
+- Fixed: starting a solo game with an installed game build that is too old no longer ends in a refusal after pressing Play. The chooser says so up front and defaults to the web build.
+
 ## 0.5.10
 
 - Fixed: 0.5.9 shipped without the start-on-login backend; it is included here.
