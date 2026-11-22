@@ -6,6 +6,7 @@ import {
     FiDownloadCloud,
     FiFileText,
     FiFolder,
+    FiGrid,
     FiGlobe,
     FiHardDrive,
     FiCompass,
