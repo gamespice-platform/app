@@ -8,6 +8,7 @@ pub mod query;
 pub mod registry;
 pub mod signature;
 pub mod steps;
+pub mod steps_install;
 pub mod theme;
 
 use std::collections::HashMap;
@@ -260,6 +261,8 @@ mod tests {
             | Step::Remove { path }
             | Step::WriteText { path, .. }
             | Step::PatchJson { path, .. } => vec![(path, true)],
+            // Install-only steps never appear in a plugin.
+            other => other.paths().into_iter().map(|p| (p, true)).collect(),
         }
     }
 

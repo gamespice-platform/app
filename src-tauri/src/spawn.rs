@@ -185,3 +185,17 @@ fn launch_with_vfs(
             .unwrap_or("Virtual-filesystem deployment is not available here."),
     ))
 }
+
+/// Starts a loader's installer (an install manifest's `runInstaller`) and
+/// waits for it: cleared environment, `work/` as cwd, stdin closed, no
+/// console window, a timeout that kills the whole process tree, and every
+/// output line streamed to the log and the sink.
+///
+/// The runner itself is [`tmc_core::plugins::steps_install::run_installer`],
+/// because the install executor that calls it lives in `tmc-core` and cannot
+/// depend on this crate. This is the app's entry to that same function, so
+/// there is still one way an installer starts. Blocking.
+#[allow(dead_code)] // The install-manifest executor calls the core runner; the A4 plan wiring calls this.
+pub fn spawn_installer(spec: &tmc_core::plugins::steps_install::InstallerSpec) -> AppResult<()> {
+    tmc_core::plugins::steps_install::run_installer(spec)
+}

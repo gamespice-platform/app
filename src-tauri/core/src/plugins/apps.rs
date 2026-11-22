@@ -1173,6 +1173,18 @@ impl AppPluginFile {
                     return Err(AppError::invalid("App plugin has too many steps."));
                 }
 
+                // The install-manifest steps and roots (`runInstaller`,
+                // `layer`, ...) are refused here as in a registry plugin.
+                crate::plugins::manifest::check_plugin_steps(
+                    &manage
+                        .install
+                        .iter()
+                        .chain(&manage.uninstall)
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                    &self.permissions.fs,
+                )?;
+
                 /*
                  * A plan with no write grant can only fail, loudly, halfway
                  * through. Same check the registry manifest makes, for the same
@@ -2478,6 +2490,8 @@ manage:
             | Step::Remove { path }
             | Step::WriteText { path, .. }
             | Step::PatchJson { path, .. } => vec![(path, true)],
+            // Install-only steps never appear in a plugin.
+            other => other.paths().into_iter().map(|p| (p, true)).collect(),
         }
     }
 

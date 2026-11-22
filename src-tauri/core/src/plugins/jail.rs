@@ -62,6 +62,8 @@ fn root_key(root: FsRoot) -> &'static str {
         FsRoot::PluginData => "pluginData",
         FsRoot::Downloads => "downloads",
         FsRoot::Prefix => "prefix",
+        FsRoot::Layer => "layer",
+        FsRoot::Runtime => "runtime",
     }
 }
 
@@ -103,6 +105,12 @@ impl Jail {
 
         for grant in &manifest.permissions.fs {
             let key = root_key(grant.root);
+
+            // An install step reads a runtime and never writes it: one runtime
+            // serves every layer, so a write would reach all of them.
+            if grant.root == FsRoot::Runtime && grant.write {
+                return Err(AppError::jail("The runtime root is read-only."));
+            }
 
             // Checked before availability, so a manifest naming the prefix
             // outside the allowlist is refused on every platform, not only the

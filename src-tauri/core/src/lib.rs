@@ -31,6 +31,7 @@ pub mod external;
 pub mod games;
 pub mod http;
 pub mod launch;
+pub mod layers;
 pub mod library;
 pub mod local;
 pub mod logging;

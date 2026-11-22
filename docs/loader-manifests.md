@@ -1,4 +1,4 @@
-An install manifest describes, as data, how to install one game version or one loader build into a layer folder. This document covers the JSON Schema, the steps it adds to the plugin step vocabulary, the jail roots they run in, the security model, the trust tiers, where manifests live in this repository, how they move to and from the AdminCP, and the seed manifests. **Status: designed; the schemas, seeds, `manifests:check` and `manifests:sign` (unit A1) are built.** It is part of [loaders-and-versions.md](loaders-and-versions.md); the build units are in [loaders-work-split.md](loaders-work-split.md).
+An install manifest describes, as data, how to install one game version or one loader build into a layer folder. This document covers the JSON Schema, the steps it adds to the plugin step vocabulary, the jail roots they run in, the security model, the trust tiers, where manifests live in this repository, how they move to and from the AdminCP, and the seed manifests. **Status: partly built: the schemas, seeds, `manifests:check` and `manifests:sign` (unit A1), and the Rust steps, roots, lint and executor (unit A3).** It is part of [loaders-and-versions.md](loaders-and-versions.md); the build units are in [loaders-work-split.md](loaders-work-split.md).
 
 ## What it is, and how it differs from a plugin
 
@@ -49,7 +49,7 @@ Signatures and idempotency keys are computed over the **canonical bytes**:
 - strings escaped minimally, as RFC 8785 JCS: `"`, `\` and the controls below U+0020 only, with `\b \t \n \f \r` by name and the rest as lowercase `\u00xx`. A lone surrogate is an error;
 - the top-level `$schema` key removed. A nested `$schema` is data and is kept.
 
-Repository files are pretty-printed: `$schema` first, then the sorted keys, with a 4-space indent and a trailing newline. `manifests:check` fails if a file is not the pretty form of its own canonical form. Rust (a JSON canonicaliser still to be written in A3; the existing `tmc_core::canon` canonicalises paths only) and TypeScript (`scripts/manifests/canonical.ts`, `website-city/src/lib/game-catalog/canonical.ts`) must produce identical bytes. A shared fixture, `schemas/fixtures/canonical/*.json` with its `.canonical` file, is tested in all three.
+Repository files are pretty-printed: `$schema` first, then the sorted keys, with a 4-space indent and a trailing newline. `manifests:check` fails if a file is not the pretty form of its own canonical form. Rust (`tmc_core::layers::canonical`; `tmc_core::canon` canonicalises paths only) and TypeScript (`scripts/manifests/canonical.ts`, `website-city/src/lib/game-catalog/canonical.ts`) must produce identical bytes. A shared fixture, `schemas/fixtures/canonical/*.json` with its `.canonical` file, is tested in all three.
 
 **Signatures.** An exec manifest's `.sig` is pure Ed25519 over the canonical bytes (not over their sha256: Ed25519 hashes internally). It is a pretty-form JSON file:
 

@@ -1,4 +1,4 @@
-How the game version and loader feature of [loaders-and-versions.md](loaders-and-versions.md) and [loader-manifests.md](loader-manifests.md) is split into build units, in what order they land, what each one must prove, and what is knowingly left open. **Status: A1 is built; the other units are designed, not built.** Each unit is sized for one builder session. Builders write the "what was built" version of the section their unit covers when they land it.
+How the game version and loader feature of [loaders-and-versions.md](loaders-and-versions.md) and [loader-manifests.md](loader-manifests.md) is split into build units, in what order they land, what each one must prove, and what is knowingly left open. **Status: A1 and A3 are built; the other units are designed, not built.** Each unit is sized for one builder session. Builders write the "what was built" version of the section their unit covers when they land it.
 
 ## Units
 
@@ -169,6 +169,14 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
   - every lint fixture behaves as in A1;
   - `cargo clippy` is clean.
 - **Coordination:** `src-tauri/usvfs` is being changed by another builder. A3 does not touch it, but must rebase onto it before landing.
+- **What was built:**
+  - `src-tauri/core/src/layers/`: `canonical.rs` is the Rust JSON canonical and pretty form, proved byte-identical to `scripts/manifests/canonical.ts` on every `schemas/fixtures/canonical` pair; `placeholders.rs` is the closed set; `lint.rs` runs the A1 lint rules, and every lint fixture yields exactly its code (bad) or none (ok); `schema.rs` holds the step and root vocabulary the lint uses.
+  - `plugins/manifest.rs`: the four install-only steps, `when`, `writeText.ifMissing`, `download.artifact`, and the `layer` and `runtime` roots. `check_plugin_steps` refuses install-only steps and roots in a plugin at load time (app-plugin manage files included), and the executor refuses them again.
+  - `plugins/jail.rs`: the root resolution for `layer` and `runtime`; `gameDir` is refused in an install manifest.
+  - `plugins/steps_install.rs`: `install_manifest` and `Executor::run_install`, with `install.step.{skip,start,ok,fail}` audit lines and a report of skipped steps, pinned URLs and artifacts. `downloadList` checks the pin, `max` (default 10000), and every hash and path before downloading anything, skips entries already present, and skips entries with no url (Mojang's native-only entries). `mergeJson` does the `inheritsFrom` merge.
+  - The installer runner lives in core (`steps_install::run_installer`) so the core tests can drive it; `src-tauri/src/spawn.rs::spawn_installer` is a thin wrapper over it, not a second copy. The environment is cleared and rebuilt: `PATH` is the runtime's `bin`, `HOME`/`USERPROFILE`/`APPDATA`/`LOCALAPPDATA` and `TMP`/`TEMP`/`TMPDIR` point under `work/`, `JAVA_HOME` for Java installers, `SystemRoot` on Windows (Winsock needs it), and proxy variables minus the forbidden list. It runs in its own process group, streams stdout and stderr to the log, and kills the whole tree on timeout (default 900 s) and after exit.
+  - Tests: 23 in `plugins/steps_install/tests.rs`. The test program is the test binary itself, re-run as an ignored `probe` test, so no Java is needed. They prove the cleared environment, `JAVA_TOOL_OPTIONS` absent, cwd `work/`, a timeout killing a forked grandchild, and a missing `expectFiles` failing the step.
+  - Left open: wiring `run_install` and `spawn_installer` into the plan (A4); where the proxy setting comes from; a Windows job object for the tree kill (the timeout uses `kill_tree`); `cargo clippy` of the app crate, which could not be built here (no GTK libraries on the build host). `tmc-core` is clippy-clean.
 
 ### A4: plan, layers, runtimes, deploy patches, launch vars, sandbox fields (tmc-app)
 

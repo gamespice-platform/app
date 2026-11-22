@@ -23,6 +23,7 @@ use crate::error::{AppError, AppResult};
 use crate::logging::Audit;
 use crate::plugins::jail::Jail;
 use crate::plugins::manifest::{Manifest, PathRef, Step};
+use crate::plugins::steps_install::{self, InstallRun};
 
 /// Hard cap on a single download, when the manifest does not set a smaller one.
 const DEFAULT_MAX_DOWNLOAD: u64 = 2 * 1024 * 1024 * 1024;
@@ -149,7 +150,7 @@ impl Executor<'_> {
                 plugin = self.manifest.id
             );
 
-            match self.run_step(step, ctx, &mut applied).await {
+            match self.run_step(step, ctx, &mut applied, None).await {
                 Ok(()) => audit!(
                     self.audit,
                     Info,
@@ -203,7 +204,7 @@ impl Executor<'_> {
     /// `mods/{fileName}` is how nearly every install rule names its output, and
     /// without substitution it produces a file called `{fileName}` — one file
     /// that every mod for that game then overwrites.
-    fn resolve(&self, path_ref: &PathRef, ctx: &RunContext, write: bool) -> AppResult<PathBuf> {
+    pub(crate) fn resolve(&self, path_ref: &PathRef, ctx: &RunContext, write: bool) -> AppResult<PathBuf> {
         self.jail.resolve(
             &PathRef {
                 root: path_ref.root,
@@ -213,19 +214,30 @@ impl Executor<'_> {
         )
     }
 
-    async fn run_step(
+    /// One step. `install` is `Some` only for an install manifest's run (see
+    /// [`Executor::run_install`]); the install-only steps refuse to run without
+    /// it, so a plugin plan that slipped past the parser still cannot reach them.
+    pub(crate) async fn run_step(
         &self,
         step: &Step,
         ctx: &RunContext,
         applied: &mut Vec<String>,
+        install: Option<&InstallRun<'_>>,
     ) -> AppResult<()> {
         match step {
+            Step::Download { artifact: Some(_), .. } => {
+                // `run_install` replaces an artifact download with its binding
+                // before it gets here; anything else is a plugin naming one.
+                return Err(AppError::invalid("download.artifact is not allowed in plugins"));
+            }
+
             Step::Download {
                 url,
                 to,
                 sha256,
                 max_bytes,
                 mirrors,
+                artifact: None,
             } => {
                 let target = self.resolve(to, ctx, true)?;
                 let resolved = ctx.fill(url);
@@ -352,8 +364,17 @@ impl Executor<'_> {
                 applied.push(format!("removed {}", display(&target)));
             }
 
-            Step::WriteText { path, content } => {
+            Step::WriteText {
+                path,
+                content,
+                if_missing,
+            } => {
                 let target = self.resolve(path, ctx, true)?;
+
+                // A stub that must not clobber what is already there.
+                if *if_missing && target.exists() {
+                    return Ok(());
+                }
 
                 ensure_parent(&target)?;
                 std::fs::write(&target, ctx.fill(content))?;
@@ -372,6 +393,19 @@ impl Executor<'_> {
 
                 applied.push(display(&target));
             }
+
+            Step::RunInstaller { .. }
+            | Step::DownloadList { .. }
+            | Step::MergeJson { .. }
+            | Step::RequireFile { .. } => match install {
+                Some(run) => steps_install::run(self, step, run, applied).await?,
+                None => {
+                    return Err(AppError::invalid(format!(
+                        "{} is not allowed in plugins",
+                        step.action_name()
+                    )))
+                }
+            },
         }
 
         Ok(())
@@ -382,7 +416,7 @@ impl Executor<'_> {
     /// The https and allow-list gate every download URL passes, primary or
     /// mirror, after placeholder substitution. One function so a mirror can
     /// never be held to a looser standard than the first URL.
-    fn check_url(&self, url: &str) -> AppResult<url::Url> {
+    pub(crate) fn check_url(&self, url: &str) -> AppResult<url::Url> {
         let parsed = url::Url::parse(url)
             .map_err(|_| AppError::jail(format!("'{url}' is not a valid URL.")))?;
 
@@ -472,7 +506,7 @@ impl Executor<'_> {
         Err(last.unwrap_or_else(|| AppError::invalid("No download URL.")))
     }
 
-    async fn download(
+    pub(crate) async fn download(
         &self,
         url: &str,
         target: &Path,
@@ -1131,7 +1165,7 @@ fn strip_and_filter(raw: &Path, strip: usize, include: &[String]) -> Option<Stri
     Some(relative)
 }
 
-fn ensure_parent(path: &Path) -> AppResult<()> {
+pub(crate) fn ensure_parent(path: &Path) -> AppResult<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -1141,13 +1175,16 @@ fn ensure_parent(path: &Path) -> AppResult<()> {
 
 /// Paths in the log are shown as-is. They are the user's own directories and
 /// the whole value of the log is being able to see exactly what was touched.
-fn display(path: &Path) -> String {
+pub(crate) fn display(path: &Path) -> String {
     path.display().to_string()
 }
 
-fn step_label(step: &Step) -> String {
+pub(crate) fn step_label(step: &Step) -> String {
     match step {
-        Step::Download { url, .. } => format!("download {url}"),
+        Step::Download { url, artifact, .. } => match artifact {
+            Some(key) => format!("download artifact {key}"),
+            None => format!("download {url}"),
+        },
         Step::Extract { from, .. } => format!("extract {}", from.path),
         Step::Copy { from, to } => format!("copy {} → {}", from.path, to.path),
         Step::Move { from, to } => format!("move {} → {}", from.path, to.path),
@@ -1155,6 +1192,12 @@ fn step_label(step: &Step) -> String {
         Step::Remove { path } => format!("remove {}", path.path),
         Step::WriteText { path, .. } => format!("write {}", path.path),
         Step::PatchJson { path, pointer, .. } => format!("patch {}{}", path.path, pointer),
+        Step::RunInstaller { program, .. } => format!("run installer {program}"),
+        Step::DownloadList { list, .. } => format!("download the list in {}", list.path),
+        Step::MergeJson { base, overlay, to, .. } => {
+            format!("merge {} + {} → {}", base.path, overlay.path, to.path)
+        }
+        Step::RequireFile { path, .. } => format!("require {}", path.path),
     }
 }
 
@@ -1164,12 +1207,7 @@ pub fn required_roots(steps: &[Step]) -> Vec<&'static str> {
     let mut out: Vec<&'static str> = Vec::new();
 
     let mut note = |p: &PathRef| {
-        let key = match p.root {
-            crate::plugins::manifest::FsRoot::GameDir => "gameDir",
-            crate::plugins::manifest::FsRoot::PluginData => "pluginData",
-            crate::plugins::manifest::FsRoot::Downloads => "downloads",
-            crate::plugins::manifest::FsRoot::Prefix => "prefix",
-        };
+        let key = p.root.name();
 
         if !out.contains(&key) {
             out.push(key);
@@ -1177,16 +1215,8 @@ pub fn required_roots(steps: &[Step]) -> Vec<&'static str> {
     };
 
     for step in steps {
-        match step {
-            Step::Download { to, .. } => note(to),
-            Step::Extract { from, to, .. } | Step::Copy { from, to } | Step::Move { from, to } => {
-                note(from);
-                note(to);
-            }
-            Step::Mkdir { path }
-            | Step::Remove { path }
-            | Step::WriteText { path, .. }
-            | Step::PatchJson { path, .. } => note(path),
+        for path in step.paths() {
+            note(path);
         }
     }
 
@@ -1301,6 +1331,7 @@ mod tests {
                 path: template.into(),
             },
             content: "x".into(),
+            if_missing: false,
         }];
 
         executor.run(&steps, ctx).await.ok

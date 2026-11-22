@@ -111,6 +111,26 @@ pub enum FsRoot {
     /// from the configured game folder. Linux only, and only subtrees named in
     /// [`crate::plugins::jail::PREFIX_ALLOWED`]; see [`crate::plugins::prefix`].
     Prefix,
+    /// The layer being built by an install manifest: its `files/`, `work/`
+    /// and `meta/`. Install manifests only; a plugin naming it is refused.
+    Layer,
+    /// The installed runtime an install manifest runs, read-only. Install
+    /// manifests only.
+    Runtime,
+}
+
+impl FsRoot {
+    /// The name a manifest writes.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::GameDir => "gameDir",
+            Self::PluginData => "pluginData",
+            Self::Downloads => "downloads",
+            Self::Prefix => "prefix",
+            Self::Layer => "layer",
+            Self::Runtime => "runtime",
+        }
+    }
 }
 
 /// One subtree of one root the plugin may touch.
@@ -169,7 +189,14 @@ pub enum Step {
     /// (the release file's URL, the item id). It is re-checked against the
     /// allow-list AFTER substitution, so a placeholder cannot smuggle a host in.
     Download {
+        /// Empty only in an install manifest that names an `artifact`, whose
+        /// URL, mirrors and digest the app fills from the bindings.
+        #[serde(default)]
         url: String,
+        /// Install manifests only: the binding key the app resolves, also the
+        /// name of `{artifact.<key>}` for later steps.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        artifact: Option<String>,
         to: PathRef,
         /// Expected SHA-256, when the plugin author knows it. A mismatch aborts
         /// the whole plan.
@@ -228,6 +255,9 @@ pub enum Step {
     WriteText {
         path: PathRef,
         content: String,
+        /// Leave an existing file alone (a config the user may have edited).
+        #[serde(default, skip_serializing_if = "is_false")]
+        if_missing: bool,
     },
 
     /// Set one value in a JSON file, creating it if absent.
@@ -240,6 +270,322 @@ pub enum Step {
         pointer: String,
         value: serde_json::Value,
     },
+
+    /// Install manifests only (see `docs/loader-manifests.md`): run the
+    /// loader's own installer from a runtime, with a cleared environment,
+    /// `work/` as the cwd and a timeout that kills the whole process tree.
+    /// Never allowed in a plugin; [`check_plugin_steps`] refuses it.
+    RunInstaller {
+        /// `{runtime.<kind>}` or `{artifact.<key>}`, nothing else.
+        program: String,
+        #[serde(default)]
+        args: Vec<String>,
+        /// Always `{layerWork}`.
+        cwd: String,
+        /// Default 900; 0 is no timeout.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout_secs: Option<u64>,
+        #[serde(default)]
+        network: bool,
+        /// Paths under `layer` that must exist after exit 0.
+        #[serde(default)]
+        expect_files: Vec<PathRef>,
+    },
+
+    /// Install manifests only: fetch every entry of a JSON list (Mojang's
+    /// `libraries`, say) that an earlier pinned `download` brought in.
+    DownloadList {
+        list: PathRef,
+        /// RFC 6901 pointer to the array; `""` is the document itself.
+        pointer: String,
+        /// Pointers, relative to one entry, to its URL, path and digests.
+        url_field: String,
+        path_field: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha1_field: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha256_field: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        size_field: Option<String>,
+        to: PathRef,
+        /// Most entries; default 10000, 0 is unlimited.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        max: Option<u64>,
+    },
+
+    /// Install manifests only: merge `overlay` into `base`, writing `to`.
+    /// A deep merge where the overlay wins, except at the pointers in `rules`.
+    MergeJson {
+        base: PathRef,
+        overlay: PathRef,
+        to: PathRef,
+        #[serde(default)]
+        rules: Vec<MergeRule>,
+    },
+
+    /// Install manifests only: fail unless the file exists (and, with
+    /// `sha256`, has exactly that digest).
+    RequireFile {
+        path: PathRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha256: Option<String>,
+    },
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+/// How `mergeJson` combines the two values at one pointer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MergeRule {
+    pub pointer: String,
+    pub mode: MergeMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MergeMode {
+    /// The overlay's value, whole.
+    Replace,
+    /// Base array, then overlay array.
+    Append,
+    /// Overlay array, then base array.
+    Prepend,
+    /// Base array, then each overlay item not already in it.
+    Union,
+}
+
+impl Step {
+    /// The `action` a manifest writes.
+    pub fn action_name(&self) -> &'static str {
+        match self {
+            Self::Download { .. } => "download",
+            Self::Extract { .. } => "extract",
+            Self::Copy { .. } => "copy",
+            Self::Move { .. } => "move",
+            Self::Mkdir { .. } => "mkdir",
+            Self::Remove { .. } => "remove",
+            Self::WriteText { .. } => "writeText",
+            Self::PatchJson { .. } => "patchJson",
+            Self::RunInstaller { .. } => "runInstaller",
+            Self::DownloadList { .. } => "downloadList",
+            Self::MergeJson { .. } => "mergeJson",
+            Self::RequireFile { .. } => "requireFile",
+        }
+    }
+
+    /// Steps only an install manifest may use.
+    pub fn is_install_only(&self) -> bool {
+        matches!(
+            self,
+            Self::RunInstaller { .. }
+                | Self::DownloadList { .. }
+                | Self::MergeJson { .. }
+                | Self::RequireFile { .. }
+        )
+    }
+
+    /// Every path the step names.
+    pub fn paths(&self) -> Vec<&PathRef> {
+        match self {
+            Self::Download { to, .. } => vec![to],
+            Self::Extract { from, to, .. } | Self::Copy { from, to } | Self::Move { from, to } => {
+                vec![from, to]
+            }
+            Self::Mkdir { path }
+            | Self::Remove { path }
+            | Self::WriteText { path, .. }
+            | Self::PatchJson { path, .. }
+            | Self::RequireFile { path, .. } => vec![path],
+            Self::RunInstaller { expect_files, .. } => expect_files.iter().collect(),
+            Self::DownloadList { list, to, .. } => vec![list, to],
+            Self::MergeJson {
+                base, overlay, to, ..
+            } => vec![base, overlay, to],
+        }
+    }
+}
+
+/// Refuses what only an install manifest may say: the four install-only
+/// steps, the `layer` and `runtime` roots (in a step or a grant), and a
+/// `download` by `artifact`. Every plugin step list passes through this —
+/// [`Manifest::validate`] and the app-plugin `manage` block alike — so a
+/// plugin can never reach the step that runs a program.
+pub fn check_plugin_steps(steps: &[Step], grants: &[FsGrant]) -> AppResult<()> {
+    for grant in grants {
+        if matches!(grant.root, FsRoot::Layer | FsRoot::Runtime) {
+            return Err(AppError::invalid(format!(
+                "The {} root is not allowed in plugins.",
+                grant.root.name()
+            )));
+        }
+    }
+
+    for step in steps {
+        if step.is_install_only() {
+            return Err(AppError::invalid(format!(
+                "{} is not allowed in plugins",
+                step.action_name()
+            )));
+        }
+
+        for path in step.paths() {
+            if matches!(path.root, FsRoot::Layer | FsRoot::Runtime) {
+                return Err(AppError::invalid(format!(
+                    "The {} root is not allowed in plugins.",
+                    path.root.name()
+                )));
+            }
+        }
+
+        if let Step::Download { url, artifact, .. } = step {
+            if artifact.is_some() {
+                return Err(AppError::invalid(
+                    "download.artifact is not allowed in plugins",
+                ));
+            }
+
+            if url.trim().is_empty() {
+                return Err(AppError::invalid("A download needs a url."));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------- Install manifests
+
+/// When an install step applies (`docs/loader-manifests.md`, "Steps"). Every
+/// field that is present must match; an absent field matches anything.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct When {
+    /// `client` or `server`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side: Option<String>,
+    /// `windows`, `linux`, `macos`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platforms: Option<Vec<String>>,
+    /// A consent key the user must have granted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consent: Option<String>,
+}
+
+/// What a `when` is matched against.
+#[derive(Debug, Clone, Default)]
+pub struct WhenContext {
+    pub side: String,
+    pub platform: String,
+    pub consents: std::collections::BTreeSet<String>,
+}
+
+impl When {
+    pub fn matches(&self, ctx: &WhenContext) -> bool {
+        self.side.as_ref().is_none_or(|s| *s == ctx.side)
+            && self
+                .platforms
+                .as_ref()
+                .is_none_or(|p| p.contains(&ctx.platform))
+            && self
+                .consent
+                .as_ref()
+                .is_none_or(|c| ctx.consents.contains(c))
+    }
+}
+
+/// One step of an install manifest's `install` list: a [`Step`] plus the
+/// fields every install step may carry (`when`, `label`, a placeholder note).
+#[derive(Debug, Clone)]
+pub struct InstallStep {
+    pub step: Step,
+    pub when: Option<When>,
+    pub label: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for InstallStep {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+
+        let mut value = serde_json::Map::<String, serde_json::Value>::deserialize(d)?;
+        let when = value
+            .remove("when")
+            .map(serde_json::from_value::<When>)
+            .transpose()
+            .map_err(D::Error::custom)?;
+        let label = match value.remove("label") {
+            None => None,
+            Some(serde_json::Value::String(s)) => Some(s),
+            Some(_) => return Err(D::Error::custom("label must be a string")),
+        };
+        value.remove("x-tmc-placeholder");
+        let step = serde_json::from_value(serde_json::Value::Object(value))
+            .map_err(D::Error::custom)?;
+
+        Ok(Self { step, when, label })
+    }
+}
+
+/// Parses and checks an install manifest's `install` list. The schema and
+/// lint pass ([`crate::layers::lint`]) run first in the real flow; this is
+/// the executor's own refusal, so a step list that skipped them still cannot
+/// name a root an install manifest has no business with.
+pub fn parse_install_steps(value: &serde_json::Value) -> AppResult<Vec<InstallStep>> {
+    let steps: Vec<InstallStep> = serde_json::from_value(value.clone())
+        .map_err(|e| AppError::invalid(format!("Install steps are invalid: {e}")))?;
+
+    check_install_steps(&steps)?;
+
+    Ok(steps)
+}
+
+/// `gameDir`, `pluginData` and `prefix` are not roots of an install
+/// manifest; a download needs exactly one of `artifact` and `url`, and a
+/// `url` needs a pinned sha256.
+pub fn check_install_steps(steps: &[InstallStep]) -> AppResult<()> {
+    for (index, s) in steps.iter().enumerate() {
+        for path in s.step.paths() {
+            if !matches!(
+                path.root,
+                FsRoot::Layer | FsRoot::Downloads | FsRoot::Runtime
+            ) {
+                return Err(AppError::invalid(format!(
+                    "Step {index}: {} is not valid in an install manifest.",
+                    path.root.name()
+                )));
+            }
+        }
+
+        if let Step::Download {
+            url,
+            artifact,
+            sha256,
+            ..
+        } = &s.step
+        {
+            let has_url = !url.trim().is_empty();
+
+            if has_url == artifact.is_some() {
+                return Err(AppError::invalid(format!(
+                    "Step {index}: a download names exactly one of artifact and url."
+                )));
+            }
+
+            if has_url
+                && !sha256
+                    .as_deref()
+                    .is_some_and(|s| crate::plugins::steps::is_sha256_hex(s.trim()))
+            {
+                return Err(AppError::invalid(format!(
+                    "Step {index}: an install download needs a pinned sha256."
+                )));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// A path, always relative and always anchored to a granted root.
@@ -459,6 +805,9 @@ impl Manifest {
                 return Err(AppError::invalid("Plugin has too many steps."));
             }
 
+            check_plugin_steps(&installer.install, &self.permissions.fs)?;
+            check_plugin_steps(&installer.uninstall, &[])?;
+
             for step in installer.install.iter().chain(installer.uninstall.iter()) {
                 if let Step::Download {
                     mirrors, sha256, ..
@@ -558,6 +907,9 @@ impl Manifest {
                 FsRoot::PluginData => "its own private folder",
                 FsRoot::Downloads => "your downloads folder",
                 FsRoot::Prefix => "the game's Wine/Proton prefix (Linux only)",
+                // Refused by `check_plugin_steps`; named rather than hidden.
+                FsRoot::Layer => "a loader layer",
+                FsRoot::Runtime => "a runtime",
             };
 
             let sub = if grant.path.is_empty() {
