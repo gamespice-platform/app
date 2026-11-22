@@ -12,7 +12,6 @@ import Shell from '~/components/shell'
 import DropImport from '~/components/drop-import'
 import ErrorBoundary from '~/components/error-boundary'
 import NotFound from '~/components/not-found'
-import PlayRoute from '~/routes/play'
 import DiscoverRoute from '~/routes/discover'
 import StoresRoute from '~/routes/stores'
 import ConsoleRoute from '~/routes/console'
@@ -52,9 +51,10 @@ const router = createHashRouter([
         path: '/',
         element: <Shell />,
         children: [
-            { index: true, element: <Navigate to="/play" replace /> },
-            { path: 'play', element: <PlayRoute /> },
-            { path: 'games', element: <Navigate to="/play" replace /> },
+            { index: true, element: <Navigate to="/apps" replace /> },
+            // The Play page folded into the Apps catalogue; old links land there.
+            { path: 'play', element: <Navigate to="/apps" replace /> },
+            { path: 'games', element: <Navigate to="/apps" replace /> },
             { path: 'games/:slug', element: <GameHubRoute /> },
             {
                 path: 'games/:slug/avatar',

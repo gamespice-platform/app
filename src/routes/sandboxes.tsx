@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
     FiAlertTriangle,
     FiArrowDown,
@@ -91,7 +91,12 @@ export default function SandboxesRoute() {
     const [sandboxes, setSandboxes] = useState<SandboxRowT[]>([])
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
-    const [creating, setCreating] = useState(false)
+    // `?new=<appId>` arrives from a catalogue card's Create sandbox action: the
+    // form opens with that game picked.
+    const [params, setParams] = useSearchParams()
+    const preset = Number(params.get('new'))
+    const presetAppId = Number.isInteger(preset) && preset > 0 ? preset : null
+    const [creating, setCreating] = useState(presetAppId !== null)
 
     const selectedId = id ? Number(id) : null
 
@@ -179,7 +184,11 @@ export default function SandboxesRoute() {
 
             {creating && (
                 <CreateSandbox
-                    onCancel={() => setCreating(false)}
+                    initialAppId={presetAppId}
+                    onCancel={() => {
+                        setCreating(false)
+                        if (presetAppId !== null) setParams({}, { replace: true })
+                    }}
                     onCreated={async (created) => {
                         setCreating(false)
                         await load()
@@ -1343,16 +1352,18 @@ function GameOption({
 // ------------------------------------------------------------------ Create
 
 function CreateSandbox({
+    initialAppId = null,
     onCancel,
     onCreated,
 }: {
+    initialAppId?: number | null
     onCancel: () => void
     onCreated: (created: SandboxRowT) => Promise<void>
 }) {
     const [apps, setApps] = useState<
         { id: number; name: string; slug: string | null; icon: string | null }[]
     >([])
-    const [appId, setAppId] = useState<number | null>(null)
+    const [appId, setAppId] = useState<number | null>(initialAppId)
     const [name, setName] = useState('')
     // Both are tagged with the game they belong to, so picking another game
     // drops the old game's preset and rules without an effect resetting them.

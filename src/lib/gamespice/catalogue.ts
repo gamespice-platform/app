@@ -1,5 +1,5 @@
 /**
- * The merged Play page's game list as pure functions: which rows to drop
+ * The Apps catalogue's play rows as pure functions: which rows to drop
  * (engines, Godot), how they dedupe, how the filter chips narrow them and how
  * they split into the GameSpice section and the rest.
  */

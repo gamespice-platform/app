@@ -65,7 +65,7 @@ async function findTile(p, id) {
 }
 
 const { page, errors } = await open()
-await page.goto(`${base}/#/play`)
+await page.goto(`${base}/#/apps`)
 const before = await me(page)
 check('the harness reads the dev account', before && Number(before.appId) === APP, JSON.stringify(before)?.slice(0, 120))
 const library = await page.evaluate(async (app) => (await (await fetch(`/__avatar/library?app=${app}`)).json()), APP).then((j) => j?.data ?? j)

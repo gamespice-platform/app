@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { RAIL } from '../nav'
+import { COMPACT, DISCOVER, LIBRARY, RAIL, isOwn } from '../nav'
 import {
     AvatarOutfitsResponse,
     PointsSummaryResponse,
@@ -129,6 +129,24 @@ describe('nav', () => {
     it('has the GameSpice routes and the avatar slot in the rail', () => {
         const to = RAIL.map((n) => n.to)
 
-        expect(to).toEqual(expect.arrayContaining(['/play', '/avatar', '/me']))
+        expect(to).toEqual(expect.arrayContaining(['/library', '/avatar', '/me']))
+        expect(to).not.toContain('/play')
+    })
+
+    it('opens on Library, whose first item is the Apps catalogue', () => {
+        expect(RAIL[0]?.id).toBe('library')
+        expect(COMPACT[0]?.id).toBe('library')
+        expect(COMPACT.length).toBeLessThanOrEqual(5)
+        const first = LIBRARY.items?.[0]
+
+        expect(first?.to).toBe('/apps')
+        expect(first !== undefined && isOwn(first, '/play')).toBe(true)
+    })
+
+    it('lists Assets above Mods in Discover, and no Apps there', () => {
+        const ids = (DISCOVER.items ?? []).map((n) => n.id)
+
+        expect(ids.indexOf('assets')).toBeLessThan(ids.indexOf('mods'))
+        expect(ids).not.toContain('apps')
     })
 })

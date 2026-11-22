@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
     useInfiniteQuery,
     useMutation,
@@ -113,7 +113,9 @@ function BrowseTab({ signedIn }: { signedIn: boolean }) {
     const qc = useQueryClient()
     const [q, setQ] = useState('')
     const [kind, setKind] = useState('')
-    const [game, setGame] = useState('')
+    // `?game=<appId>` arrives from a catalogue card's Workshop action.
+    const [params] = useSearchParams()
+    const [game, setGame] = useState(() => params.get('game') ?? '')
     const [sort, setSort] = useState<SortT>('popular')
     // Optimistic subscribe state, by asset id; cleared when the catalog refetches.
     const [override, setOverride] = useState<Record<number, boolean>>({})

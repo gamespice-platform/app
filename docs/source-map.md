@@ -116,7 +116,7 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `lib/library/provider.tsx` | The subscription sync loop |
 | `lib/external.ts` | Which content kinds are handed to the system browser |
 | `components/shell.tsx` | Sidebar ≥768px, bottom tabs below; draws the tree in `lib/nav.ts` |
-| `lib/nav.ts` | The primary navigation as data: Play, Discover (Apps, Mods, Assets, Servers > RCON, More), Library (My apps, Sandboxes, Workshop, Downloads, Stores), Friends, Console, Settings. Feeds the rail, the bottom bar and the landing cards |
+| `lib/nav.ts` | The primary navigation as data: Library first (Apps, Sandboxes, My apps, Workshop, Downloads, Stores), then Discover (Assets, Mods, Servers > RCON, More), Avatar, My GameSpice, Store, Stats, Friends, Console, Settings. Feeds the rail, the bottom bar and the landing cards. There is no Play page: `/play` and `/games` redirect to Apps |
 | `components/section-cards.tsx` | The card grid on the Discover and Library landing pages |
 | `components/titlebar.tsx` | The app's own window frame — [frontend.md](frontend.md#the-window-frame-is-the-apps-not-the-oss) |
 | `components/update-banner.tsx` | "There is a newer version", with an Install button when this build can verify one |
@@ -136,7 +136,11 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `components/server-table.tsx` | The server browser's default view: table, expandable rows |
 | `components/browse-filters.tsx` | The filter panel: collapsible groups, kind-aware, URL-backed |
 | `components/server-panel.tsx` | The live panel on a server's page |
-| `routes/apps.tsx` | **The front door.** Every game and app, and which of them can be started here |
+| `routes/apps.tsx` | **The front door** (Library > Apps). The catalogue: every game and app with tabs (All, Managed, Unmanaged, GameSpice, Installed, Multiplayer, Singleplayer), search, sort, and per card Quick play, Play solo, install, Manage, sandbox, workshop and a detail drawer. Absorbed the former Play page (party bar, quick match) |
+| `components/catalog-card.tsx` | One catalogue card: GameSpice games lead with `GameCardStats`, managed ones are ringed in the accent; play/install/manage buttons and the overflow menu, shared with the drawer |
+| `components/catalog-drawer.tsx` | The catalogue's detail drawer (modal side panel) |
+| `lib/catalog/filter.ts` | Pure tab logic: joins `/apps` and `/play/page` rows by id, GameSpice first and always managed |
+| `lib/catalog/managed.ts` | The user's Managed choice, in localStorage until the API stores it (see gaps.md) |
 | `routes/game.tsx` | **One game** (`/apps/:id`): play, its busiest servers, leaderboards and the member's own figures |
 | `routes/friends.tsx` | Friends, requests, presence, party invites and the current party — the routes a Dot game's `dot-friends`/`dot-party` speak |
 | `lib/api/social.ts` | UI names + helpers (`presenceLabel`, `formatStat`, `isStatKey`) for the friends/party/presence/stats routes; their schemas are the contract's "Social" section |

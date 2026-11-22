@@ -227,7 +227,7 @@ pub async fn tray_action(app: AppHandle, window: Window, action: String) {
 
     let route = match action.as_str() {
         "open" => None,
-        "play" => Some("/play"),
+        "play" => Some("/apps"),
         "downloads" => Some("/downloads"),
         "settings" => Some("/settings"),
         "quit" => {

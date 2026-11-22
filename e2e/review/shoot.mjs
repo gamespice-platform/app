@@ -18,7 +18,7 @@ mkdirSync(out, { recursive: true })
 
 const routes = process.argv.slice(2).length
     ? process.argv.slice(2)
-    : ['/play', '/games', '/games/fatal-contact', '/games/fatal-contact/avatar', '/avatar', '/workshop', '/me', '/discover', '/apps', '/friends', '/browse/server', '/library', '/my-apps', '/installs', '/sandboxes', '/downloads', '/stores', '/account', '/settings', '/settings/downloads', '/settings/plugins', '/settings/logging']
+    : ['/apps', '/games/fatal-contact', '/games/fatal-contact/avatar', '/avatar', '/workshop', '/me', '/discover', '/friends', '/browse/server', '/library', '/my-apps', '/installs', '/sandboxes', '/downloads', '/stores', '/account', '/settings', '/settings/downloads', '/settings/plugins', '/settings/logging']
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? undefined, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
 const theme = process.env.THEME ?? 'dark'

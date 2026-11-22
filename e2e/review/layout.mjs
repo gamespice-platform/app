@@ -17,7 +17,7 @@ const check = (name, ok, detail = '') => {
     if (!ok) failed++
 }
 
-const ROUTES = ['/play', '/browse/mod', '/library', '/settings']
+const ROUTES = ['/apps', '/browse/mod', '/library', '/settings']
 
 for (const width of [760, 480]) {
     const page = await browser.newPage({ viewport: { width, height: 800 }, colorScheme: 'dark' })
@@ -63,7 +63,7 @@ for (const width of [760, 480]) {
         check(`${tag}: footer below the content, not over it`, !!m.s && m.f.y >= m.s.bottom - 0.5, JSON.stringify({ f: m.f, s: m.s }))
         check(`${tag}: footer above the bottom bar`, !m.nav || m.f.bottom <= m.nav.y + 0.5, JSON.stringify({ f: m.f, nav: m.nav }))
         check(`${tag}: nothing drawn over the footer`, m.topmost)
-        if (route === '/play') await page.screenshot({ path: `${out}footer-${width}.png` })
+        if (route === '/apps') await page.screenshot({ path: `${out}footer-${width}.png` })
     }
     check(`${width}px: no page errors`, errors.length === 0, errors.join(' | '))
     await page.close()

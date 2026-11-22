@@ -13,7 +13,6 @@ import {
     FiLayers,
     FiMoreHorizontal,
     FiPackage,
-    FiPlay,
     FiServer,
     FiSettings,
     FiTerminal,
@@ -68,15 +67,6 @@ export type NavNode = {
     virtual?: boolean
 }
 
-export const PLAY: NavNode = {
-    id: 'play',
-    to: '/play',
-    label: 'Play',
-    icon: FiPlay,
-    description: 'GameSpice games, every game you can play, servers and lobbies.',
-    match: ['/games'],
-}
-
 /** Slot for the avatar studio (gs-app-avatar-1 replaces the route's element). */
 export const AVATAR: NavNode = {
     id: 'avatar',
@@ -119,14 +109,12 @@ export const DISCOVER: NavNode = {
     collapsible: true,
     items: [
         {
-            // The front door's old tenant: a flat catalogue across every game,
-            // which the site cannot offer because it makes you pick a game first.
-            id: 'apps',
-            to: '/apps',
-            label: 'Apps',
-            icon: FiGrid,
-            description:
-                'Every game, engine and platform, and what you can do with each.',
+            id: 'assets',
+            to: '/browse/asset',
+            label: 'Assets',
+            icon: FiBox,
+            description: 'Models, textures, sounds and other building blocks.',
+            match: ['/view/asset'],
         },
         {
             id: 'mods',
@@ -135,14 +123,6 @@ export const DISCOVER: NavNode = {
             icon: FiPackage,
             description: 'Gameplay changes, maps and total conversions.',
             match: ['/view/mod'],
-        },
-        {
-            id: 'assets',
-            to: '/browse/asset',
-            label: 'Assets',
-            icon: FiBox,
-            description: 'Models, textures, sounds and other building blocks.',
-            match: ['/view/asset'],
         },
         {
             id: 'servers',
@@ -221,6 +201,19 @@ export const LIBRARY: NavNode = {
     collapsible: true,
     items: [
         {
+            // The catalogue, and the app's front door: every game with what
+            // this device can do for it (play, quick play, install, manage,
+            // sandboxes). It absorbed the old Play screen, so `/play` and
+            // `/games` land here too.
+            id: 'apps',
+            to: '/apps',
+            label: 'Apps',
+            icon: FiGrid,
+            description:
+                'Every game, the GameSpice ones first: play, install and manage.',
+            match: ['/play', '/games'],
+        },
+        {
             // The mod manager proper: where somebody SPENDS time reordering,
             // deploying and checking conflicts, so it is its own entry.
             id: 'sandboxes',
@@ -291,9 +284,8 @@ export const SETTINGS: NavNode = {
 
 /** Top to bottom, as the rail draws them. */
 export const RAIL: NavNode[] = [
-    PLAY,
-    DISCOVER,
     LIBRARY,
+    DISCOVER,
     AVATAR,
     GAMESPICE_ACCOUNT,
     STORE,
@@ -306,9 +298,10 @@ export const RAIL: NavNode[] = [
 /**
  * The bottom bar: at most five, because past that the labels stop being
  * legible and the fix is fewer items rather than smaller text. Discover and
- * Library go to their landing pages, which link to every child.
+ * Library go to their landing pages, which link to every child (the catalogue
+ * is Library's first card).
  */
-export const COMPACT: NavNode[] = [PLAY, DISCOVER, LIBRARY, FRIENDS, SETTINGS]
+export const COMPACT: NavNode[] = [LIBRARY, DISCOVER, FRIENDS, STORE, SETTINGS]
 
 /** `path` is `base` or below it, on a segment boundary ('/view/user2' is not under '/view/user'). */
 function underPath(path: string, base: string): boolean {

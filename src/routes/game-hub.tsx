@@ -32,7 +32,7 @@ export default function GameHubRoute() {
         return (
             <div className="flex flex-col gap-3 p-4">
                 <p className="text-sm text-muted">That is not a GameSpice game.</p>
-                <Link to="/play" className={BTN_GHOST}>
+                <Link to="/apps" className={BTN_GHOST}>
                     All games
                 </Link>
             </div>
@@ -44,7 +44,7 @@ export default function GameHubRoute() {
 
     return (
         <div className="flex flex-col gap-4 p-4">
-            <Link to="/play" className="flex items-center gap-1 text-xs text-muted">
+            <Link to="/apps" className="flex items-center gap-1 text-xs text-muted">
                 <FiArrowLeft className="size-3" /> GameSpice games
             </Link>
 
@@ -122,7 +122,7 @@ export default function GameHubRoute() {
                                     Play
                                 </button>
                                 <Link
-                                    to={`/play?app=${row.id}&tab=servers`}
+                                    to={`/browse/server?apps=${row.id}`}
                                     className={BTN_GHOST}
                                 >
                                     Servers and lobbies
