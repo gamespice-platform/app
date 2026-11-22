@@ -30,7 +30,7 @@ sha1 and md5 are not computed; a file with only those is verified by size.
 
 ## IPC
 
-`external_parse`, `external_resolve`, `external_install`, `external_remove`, `external_inspect_path` (a vault token, never a path), `external_scheme_status`, `external_scheme_set`, and the credential commands below. Typed in `src/lib/external/`.
+`external_parse`, `external_resolve`, `external_install`, `external_remove`, `external_inspect_path` (a vault token, never a path), `external_scheme_status`, `external_scheme_set`, `external_install_path` (install a chosen subset of an inspected token: `selected` paths, minimal cover, the core re-checks each against the tree), and the credential commands below. Typed in `src/lib/external/`.
 
 ## Credentials
 
@@ -80,5 +80,19 @@ Rules the app enforces on the answer: `provider` matches the request; every file
 - Nothing deployed yet answers the two endpoints above, so CurseForge and mod.io report "not enabled" until website-city ships them. All app code is tested against a mock site.
 - `external_max_download_mb = 0` is unlimited. The ceiling is carried per request (`tmc.max_bytes`); a request that carries none keeps the 32 GiB default.
 - macOS cannot read or reassign link handlers from here; scheme status is `unknown` there. Linux needs the desktop file to declare the scheme MIME type.
-- Needs-selection installs (no metadata found) return the file tree but the selected-files install is not wired yet.
+- Install progress is indeterminate (a step label, no byte counter); the core reports no per-download progress to this flow yet.
+- The drop host handles only the first file of a batch.
+- Linux: the app does not add `x-scheme-handler/*` MIME entries to its desktop file. Declaring them at install would make us the default handler where none exists, which contradicts "never register by default"; the Setup dialog registers a scheme only on request.
 - The encrypted-file backend has a passphrase mode in core only; no screen asks for one yet.
+
+## Screens (mount points)
+
+Self-contained pieces in `src/components/external/` (barrel `index.ts`) over the logic in `src/lib/external/`. Nothing is mounted by default; the Library > Mods page owner wires them:
+
+- `ExternalIntakeHost` (once, inside the router or above it): window paste of a link, `tmc://external-link` deep links (confirm dialog, explicit Install), and with `handleDrops` an own drop listener. Leave `handleDrops` off while `DropImport` is mounted, or both would handle one drop.
+- `PasteExternalLink` and `useExternalIntake`: a labelled field for user-initiated installs, with a progress bar and Undo.
+- `SetupExternalDialog` (first run, mode `setup`) and `EditExternalDialog`: schemes nxm, curseforge, modrinth, ror2mm, prismlauncher. Only a free scheme is pre-ticked; replacing another app's handler needs a second explicit tick and a warning.
+- `ProviderCredentials`: configured state, backend and fallback warning, set/replace/clear in a password field, never shows a stored value; providers the site has not enabled say "Not enabled".
+- `FileSelectionPicker`: for needs-selection installs; tree with tri-state folders, sizes, search, expand/collapse all, presets, column choice, keyboard navigation (arrows, Space, Home/End); sort and columns kept under the `tmc.external.picker.layout` local-storage key.
+
+prismlauncher is now a managed scheme (was recognised only). Tests are pure-logic plus static-markup; the repo has no DOM test environment.

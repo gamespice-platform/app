@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AppError, AppResult};
 
 /// The schemes a user can hand to this app.
-pub const MANAGED: [&str; 4] = ["nxm", "curseforge", "modrinth", "ror2mm"];
+pub const MANAGED: [&str; 5] = ["nxm", "curseforge", "modrinth", "ror2mm", "prismlauncher"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "state")]

@@ -42,6 +42,18 @@ export const externalIpc = {
             request: { text, ...opts },
         }),
 
+    /**
+     * Install a dropped folder or zip by its vault token. `selected` is the
+     * picker's include set (omit to take everything).
+     */
+    installPath: (
+        token: string,
+        opts?: { selected?: string[]; name?: string; appId?: number; sandboxId?: number }
+    ) =>
+        call('external_install_path', InstallReportSchema, {
+            request: { token, ...opts },
+        }),
+
     /** Remove a mod that was added from a link. Resolves to sandboxes needing a redeploy. */
     remove: (localId: number) =>
         call('external_remove', z.array(z.number()), { localId }),
