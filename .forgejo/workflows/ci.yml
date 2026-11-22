@@ -1,7 +1,15 @@
-# Internal CI on Forgejo (dot-bootstrap docs/forgejo-ci.md). Forgejo prefers .forgejo/workflows over
-# .github/workflows, so this file is what runs there; GitHub still runs .github/workflows/ci.yml unchanged.
-# Linux fast checks only: the `shell` job (GTK stack via sudo apt-get) and `tmc-cli` (needs a GitHub token) stay on GitHub, and the release
-# workflow is tag-triggered and Forgejo never receives tags.
+# Internal CI on Forgejo (gs-bootstrap docs/forgejo-ci.md). Forgejo prefers .forgejo/workflows over
+# .github/workflows, so this file is what runs there. It is the PRIMARY place for the checks that
+# .github/workflows/ci.yml used to run on every push: GitHub's copy is now workflow_dispatch + pull_request only.
+#
+# Runner: one host-executor runner (labels ubuntu-latest, ubuntu-22.04, linux; no docker, no sudo, no apt).
+# Jobs that need something the runner lacks are gated on a repository variable and say so, instead of failing:
+#   - web needs the @modcommunity/shared package: secret PACKAGES_TOKEN and variable PACKAGES_ENABLED=true.
+#   - shell needs the GTK/WebKit dev packages on the runner box; it probes pkg-config and skips with a warning
+#     when they are absent (a root step: install the apt list from .github/workflows/ci.yml), and also needs
+#     PACKAGES_ENABLED=true for the frontend bundle.
+#   - tmc-cli needs secret TMC_CLI_TOKEN and variable TMC_CLI_ENABLED=true.
+# Tags are never mirrored to Forgejo, and release.yml stays on GitHub.
 # Everything `npm run check` runs, plus the tests and the one cross-check that
 # proves the Windows-only half of `tmc-usvfs` still compiles.
 #
@@ -15,7 +23,7 @@ name: ci
 
 on:
     push:
-        branches: [main]
+        branches: ['**']
     pull_request:
     workflow_dispatch:
 
@@ -93,6 +101,129 @@ jobs:
             - name: Formatting
               working-directory: src-tauri
               run: cargo fmt --all -- --check
+
+    # Advisories, licences and sources of the whole dependency tree. cargo-audit and cargo-deny read Cargo.lock
+    # and the metadata and compile nothing. Config: src-tauri/.cargo/audit.toml and src-tauri/deny.toml.
+    # The tools are installed once into the runner's persistent ~/.cargo/bin; `cargo install` is a few minutes
+    # the first time only.
+    supply-chain:
+        name: cargo audit, cargo deny
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+            - name: Install cargo-audit and cargo-deny
+              run: |
+                  command -v cargo-audit >/dev/null || cargo install --locked cargo-audit
+                  command -v cargo-deny >/dev/null || cargo install --locked cargo-deny
+
+            - name: Advisories
+              working-directory: src-tauri
+              run: cargo audit --deny warnings
+
+            - name: Licences, bans, sources
+              working-directory: src-tauri
+              run: cargo deny check licenses bans sources
+
+    # The Tauri crate: clippy and tests over the WHOLE workspace. Needs the GTK/WebKit dev packages on the runner.
+    shell:
+        name: gamespice-app (clippy, tests)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Probe for the GTK stack
+              id: gtk
+              run: |
+                  if pkg-config --exists webkit2gtk-4.1 gtk+-3.0 libsoup-3.0; then
+                      echo "present=yes" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "present=no" >> "$GITHUB_OUTPUT"
+                      echo "::warning::GTK/WebKit dev packages are not installed on this runner; gamespice-app clippy and tests were SKIPPED"
+                  fi
+
+            - uses: dtolnay/rust-toolchain@master
+              if: steps.gtk.outputs.present == 'yes'
+              with:
+                  toolchain: ${{ env.RUST_TOOLCHAIN }}
+                  components: clippy
+
+            - uses: Swatinem/rust-cache@v2
+              if: steps.gtk.outputs.present == 'yes'
+              with:
+                  workspaces: src-tauri
+
+            # `tauri-build` reads the frontend's dist directory, so the bundle has to exist before the crate checks.
+            # The bundle needs @modcommunity/shared, hence the PACKAGES_ENABLED gate.
+            - name: Frontend bundle, clippy, tests
+              if: steps.gtk.outputs.present == 'yes' && vars.PACKAGES_ENABLED == 'true'
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
+              run: |
+                  npm ci
+                  npm run build
+                  npm run check:rust
+                  npm run test:rust
+
+    # The bundled `tmc`: build it from the pinned ref and start it through the Console's own lookup.
+    tmc-cli:
+        name: bundled tmc (build, --version through the Console)
+        if: ${{ vars.TMC_CLI_ENABLED == 'true' }}
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: src-tauri
+
+            - name: Build and test
+              env:
+                  TMC_CLI_TOKEN: ${{ secrets.TMC_CLI_TOKEN }}
+              run: bash scripts/build-tmc-cli.sh --test
+
+    # INFORMATIONAL. The release workflow's `manifests` job runs `manifests:check --release`, which fails by design
+    # until the owner's real exec key exists and the loader manifests are re-signed (docs/loader-manifests.md,
+    # "What blocks a release"). Running it here on every push means a tag never finds out first. The gate itself is
+    # not weakened: the ordinary check must pass, and the --release result is reported, not enforced, so the run
+    # stays green while the gate is closed (ci-red reads green/red).
+    manifests:
+        name: manifests (check; release gate reported)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            # The checker needs only ajv, not the whole tree: a full `npm ci` would need the private
+            # @modcommunity/shared package, and this job must run without any secret. ajv is installed in a
+            # scratch directory (inside the repo npm would resolve package.json's private scope) and linked in.
+            - name: Install ajv (version from package.json)
+              run: |
+                  v=$(node -p "require('./package.json').devDependencies.ajv || require('./package.json').dependencies.ajv")
+                  d=$(mktemp -d)
+                  (cd "$d" && npm init -y >/dev/null && npm install --ignore-scripts "ajv@$v")
+                  ln -s "$d/node_modules" node_modules
+
+            - name: manifests:check (enforced)
+              run: node scripts/manifests/check.ts
+
+            - name: manifests:check --release (informational)
+              run: |
+                  rc=0
+                  node scripts/manifests/check.ts --release > release-gate.log 2>&1 || rc=$?
+                  cat release-gate.log
+                  if [ "$rc" -eq 0 ]; then
+                      echo "RELEASE GATE: OPEN (a tag would pass the manifests job)"
+                  else
+                      echo "RELEASE GATE: CLOSED - $(tail -1 release-gate.log). Owner-only blockers: docs/loader-manifests.md, 'What blocks a release'."
+                  fi
 
     windows-crosscheck:
         # The Windows-only halves of `tmc-usvfs` — the IAT patch and the

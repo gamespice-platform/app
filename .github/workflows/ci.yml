@@ -9,9 +9,12 @@
 # something the release workflow proves when it matters.
 name: ci
 
+# SAFETY NET, NOT THE PRIMARY CHECK. These same jobs run first on the internal Forgejo CI
+# (.forgejo/workflows/ci.yml) on every push to a mirrored branch, where a failure is seen before a tag is
+# cut. GitHub therefore no longer runs them on every push to main (v0.5.17's tag push was the first anyone saw
+# of three red checks); it runs them on pull requests (which do not exist on the Forgejo mirror) and on demand.
+# Keep the two files' job lists in step: docs/development.md, "What CI runs".
 on:
-    push:
-        branches: [main]
     pull_request:
     workflow_dispatch:
 

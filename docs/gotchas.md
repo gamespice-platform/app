@@ -50,6 +50,8 @@ Traps that do not error usefully, grouped by where they bite. The ones that belo
 
 - **No apostrophe inside `${VAR:-...}` in a workflow `run:` block.** Within double quotes bash reads it as an opening quote and the whole step dies with "unexpected EOF while looking for matching": the release's Build step failed on every platform for that reason until 0.2.0. A release tag is the only thing that runs `release.yml`, so check its blocks with `bash -n` before tagging.
 - **A play window builder call may be desktop-only.** Tauri declares `center`, `inner_size`, `decorations`, `fullscreen` and the rest of the sizing calls under `cfg(desktop)`; ungated, the Android build does not compile. `cargo check -p gamespice-app --target aarch64-linux-android` needs an NDK's clang as `CC_aarch64_linux_android` (ring builds C).
+- **A rustfmt diff fails the `core` job and nothing locally shows it.** `npm run check` runs clippy, not `cargo fmt --check`, so an edit that only passes clippy (v0.5.17's `http.rs` Android TLS change) goes red in CI after the push. Run `cargo fmt --all -- --check` in `src-tauri` before pushing; CI now runs the same jobs on Forgejo first (see development.md, "What CI runs").
+- **`cargo deny check` with no arguments fails on the `zip` 4.6.1 advisories on purpose.** Advisories are `cargo audit`'s job (reviewed list in `audit.toml`); CI runs `cargo deny check licenses bans sources`. A new RUSTSEC entry against a locked crate (`cookie` 0.18.2, v0.5.17) fails `supply-chain` until `cargo update -p <crate>`.
 
 ## Versions
 

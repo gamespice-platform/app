@@ -106,14 +106,19 @@ Where **libfuse2** is missing (Debian 13, Ubuntu 24.04) the AppImage stays a rea
 
 ### What CI runs, and why it is split that way
 
-`.github/workflows/ci.yml` on every push and pull request, in four jobs rather than one:
+The checks run **first on the internal Forgejo CI**, `.forgejo/workflows/ci.yml`, on every branch push (the Forgejo copy is mirrored from GitHub, so a result is there within minutes of a push to main and before anyone tags). `.github/workflows/ci.yml` holds the same jobs but runs only on pull requests and by hand: it is a safety net for outside pull requests, which the mirror never sees, and no longer fails a push to main. Before this, the first red check was the one GitHub showed after a tag push (v0.5.17: a stale `Cargo.lock` advisory, a rustfmt diff, and the release manifests gate). **Before tagging, read the Forgejo run for the commit** (`tools/ci-red.sh` in gs-bootstrap, or `http://127.0.0.1:3300/gamespice-platform/app/actions`).
 
-| Job | Runs | Needs |
-| --- | --- | --- |
-| `web` | `check:web` — tsc, eslint, vitest | node |
-| `core` | clippy, tests and `cargo fmt --check` for `tmc-core` + `tmc-usvfs` | **nothing else** |
-| `shell` | `check:rust` and `test:rust` for the whole workspace | the GTK/WebKit stack |
-| `windows-crosscheck` | `cargo check -p tmc-usvfs --target x86_64-pc-windows-gnu` | the Windows target |
+| Job | Runs | Needs | On Forgejo |
+| --- | --- | --- | --- |
+| `web` | `check:web` — tsc, eslint, vitest, `manifests:check` | node, `@modcommunity/shared` | only with variable `PACKAGES_ENABLED=true` and secret `PACKAGES_TOKEN` |
+| `core` | clippy, tests and `cargo fmt --check` for `tmc-core` + `tmc-usvfs` | **nothing else** | yes |
+| `supply-chain` | `cargo audit --deny warnings`, `cargo deny check licenses bans sources` | the two tools (installed once into the runner's `~/.cargo/bin`) | yes |
+| `shell` | `check:rust` and `test:rust` for the whole workspace | the GTK/WebKit stack, the frontend bundle | skips with a warning until the dev packages are installed on the runner box (root step) and `PACKAGES_ENABLED=true` |
+| `tmc-cli` | builds the bundled `tmc`, starts it through the Console | `TMC_CLI_TOKEN` | only with variable `TMC_CLI_ENABLED=true` |
+| `manifests` | `manifests:check` (enforced) and `manifests:check --release` (**informational**: prints `RELEASE GATE: OPEN/CLOSED`, never fails the run) | node | yes, Forgejo only |
+| `windows-crosscheck` | `cargo check -p tmc-usvfs --target x86_64-pc-windows-gnu` | the Windows target | yes |
+
+The Forgejo runner is a host executor (no docker, no sudo, no apt), which is why `shell` and `tmc-cli` are gated rather than copied. The `manifests --release` gate is closed until the owner supplies the real exec key (see [loader-manifests.md](loader-manifests.md#what-blocks-a-release)); it stays a hard failure in `release.yml`, and the Forgejo job only makes that visible on every push.
 
 **The `core` job is the one the workspace split exists for.** Every guard worth failing a pull request over — the path jail, the address guard, the protocol parsers, the token lifecycle — is in `tmc-core`, and that job proves them on a runner with no display stack, no WebKit and no dbus. If it ever starts needing `apt-get`, something has been added on the wrong side of the line.
 

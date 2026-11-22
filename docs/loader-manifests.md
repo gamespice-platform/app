@@ -247,7 +247,7 @@ The repository is the source of truth for **templates** (`*.manifest.json`). The
 
 ## What blocks a release
 
-`.github/workflows/release.yml` runs `npm run manifests:check -- --release` in its `manifests` job, and `build`, `android` and `ios` need that job, so a tag whose manifests still carry a placeholder or the test key builds nothing and publishes nothing. On this branch `--release` fails with 12 problems on purpose. None of them can be closed from the repository alone, and none is faked:
+`.github/workflows/release.yml` runs `npm run manifests:check -- --release` in its `manifests` job, and `build`, `android` and `ios` need that job, so a tag whose manifests still carry a placeholder or the test key builds nothing and publishes nothing. On this branch `--release` fails with 12 problems on purpose. The internal Forgejo CI runs the same `--release` check on every push as an informational `manifests` job (it prints `RELEASE GATE: CLOSED` and the problem count without failing the run), so the state is visible before a tag; `release.yml` still enforces it. Every artifact needs the gate, including Android and iOS: `src-tauri/core/build.rs` compiles `manifests/**` and the exec key list into `tmc-core`, which all three build. None of them can be closed from the repository alone, and none is faked:
 
 | Blocker | Where | What closes it |
 | --- | --- | --- |

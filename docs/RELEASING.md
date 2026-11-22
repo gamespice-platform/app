@@ -5,6 +5,8 @@ git tag v0.3.0 && git push origin v0.3.0        # a release
 git tag v0.4.0-beta.1 && git push origin v0.4.0-beta.1   # a beta
 ```
 
+Before tagging, read the Forgejo CI result for the commit (docs/development.md, "What CI runs"): GitHub no longer runs the checks on pushes to main, so a red `core`, `supply-chain` or `shell` job there is what a failed release would otherwise show first. The `manifests` job reports `RELEASE GATE: CLOSED` until the real exec key is in; that is expected and is the one red-in-release you cannot fix by pushing.
+
 Bump `version` in `src-tauri/tauri.conf.json` (and `package.json`, `src-tauri/Cargo.toml`) to match first and tag that commit: the workflow refuses a tag that differs, because a manifest newer than the binary it points at is an update every installed app takes again on every check. Beyond that, this is the whole ceremony once the secrets below exist. `.github/workflows/release.yml` then:
 
 1. **Builds and signs** on Linux (AppImage, deb), Windows (NSIS setup, MSI, portable exe) and macOS (universal `.app` + `.dmg`). With `TAURI_SIGNING_PRIVATE_KEY` set it turns on `createUpdaterArtifacts`, so every updatable bundle gets a `.sig`, and then runs `scripts/verify-updater-signature.mjs`, which **fails the job** if those signatures do not verify against the public key the app is compiled with.

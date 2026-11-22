@@ -54,5 +54,7 @@ fn android_tls_config() -> rustls::ClientConfig {
 
 /// `reqwest::Client::new()` with the TLS provider installed.
 pub fn client() -> reqwest::Client {
-    builder().build().expect("default reqwest client config is valid")
+    builder()
+        .build()
+        .expect("default reqwest client config is valid")
 }
