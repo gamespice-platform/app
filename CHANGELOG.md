@@ -8,6 +8,13 @@ The GameSpice App's releases, newest first. A version here is the one in `packag
 - New: CurseForge and mod.io links resolve through the TMC site, which holds our API keys, so no key is ever in the app; they stay off until the site enables them. Nexus Mods uses your own API key, kept in the OS keychain (an encrypted file with a notice when there is none) and never shown back. Free Nexus accounts install from "Download with manager" links.
 - Fixed: setting the download limit to 0 now really means unlimited (there was a hidden 32 GiB cap).
 
+## 0.5.16
+
+### Fixed
+
+- Stores: the built-in App downloads folder is created when it is missing, so a fresh install (or one whose folder was removed) no longer shows "This folder is missing" for it.
+- Discover > Servers: scrolling no longer stalls. The fix is server-side (stable paging order); it takes effect when the site deploys it.
+
 ## 0.5.15
 
 ### Fixed
