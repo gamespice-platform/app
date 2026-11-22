@@ -472,6 +472,7 @@ pub fn run() {
             commands::detect::detect_apply_many,
             commands::sandbox::sandbox_install_item,
             commands::sandbox::sandbox_export,
+            commands::sandbox::sandbox_export_pack,
             commands::sandbox::sandbox_import_preview,
             commands::sandbox::sandbox_import,
             commands::config::config_available,

@@ -113,9 +113,9 @@ pub struct SharedSandbox {
     pub mods: Vec<SharedMod>,
 }
 
-/// Turn a sandbox into a code.
-pub fn export(row: &Sandbox) -> AppResult<String> {
-    let shared = SharedSandbox {
+/// What a sandbox shares about itself: the payload of a code, before encoding.
+pub fn to_shared(row: &Sandbox) -> SharedSandbox {
+    SharedSandbox {
         v: FORMAT,
         app_id: row.app_id,
         app_slug: row.app_slug.clone(),
@@ -147,7 +147,12 @@ pub fn export(row: &Sandbox) -> AppResult<String> {
                 priority: m.priority,
             })
             .collect(),
-    };
+    }
+}
+
+/// Turn a sandbox into a code.
+pub fn export(row: &Sandbox) -> AppResult<String> {
+    let shared = to_shared(row);
 
     let json = serde_json::to_vec(&shared)
         .map_err(|e| AppError::internal(format!("could not encode the sandbox: {e}")))?;

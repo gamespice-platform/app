@@ -41,7 +41,8 @@ A `.mrpack` (Modrinth) or a zip with a CurseForge `manifest.json` (`manifestType
 - **Nothing is fetched at import.** The webview calls `local_pack_download(id)` (queue, stable ids `pack<id>:<n>`, destinations in the staging folder) and later `local_pack_finalize(id)`, which hashes each staged file and moves it into the mod only on a match; a mismatch is deleted and reported. Neither command takes a URL or a path.
 - **CurseForge.** Files are `projectID/fileID` pairs; turning them into URLs needs the keyed CurseForge API, which the app does not call. Overrides are imported and the pairs are reported as unresolved.
 - **Frontend.** `components/pack-panel.tsx` (rendered by the import dialog from `ImportReport.packs`) lists the unresolved CurseForge files, starts `local_pack_download`, shows progress from the download queue (`lib/local-pack.ts`) and calls `local_pack_finalize`. The shell side filling `packs` is in `commands/import.rs`.
-- **Not done.** Exporting a pack (hook: `ExportSandboxSlot` in pack-panel.tsx and `HOOK(export-sandbox)` in `lib/ipc/commands.ts`); picking `fileSize` mismatch as a pre-check in the queue.
+- **Export** is the other direction: `sandbox_export_pack` writes a sandbox as an `.mrpack` ([sandboxes.md](sandboxes.md#exporting-a-file)); the importer reads it back (round-trip test, hashes included). The frontend hook is `ExportSandboxSlot` in pack-panel.tsx and `HOOK(export-sandbox)` in `lib/ipc/commands.ts`.
+- **Not done.** Picking `fileSize` mismatch as a pre-check in the queue.
 
 Where the payload lands is a guess and is treated as one — the sidecar's `installPath`, then "does its top level already hold a declared mod target?", then the game's first `modTargets` entry — and then the user can change it. `store::relayout` is what makes that cheap: a directory rename inside the store, not a re-import.
 

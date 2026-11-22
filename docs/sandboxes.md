@@ -160,6 +160,15 @@ The strategy matrix per game, plus presets, options and detection hints:
 
 Options reach a command line only through `optionArgs` in the game's own `launch.json`. `LaunchOptions` carries them in a flattened `extra` map; an object or an array contributes nothing, and there is still no shell.
 
+## Exporting a file
+
+`sandbox_export_pack(id, kind)` writes a file into the downloads folder (`download_target_dir()`) and returns its name, file count and size. The webview names an id and `"mrpack"` or `"share"`, never a path; the file name is the sandbox name made safe, made unique, and never overwrites.
+
+- **`mrpack`** (`library::export`): the sandbox's enabled, staged mods go in as `overrides/`, resolved through the same merge tree a deploy uses (so priority winners are what is written, and symlinks are skipped). `files` is empty: a subscribed mod has no host the format permits, so its bytes travel in the archive. Only Minecraft sandboxes with a game version export; the loader dependency is left out because only a name is recorded. The report's notes list skipped and unstaged mods. A test imports the result with the real importer and compares SHA-512 of every file.
+- **`share`**: a zip of the same `sandbox.json` and code `share` produces, with nothing about this machine.
+
+Both are written to a `.tmcpart` file and renamed on success, so a failure leaves nothing behind.
+
 ## Sharing a sandbox
 
 A code, not a file. `library::share` encodes a sandbox as `TMC1-<base64>`.

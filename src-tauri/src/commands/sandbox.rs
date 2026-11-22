@@ -599,6 +599,41 @@ pub fn sandbox_export(state: State<'_, AppState>, id: i64) -> AppResult<String> 
     tmc_core::library::share::export(&sandbox)
 }
 
+/// Write a sandbox to a file in the downloads folder: a Modrinth `.mrpack`
+/// (`kind = "mrpack"`) or a TMC share zip (`kind = "share"`).
+///
+/// Takes an id and a kind, never a path: the destination is
+/// `download_target_dir()` and the file name is chosen by the core. The report
+/// names the file, not where it landed.
+#[tauri::command]
+pub fn sandbox_export_pack(
+    state: State<'_, AppState>,
+    id: i64,
+    kind: String,
+) -> AppResult<tmc_core::library::export::ExportReport> {
+    let sandbox = state
+        .library
+        .sandbox_get(id)?
+        .ok_or_else(|| AppError::invalid("That sandbox does not exist."))?;
+
+    let out_dir = state.download_target_dir();
+
+    match kind.as_str() {
+        "mrpack" => {
+            let plugins = state.app_plugins();
+            let settings = state.settings.get();
+            let roots = state.jail_roots();
+            let dirs = state.sandbox_dirs();
+            let ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
+            let mods = tmc_core::library::deploy::deployable(&sandbox, &ctx);
+
+            tmc_core::library::export::export_mrpack(&sandbox, &mods, &out_dir)
+        }
+        "share" => tmc_core::library::export::export_share_zip(&sandbox, &out_dir),
+        _ => Err(AppError::invalid("Unknown export kind.")),
+    }
+}
+
 /// What importing a code WOULD do, without doing any of it.
 ///
 /// The same split every other risky operation here has: a code is a string from
