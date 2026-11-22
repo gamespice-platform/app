@@ -114,7 +114,7 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
   - `src/lib/game-catalog/importers/{registry,diff}.ts`;
   - `src/lib/game-catalog/importers/minecraft/{mojang,fabric,quilt,forge,neoforge}.ts`;
   - their recorded upstream fixtures under `importers/minecraft/fixtures/`.
-- **Touches:** W2's router file, only to add the `sync.preview` and `sync.apply` bodies. Coordinate with W2, or land after it.
+- **Touches:** W2's router file, only to add the `sync.preview` and `sync.applyPreview` bodies (named `applyPreview` because tRPC reserves `apply` as a procedure name). Coordinate with W2, or land after it.
 - **Depends on:** W1, and W2 for the sync procedures.
 - **Acceptance:** each importer, run against its recorded fixture, produces drafts with the right `sortKey`, channel and `javaMajor`.
   - Mojang: `release`→STABLE, `snapshot`→EXPERIMENTAL, a pre-release or release candidate (by the id pattern `-pre\d+|-rc\d+`)→PREVIEW, and `old_*`→LEGACY.
