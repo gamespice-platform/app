@@ -11,6 +11,9 @@ import {
     AppListResponseSchema,
     BrowseQuerySchema,
     BrowseResponseSchema,
+    SetFavoriteBodySchema,
+    SetFavoriteResponseSchema,
+    type SetFavoriteBodyT,
     ContentDetailSchema,
     FacetsResponseSchema,
     FriendListResponse,
@@ -169,6 +172,23 @@ export const api = {
 
     browse: (query: BrowseQueryT) =>
         get('/browse', BrowseResponseSchema, BrowseQuerySchema.parse(query)),
+
+    /** The signed-in account's favourite servers (`favorites=1`); needs auth. */
+    browseFavorites: (query: BrowseQueryT) =>
+        get(
+            '/browse',
+            BrowseResponseSchema,
+            BrowseQuerySchema.parse(query),
+            true
+        ),
+
+    setFavorite: (body: SetFavoriteBodyT) =>
+        send(
+            'POST',
+            '/favorites',
+            SetFavoriteResponseSchema,
+            SetFavoriteBodySchema.parse(body)
+        ),
 
     content: (kind: ContentKindT, id: string) =>
         get(

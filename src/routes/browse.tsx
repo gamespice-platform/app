@@ -253,6 +253,7 @@ export default function BrowseRoute() {
     const canTable = kind === 'server'
     const favOnly = kind === 'server' && search.get('fav') === '1'
     const favorites = useFavorites()
+    const auth = useAuth()
     const favCount = Object.keys(favorites).length
     const view: 'grid' | 'table' =
         canTable && search.get('view') !== 'grid' ? 'table' : 'grid'
@@ -402,15 +403,15 @@ export default function BrowseRoute() {
     })
 
     /*
-     * Favourites are a local snapshot (the app API has no favourites endpoint
-     * and `/browse` cannot filter by id), so opening the view re-reads each
-     * favourite from the item endpoint and writes the fresh row back. A failed
-     * read leaves the old snapshot, which is stale rather than missing.
+     * Signed out, favourites are a local snapshot, so opening the view
+     * re-reads each from the item endpoint and writes the fresh row back (a
+     * failed read leaves the old snapshot). Signed in, the account set is
+     * loaded fresh by `useFavoritesSync`, so there is nothing to refresh.
      */
     const favIds = Object.keys(favorites).slice(0, 100).join(',')
 
     useQuery({
-        enabled: favOnly && favIds !== '',
+        enabled: favOnly && favIds !== '' && auth.status !== 'signedIn',
         queryKey: ['favorites-refresh', favIds],
         staleTime: 60 * 1000,
         queryFn: async () => {

@@ -12,6 +12,7 @@ import { listen } from '@tauri-apps/api/event'
 import { openUrl } from '@tauri-apps/plugin-opener'
 
 import { ipc } from '~/lib/ipc/commands'
+import { useFavoritesSync } from '~/lib/favorites-sync'
 import { isIpcError } from '~/lib/ipc'
 import type { PendingLoginT, SessionUserT } from '~/lib/ipc/schemas'
 
@@ -50,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<SessionUserT | null>(null)
     const [pending, setPending] = useState<PendingLoginT | null>(null)
     const [error, setError] = useState<string | null>(null)
+
+    useFavoritesSync(status === 'signedIn')
 
     /** Held in a ref so the poll loop can read it without re-subscribing. */
     const pollTimer = useRef<number | null>(null)

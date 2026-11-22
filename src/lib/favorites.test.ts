@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest'
 import type { ContentSummaryT } from '~/lib/api/contract'
 import {
     MAX_FAVORITES,
+    collectFavoritePages,
+    favoritesFromRows,
+    pickFavorites,
     filterFavorites,
     parseFavorites,
     refreshFavorites,
@@ -95,5 +98,78 @@ describe('parseFavorites', () => {
         expect(parseFavorites('[1]')).toEqual({})
         expect(parseFavorites(null)).toEqual({})
         expect(Object.keys(parseFavorites('{"1":{},"x":{}}'))).toEqual(['1'])
+    })
+})
+
+describe('pickFavorites', () => {
+    const local = { '1': srv(1) }
+
+    it('uses the local map when signed out', () => {
+        expect(pickFavorites(local, null)).toBe(local)
+    })
+
+    it('uses only the account set when signed in, never the local map', () => {
+        const remote = { '2': srv(2) }
+
+        expect(pickFavorites(local, remote)).toBe(remote)
+        expect(pickFavorites(local, {})).toEqual({})
+    })
+})
+
+describe('favoritesFromRows', () => {
+    it('keys rows by id', () => {
+        const map = favoritesFromRows([srv(3), srv(1)])
+
+        expect(Object.keys(map).sort()).toEqual(['1', '3'])
+    })
+})
+
+describe('collectFavoritePages', () => {
+    it('follows cursors across every page', async () => {
+        const pages: Record<string, { items: ContentSummaryT[]; nextCursor: string | null }> = {
+            start: { items: [srv(1), srv(2)], nextCursor: 'b' },
+            b: { items: [srv(3)], nextCursor: null },
+        }
+        const seen: (string | null)[] = []
+        const rows = await collectFavoritePages((cursor) => {
+            seen.push(cursor)
+
+            return Promise.resolve(pages[cursor ?? 'start']!)
+        })
+
+        expect(rows.map((r) => r.id)).toEqual([1, 2, 3])
+        expect(seen).toEqual([null, 'b'])
+    })
+
+    it('stops on a repeated cursor and at the page bound', async () => {
+        let calls = 0
+        const rows = await collectFavoritePages(() => {
+            calls++
+
+            return Promise.resolve({ items: [srv(calls)], nextCursor: 'same' })
+        })
+
+        expect(calls).toBe(2)
+        expect(rows).toHaveLength(2)
+
+        calls = 0
+        await collectFavoritePages(() => {
+            calls++
+
+            return Promise.resolve({ items: [], nextCursor: `c${calls}` })
+        }, 5)
+
+        expect(calls).toBe(5)
+    })
+})
+
+describe('toggleFavorite cap', () => {
+    it('is unbounded when the cap is Infinity (account set)', () => {
+        let map: Record<string, ContentSummaryT> = {}
+
+        for (let i = 1; i <= MAX_FAVORITES + 5; i++)
+            map = { ...toggleFavorite(map, srv(i), Infinity) }
+
+        expect(Object.keys(map)).toHaveLength(MAX_FAVORITES + 5)
     })
 })

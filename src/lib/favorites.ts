@@ -3,15 +3,19 @@ import { useSyncExternalStore } from 'react'
 import type { ContentSummaryT } from '~/lib/api/contract'
 
 /**
- * Favourite servers, kept on this device.
+ * Favourite servers: two sources, never merged.
  *
- * WHY LOCAL: the app API (`/api/app/v1`) has no favourites endpoint, and
- * `/browse` has neither a `favorites` switch nor an `ids` filter. The website
- * stores `Favorite` rows server-side and resolves "Favourites only" there; the
- * app cannot. So favourites live in localStorage as a snapshot of the row
- * (`ContentSummary`), which is also what lets the Favourites view render with no
- * way to ask the API for "these ids". Snapshots are refreshed from the item
- * endpoint when the view opens.
+ * Signed in, the ACCOUNT is the single source of truth, exactly like the
+ * website: the Favourites view lists `/browse?kind=server&favorites=1`, the
+ * star state comes from that set, and a toggle POSTs `/favorites` after an
+ * optimistic flip (rolled back if the POST fails). See `favorites-sync.ts`.
+ *
+ * Signed out (or never signed in), favourites live in localStorage as a
+ * snapshot of the row (`ContentSummary`), which also lets the Favourites view
+ * render offline. The local map is NOT merged into the account on sign-in and
+ * the account is not copied down: the local map stays untouched on the device
+ * for the next signed-out session. `pickFavorites` is the one place that
+ * chooses between them.
  */
 
 export const FAVORITES_KEY = 'tmc.favorites.servers'
@@ -22,7 +26,8 @@ export type FavoriteMap = Readonly<Record<string, ContentSummaryT>>
 /** Pure toggle: add when absent, remove when present. Never mutates. */
 export function toggleFavorite(
     map: FavoriteMap,
-    item: ContentSummaryT
+    item: ContentSummaryT,
+    cap: number = MAX_FAVORITES
 ): FavoriteMap {
     const id = String(item.id)
 
@@ -36,8 +41,8 @@ export function toggleFavorite(
     const keys = Object.keys(next)
 
     // Oldest-inserted first; drop the overflow rather than refusing to save.
-    if (keys.length > MAX_FAVORITES) {
-        for (const key of keys.slice(0, keys.length - MAX_FAVORITES))
+    if (keys.length > cap) {
+        for (const key of keys.slice(0, keys.length - cap))
             delete next[key]
     }
 
@@ -58,6 +63,52 @@ export function refreshFavorites(
     }
 
     return next
+}
+
+/**
+ * Which map the UI shows. `remote` is null when signed out; signed in it is the
+ * account's set (empty until the first fetch lands, never the local map).
+ */
+export function pickFavorites(
+    local: FavoriteMap,
+    remote: FavoriteMap | null
+): FavoriteMap {
+    return remote ?? local
+}
+
+/** Build a map from account rows, in the order the API returned them. */
+export function favoritesFromRows(rows: ContentSummaryT[]): FavoriteMap {
+    const out: Record<string, ContentSummaryT> = {}
+
+    for (const item of rows) out[String(item.id)] = item
+
+    return out
+}
+
+export type FavoritePage = {
+    items: ContentSummaryT[]
+    nextCursor: string | null
+}
+
+/** Follow `nextCursor` until the end (bounded, so a looping cursor ends). */
+export async function collectFavoritePages(
+    fetchPage: (cursor: string | null) => Promise<FavoritePage>,
+    maxPages = 200
+): Promise<ContentSummaryT[]> {
+    const rows: ContentSummaryT[] = []
+    let cursor: string | null = null
+
+    for (let i = 0; i < maxPages; i++) {
+        const page: FavoritePage = await fetchPage(cursor)
+
+        rows.push(...page.items)
+
+        if (!page.nextCursor || page.nextCursor === cursor) break
+
+        cursor = page.nextCursor
+    }
+
+    return rows
 }
 
 export type FavoriteFilters = {
@@ -117,6 +168,8 @@ export function parseFavorites(raw: string | null): FavoriteMap {
 // ------------------------------------------------------------------ store
 
 let current: FavoriteMap | null = null
+/** The account's set while signed in; null when signed out. */
+let remote: FavoriteMap | null = null
 const listeners = new Set<() => void>()
 
 function read(): FavoriteMap {
@@ -138,6 +191,10 @@ function read(): FavoriteMap {
     return current
 }
 
+function emit(): void {
+    for (const listener of listeners) listener()
+}
+
 function write(next: FavoriteMap): void {
     current = next
 
@@ -147,13 +204,65 @@ function write(next: FavoriteMap): void {
         // Blocked storage: favourites last until the window closes.
     }
 
-    for (const listener of listeners) listener()
+    emit()
 }
 
-export function toggleStoredFavorite(item: ContentSummaryT): void {
+/** Signed in: switch to the account source (empty until `setRemoteFavorites`). */
+export function enterAccountFavorites(): void {
+    if (remote === null) {
+        remote = {}
+        emit()
+    }
+}
+
+/** Signed out: back to the local source, which was never touched. */
+export function leaveAccountFavorites(): void {
+    if (remote !== null) {
+        remote = null
+        emit()
+    }
+}
+
+export function setRemoteFavorites(next: FavoriteMap): void {
+    remote = next
+    emit()
+}
+
+/**
+ * Flip a favourite in the active source. Returns whether the account is the
+ * source (the caller then POSTs) and the new state.
+ */
+export function toggleStoredFavorite(item: ContentSummaryT): {
+    account: boolean
+    favorite: boolean
+} {
+    const id = String(item.id)
+
+    if (remote !== null) {
+        const favorite = !(id in remote)
+
+        remote = toggleFavorite(remote, item, Infinity)
+        emit()
+
+        return { account: true, favorite }
+    }
+
+    const favorite = !(id in read())
+
     write(toggleFavorite(read(), item))
+
+    return { account: false, favorite }
 }
 
+/** Undo an optimistic account flip after a failed POST. */
+export function revertRemoteFavorite(item: ContentSummaryT): void {
+    if (remote !== null) {
+        remote = toggleFavorite(remote, item, Infinity)
+        emit()
+    }
+}
+
+/** Refresh local snapshots (signed out only; account rows are already fresh). */
 export function refreshStoredFavorites(fresh: ContentSummaryT[]): void {
     write(refreshFavorites(read(), fresh))
 }
@@ -164,7 +273,11 @@ function subscribe(listener: () => void): () => void {
     return () => listeners.delete(listener)
 }
 
-/** The favourites map; re-renders on any change (optimistic by construction). */
+function snapshot(): FavoriteMap {
+    return pickFavorites(read(), remote)
+}
+
+/** The active favourites map; re-renders on any change (optimistic). */
 export function useFavorites(): FavoriteMap {
-    return useSyncExternalStore(subscribe, read, read)
+    return useSyncExternalStore(subscribe, snapshot, snapshot)
 }

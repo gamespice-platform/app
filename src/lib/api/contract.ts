@@ -564,6 +564,9 @@ export const BrowseQuerySchema = z.object({
     nsfw: QueryBool.optional(),
     archived: QueryBool.optional(),
 
+    /** Servers only: the signed-in account's favourites (unsigned: empty). */
+    favorites: QueryBool.optional(),
+
     /**
      * AND across tags by default; `tagsOr: true` switches to ANY.
      *
@@ -637,6 +640,16 @@ export const BrowseQuerySchema = z.object({
     cursor: z.coerce.string().nullish(),
     limit: QueryInt.min(1).max(50).default(30),
 })
+
+export const SetFavoriteBodySchema = z.object({
+    kind: z.literal('server'),
+    id: z.number().int().positive(),
+    favorite: z.boolean(),
+})
+
+export type SetFavoriteBodyT = z.infer<typeof SetFavoriteBodySchema>
+
+export const SetFavoriteResponseSchema = z.object({ favorite: z.boolean() })
 
 export type BrowseQueryT = z.input<typeof BrowseQuerySchema>
 
