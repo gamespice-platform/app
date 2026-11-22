@@ -954,7 +954,10 @@ mod tests {
         std::fs::remove_dir_all(&cache).expect("remove");
         db.store_sync_default(None, &cache).expect("resync");
         assert!(cache.is_dir());
-        assert!(db.store_list().expect("list")[0].exists);
+        let mut store = db.store_list().expect("list").remove(0);
+
+        store.fill_stats();
+        assert!(store.exists);
     }
 
     #[test]
