@@ -23,7 +23,6 @@ import JoinRoute from '~/routes/join'
 import LibraryRoute from '~/routes/library'
 import InstallsRoute from '~/routes/installs'
 import SandboxesRoute from '~/routes/sandboxes'
-import MyAppsRoute from '~/routes/my-apps'
 import DownloadsRoute from '~/routes/downloads'
 import RconRoute from '~/routes/rcon'
 import ViewRoute from '~/routes/view'
@@ -118,7 +117,7 @@ const router = createHashRouter([
             { path: 'library', element: <LibraryRoute /> },
             { path: 'installed-mods', element: <InstalledModsRoute /> },
             { path: 'installs', element: <InstallsRoute /> },
-            { path: 'my-apps', element: <MyAppsRoute /> },
+            { path: 'my-apps', element: <Navigate to="/library" replace /> },
             { path: 'sandboxes', element: <SandboxesRoute /> },
             { path: 'sandboxes/:id', element: <SandboxesRoute /> },
             { path: 'downloads', element: <DownloadsRoute /> },
@@ -134,7 +133,7 @@ const router = createHashRouter([
                     { index: true, element: <AppSettingsRoute /> },
                     { path: 'account', element: <AccountSettingsRoute /> },
                     { path: 'downloads', element: <DownloadsSettingsRoute /> },
-                    { path: 'games', element: <Navigate to="/my-apps" replace /> },
+                    { path: 'games', element: <Navigate to="/library" replace /> },
                     { path: 'plugins', element: <PluginsRoute /> },
                     { path: 'logging', element: <LoggingRoute /> },
                 ],

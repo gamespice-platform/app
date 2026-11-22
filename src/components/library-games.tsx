@@ -12,6 +12,7 @@ import {
     FiShare2,
     FiSquare,
     FiTerminal,
+    FiX,
 } from 'react-icons/fi'
 
 import { api } from '~/lib/api/client'
@@ -21,6 +22,7 @@ import { useSettings } from '~/lib/settings/provider'
 import { useAppRefs } from '~/lib/hooks/use-app-icons'
 import { GameIcon } from '~/components/game-icon'
 import SandboxEditor from '~/components/sandbox-editor'
+import { useFolderPicker } from '~/components/folder-picker'
 import ScanDialog from '~/components/scan-dialog'
 import PlayDialog, { type PlayTargetT } from '~/components/play-dialog'
 import SessionHistory from '~/components/session-history'
@@ -93,6 +95,8 @@ function GameCard({
     onCreate,
     onPlay,
     onStop,
+    onChooseFolder,
+    onClearFolder,
 }: {
     row: GameRow
     running: SessionT | null
@@ -105,6 +109,8 @@ function GameCard({
     onCreate: () => void
     onPlay: () => void
     onStop: (session: SessionT) => void
+    onChooseFolder: () => void
+    onClearFolder: () => void
 }) {
     return (
         <article className="rounded-xl border border-border bg-surface">
@@ -154,15 +160,29 @@ function GameCard({
                         )}
                     </p>
 
-                    <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted">
+                    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted">
                         <FiFolder className="size-3 shrink-0" />
-                        <span className="selectable truncate">
-                            {row.dir ?? (
-                                <Link to="/my-apps" className="underline">
-                                    No folder set for this game
-                                </Link>
-                            )}
+                        <span className="selectable min-w-0 truncate">
+                            {row.dir ?? 'No folder set for this game'}
                         </span>
+                        <button
+                            type="button"
+                            onClick={onChooseFolder}
+                            aria-label={`Choose folder for ${row.name}`}
+                            className="shrink-0 rounded border border-border px-1.5 py-0.5 hover:text-foreground"
+                        >
+                            {row.dir ? 'Change' : 'Set folder'}
+                        </button>
+                        {row.dir && (
+                            <button
+                                type="button"
+                                onClick={onClearFolder}
+                                aria-label={`Clear folder for ${row.name}`}
+                                className="shrink-0 rounded border border-border p-0.5 hover:text-danger"
+                            >
+                                <FiX className="size-3" />
+                            </button>
+                        )}
                     </p>
                 </div>
 
@@ -266,7 +286,8 @@ function GameCard({
 }
 
 export default function LibraryGames() {
-    const { app, reloadApp } = useSettings()
+    const { app, reloadApp, setGameDir } = useSettings()
+    const { pick, element: picker } = useFolderPicker()
     const refFor = useAppRefs()
 
     const [search, setSearch] = useState('')
@@ -414,6 +435,27 @@ export default function LibraryGames() {
             })
     }, [sandboxRows, gameDirs, refFor, search, playedByApp])
 
+    /** Set or clear a game's install folder; Rust validates and refuses a bad one. */
+    const writeFolder = async (appId: number, dir: string | null) => {
+        setError(null)
+
+        try {
+            await setGameDir(appId, dir)
+        } catch (err) {
+            setError(messageOf(err))
+        }
+    }
+
+    const chooseFolder = async (row: GameRow) => {
+        const dir = await pick({
+            title: `Where is ${row.name} installed?`,
+            hint: 'Installer plugins for this game can only write inside the folder you choose.',
+            initial: row.dir,
+        })
+
+        if (dir !== null) await writeFolder(row.appId, dir)
+    }
+
     /**
      * End a running session, by whichever means actually ends it.
      *
@@ -547,6 +589,8 @@ export default function LibraryGames() {
                             }
                             onPlay={() => play(row)}
                             onStop={(session) => void stop(session)}
+                            onChooseFolder={() => void chooseFolder(row)}
+                            onClearFolder={() => void writeFolder(row.appId, null)}
                         />
                     ))}
                 </div>
@@ -585,6 +629,8 @@ export default function LibraryGames() {
                     onSaved={refresh}
                 />
             )}
+
+            {picker}
 
             {target && (
                 <PlayDialog target={target} onClose={() => setTarget(null)} />

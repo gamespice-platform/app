@@ -6,7 +6,6 @@ import {
     FiDownloadCloud,
     FiFileText,
     FiFolder,
-    FiGrid,
     FiGlobe,
     FiHardDrive,
     FiCompass,
@@ -221,15 +220,6 @@ export const LIBRARY: NavNode = {
             label: 'Sandboxes',
             icon: FiLayers,
             description: 'Mod profiles you can deploy, share and switch between.',
-        },
-        {
-            // Per-game settings (install folder, Find my games) live here, on
-            // a game's Manage view, not in Settings.
-            id: 'my-apps',
-            to: '/my-apps',
-            label: 'My apps',
-            icon: FiGrid,
-            description: 'Your games: install folders and Find my games.',
         },
         {
             id: 'workshop',

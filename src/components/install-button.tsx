@@ -143,7 +143,7 @@ export default function InstallButton({
                     <p className="text-danger">
                         No install folder is set for{' '}
                         {summary.app?.name ?? 'this game'}.{' '}
-                        <Link to="/my-apps" className="underline">
+                        <Link to="/library" className="underline">
                             Set one first
                         </Link>
                         .

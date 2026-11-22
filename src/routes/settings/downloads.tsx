@@ -73,8 +73,8 @@ export default function DownloadsSettingsRoute() {
 
             <p className="text-xs text-muted">
                 Install folders and Find my games are per game:{' '}
-                <Link to="/my-apps" className="underline">
-                    Library &rarr; Apps
+                <Link to="/library" className="underline">
+                    Library
                 </Link>
                 .
             </p>

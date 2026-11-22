@@ -129,7 +129,7 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `lib/library/sandbox-games.ts` | The games New sandbox offers: every supported slug resolved with `/apps?slugs=`, not the mod facets |
 | `lib/external.ts` | Which content kinds are handed to the system browser |
 | `components/shell.tsx` | Sidebar ≥768px, bottom tabs below; draws the tree in `lib/nav.ts` |
-| `lib/nav.ts` | The primary navigation as data: Library first (Mods, Sandboxes, My apps, Workshop, Downloads, Stores), then Discover (Assets, Mods, Servers > RCON, More), Avatar, My GameSpice, Store, Stats, Friends, Console, Settings. Feeds the rail, the bottom bar and the landing cards. There is no Play page: `/apps`, `/play` and `/games` redirect to Library |
+| `lib/nav.ts` | The primary navigation as data: Library first (Mods, Sandboxes, Workshop, Downloads, Stores), then Discover (Assets, Mods, Servers > RCON, More), Avatar, My GameSpice, Store, Stats, Friends, Console, Settings. Feeds the rail, the bottom bar and the landing cards. There is no Play page: `/apps`, `/play` and `/games` redirect to Library |
 | `components/section-cards.tsx` | The card grid on the Discover and Library landing pages |
 | `components/titlebar.tsx` | The app's own window frame — [frontend.md](frontend.md#the-window-frame-is-the-apps-not-the-oss) |
 | `components/update-banner.tsx` | "There is a newer version", with an Install button when this build can verify one |
@@ -163,8 +163,6 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `routes/store.tsx` | Store directory, per-game store (search, kind/currency/show filters, sort), item dialog (points buy with confirm, credits open the website externally, equip), loadout panel, inventory tab |
 | `routes/stats.tsx` | Stats overview (totals, 30-day activity, play share, per-game cards) and per-game drill-down (my stats, achievements, leaderboards) |
 | `components/add-friend-button.tsx` | "Add friend" on a member's page |
-| `routes/my-apps.tsx` | Library → My apps: every game, its install folder, and Find my games; unplaced and unsupported scan results |
-| `lib/app-manage/rows.ts` | The My apps rows as pure data: places scan results by `appId` (slug fallback), `sameDir`, unplaced and unsupported lists |
 | `routes/library.tsx` | Library: the catalogue (Games), On this device (games found here and GameSpice games installed) and Subscribed, above the cards for its sub-pages |
 | `routes/installed-mods.tsx` | Library > Mods: every installed mod per game (subscribed and imported), filters in the URL, enable/disable, update, uninstall, open folder, workshop page |
 | `components/library-tmc.tsx` | TMC's own games: install, update, auto-update, remove |
