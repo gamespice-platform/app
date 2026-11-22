@@ -19,7 +19,7 @@ import {
 import { api } from '~/lib/api/client'
 import { ipc } from '~/lib/ipc/commands'
 import { messageOf } from '~/lib/ipc'
-import { appLabel } from '~/lib/api/labels'
+import { sandboxGameOptions, sandboxSlugs, type SandboxGame } from '~/lib/library/sandbox-games'
 import { GameIcon } from '~/components/game-icon'
 import { ItemThumb } from '~/components/item-thumb'
 import { useAppIcons } from '~/lib/hooks/use-app-icons'
@@ -1360,9 +1360,7 @@ function CreateSandbox({
     onCancel: () => void
     onCreated: (created: SandboxRowT) => Promise<void>
 }) {
-    const [apps, setApps] = useState<
-        { id: number; name: string; slug: string | null; icon: string | null }[]
-    >([])
+    const [apps, setApps] = useState<SandboxGame[]>([])
     const [appId, setAppId] = useState<number | null>(initialAppId)
     const [name, setName] = useState('')
     // Both are tagged with the game they belong to, so picking another game
@@ -1384,23 +1382,16 @@ function CreateSandbox({
     useEffect(() => {
         void (async () => {
             try {
-                const [facets, supported] = await Promise.all([
-                    api.facets('mod'),
-                    ipc.librarySupportedApps(),
-                ])
-
-                const slugs = new Set(supported)
-
-                setApps(
-                    facets.apps
-                        .filter((a) => a.url && slugs.has(a.url.toLowerCase()))
-                        .map((a) => ({
-                            id: a.id,
-                            name: appLabel(a),
-                            slug: a.url ? a.url.toLowerCase() : null,
-                            icon: a.icon,
-                        }))
+                // Every game with a manage rule, not just the ones with mods on
+                // the site: see `~/lib/library/sandbox-games`.
+                const slugs = sandboxSlugs(await ipc.librarySupportedApps())
+                const pages = await Promise.all(
+                    Array.from({ length: Math.ceil(slugs.length / 100) }, (_, i) =>
+                        api.apps({ slugs: slugs.slice(i * 100, i * 100 + 100), limit: 100 })
+                    )
                 )
+
+                setApps(sandboxGameOptions(pages.flatMap((p) => p.apps), slugs))
             } catch (err) {
                 setError(messageOf(err))
             }

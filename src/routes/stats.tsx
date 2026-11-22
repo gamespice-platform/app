@@ -102,7 +102,7 @@ export function StatsRoute() {
                         Play any GameSpice game and your days, streaks and
                         achievements show up here.
                         <div className="mt-3">
-                            <Link to="/apps" className={BTN_PRIMARY}>
+                            <Link to="/library" className={BTN_PRIMARY}>
                                 Find a game
                             </Link>
                         </div>

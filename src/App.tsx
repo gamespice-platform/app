@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { attachOfflineCache } from '~/lib/api/offline-cache'
-import { createHashRouter, Navigate, RouterProvider } from 'react-router-dom'
+import { createHashRouter, Navigate, RouterProvider, useLocation } from 'react-router-dom'
 
 import { AuthProvider } from '~/lib/auth/provider'
 import { SettingsProvider } from '~/lib/settings/provider'
@@ -15,7 +15,7 @@ import NotFound from '~/components/not-found'
 import DiscoverRoute from '~/routes/discover'
 import StoresRoute from '~/routes/stores'
 import ConsoleRoute from '~/routes/console'
-import AppsRoute from '~/routes/apps'
+import InstalledModsRoute from '~/routes/installed-mods'
 import GameRoute from '~/routes/game'
 import FriendsRoute from '~/routes/friends'
 import BrowseRoute from '~/routes/browse'
@@ -46,15 +46,24 @@ import LoggingRoute from '~/routes/settings/logging'
  * window would 404. The hash keeps every route inside one document, which is
  * also what makes the same build work unchanged on all five targets.
  */
+/** To the Library catalogue, keeping the query (`/apps?app=4&start=1` still starts the game). */
+function ToLibrary() {
+    const { search } = useLocation()
+
+    return <Navigate to={`/library${search}`} replace />
+}
+
 const router = createHashRouter([
     {
         path: '/',
         element: <Shell />,
         children: [
-            { index: true, element: <Navigate to="/apps" replace /> },
-            // The Play page folded into the Apps catalogue; old links land there.
-            { path: 'play', element: <Navigate to="/apps" replace /> },
-            { path: 'games', element: <Navigate to="/apps" replace /> },
+            { index: true, element: <ToLibrary /> },
+            // Library's own page is the catalogue: the Play page and the Apps
+            // page folded into it, and their old links land there.
+            { path: 'play', element: <ToLibrary /> },
+            { path: 'games', element: <ToLibrary /> },
+            { path: 'apps', element: <ToLibrary /> },
             { path: 'games/:slug', element: <GameHubRoute /> },
             {
                 path: 'games/:slug/avatar',
@@ -101,13 +110,13 @@ const router = createHashRouter([
                     })),
             },
             { path: 'discover', element: <DiscoverRoute /> },
-            { path: 'apps', element: <AppsRoute /> },
             { path: 'apps/:id', element: <GameRoute /> },
             { path: 'friends', element: <FriendsRoute /> },
             { path: 'browse/:kind', element: <BrowseRoute /> },
             { path: 'view/:kind/:id', element: <ViewRoute /> },
             { path: 'join', element: <JoinRoute /> },
             { path: 'library', element: <LibraryRoute /> },
+            { path: 'installed-mods', element: <InstalledModsRoute /> },
             { path: 'installs', element: <InstallsRoute /> },
             { path: 'my-apps', element: <MyAppsRoute /> },
             { path: 'sandboxes', element: <SandboxesRoute /> },

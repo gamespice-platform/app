@@ -7,9 +7,12 @@ import {
     FiExternalLink,
     FiPauseCircle,
     FiRefreshCw,
+    FiSlash,
     FiTrash2,
 } from 'react-icons/fi'
 
+import { api } from '~/lib/api/client'
+import { messageOf } from '~/lib/ipc'
 import { useLibrary } from '~/lib/library/provider'
 import { openExternally } from '~/lib/external'
 import { useAppIcons } from '~/lib/hooks/use-app-icons'
@@ -43,7 +46,7 @@ const KIND_LABELS: Record<LibraryRowT['kind'], string> = {
 type Filter = 'all' | 'installed' | 'updates' | 'problems'
 
 /** The one-line status under a row's name. */
-function statusOf(row: LibraryRowT): { text: string; tone: string } {
+function statusOf(row: LibraryRowT): { text: string; tone: string; badge?: string } {
     if (row.state === 'installing')
         return { text: 'Installing…', tone: 'text-accent' }
     if (row.state === 'removing') return { text: 'Removing…', tone: 'text-accent' }
@@ -53,8 +56,9 @@ function statusOf(row: LibraryRowT): { text: string; tone: string } {
 
     if (!row.installable)
         return {
-            text: 'No longer installable — its team turned subscriptions off, or the game lost app support.',
-            tone: 'text-warning',
+            badge: 'Not installable',
+            text: 'Its team turned app installs off, or the game lost app support. Unsubscribe, or open its page to check.',
+            tone: 'text-muted',
         }
 
     /*
@@ -98,7 +102,28 @@ function statusOf(row: LibraryRowT): { text: string; tone: string } {
 
 function LibraryRow({ row }: { row: LibraryRowT }) {
     const iconFor = useAppIcons()
-    const { install, uninstall, busy } = useLibrary()
+    const { install, uninstall, busy, sync } = useLibrary()
+    const [leaving, setLeaving] = useState(false)
+    const [leaveError, setLeaveError] = useState<string | null>(null)
+
+    /*
+     * Unsubscribing is the one way out of a row that can no longer install:
+     * nothing else on it does anything. It goes through the account (the same
+     * call the website makes), then a sync drops the row here.
+     */
+    const unsubscribe = async () => {
+        setLeaving(true)
+        setLeaveError(null)
+
+        try {
+            await api.subscribe(row.kind, row.itemId, false)
+            await sync()
+        } catch (e) {
+            setLeaveError(messageOf(e))
+        } finally {
+            setLeaving(false)
+        }
+    }
 
     const status = statusOf(row)
     const working =
@@ -161,7 +186,20 @@ function LibraryRow({ row }: { row: LibraryRowT }) {
                     ) : null}
                 </div>
 
-                <p className={`mt-0.5 text-xs ${status.tone}`}>{status.text}</p>
+                <p className={`mt-0.5 text-xs ${status.tone}`}>
+                    {status.badge ? (
+                        <span className="mr-1.5 inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground">
+                            <FiSlash className="size-3" />
+                            {status.badge}
+                        </span>
+                    ) : null}
+                    {status.text}
+                </p>
+                {leaveError ? (
+                    <p role="alert" className="mt-0.5 text-xs text-danger">
+                        {leaveError}
+                    </p>
+                ) : null}
             </div>
 
             <div className="flex shrink-0 items-center gap-1">
@@ -194,6 +232,17 @@ function LibraryRow({ row }: { row: LibraryRowT }) {
                         className="rounded-lg border border-border p-2 text-muted hover:text-danger disabled:opacity-50"
                     >
                         <FiTrash2 className="h-4 w-4" />
+                    </button>
+                ) : null}
+
+                {!row.installable ? (
+                    <button
+                        type="button"
+                        disabled={leaving}
+                        onClick={() => void unsubscribe()}
+                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted hover:text-foreground disabled:opacity-50"
+                    >
+                        {leaving ? 'Unsubscribing…' : 'Unsubscribe'}
                     </button>
                 ) : null}
 

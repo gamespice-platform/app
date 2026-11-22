@@ -17,7 +17,7 @@ Any program on the machine can claim a custom scheme and any web page can naviga
 
 **`gs://play/<host>:<port>` is the website's Join button**, and it is the only link whose payload is not an id of ours. It is still only a screen: `/join` resolves the address through `/servers/lookup`, shows which game is running there with the latency measured from this device, and offers the launch modes this machine actually has. The rule is load-bearing here rather than theoretical, because this is the link an ordinary web page can navigate to without a click — an auto-joining version would be a remote primitive for making somebody's machine connect to an address a stranger chose.
 
-`solo`/`solo-version` (the site sends the hyphen; the legacy `solo_version` is still read) are the one query the grammar accepts, and only on `play/app`: each is checked by `games::build::SoloPack::new` (a closed character set, no leading `-`, since both become process arguments) and silently dropped when it fails, so the link still opens the dialog. They ride to the launch dialog as `/apps?app=..&start=1&solo=..&soloVersion=..` and still wait for a click; the site's own `boot.solo` wins over the link at launch.
+`solo`/`solo-version` (the site sends the hyphen; the legacy `solo_version` is still read) are the one query the grammar accepts, and only on `play/app`: each is checked by `games::build::SoloPack::new` (a closed character set, no leading `-`, since both become process arguments) and silently dropped when it fails, so the link still opens the dialog. They ride to the launch dialog as `/library?app=..&start=1&solo=..&soloVersion=..` and still wait for a click; the site's own `boot.solo` wins over the link at launch.
 
 Properties of the grammar:
 

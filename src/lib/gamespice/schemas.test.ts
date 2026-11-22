@@ -133,14 +133,14 @@ describe('nav', () => {
         expect(to).not.toContain('/play')
     })
 
-    it('opens on Library, whose first item is the Apps catalogue', () => {
+    it('opens on Library, which is the catalogue itself, with Mods first', () => {
         expect(RAIL[0]?.id).toBe('library')
         expect(COMPACT[0]?.id).toBe('library')
         expect(COMPACT.length).toBeLessThanOrEqual(5)
-        const first = LIBRARY.items?.[0]
-
-        expect(first?.to).toBe('/apps')
-        expect(first !== undefined && isOwn(first, '/play')).toBe(true)
+        // No separate Apps entry: the old Apps and Play paths are Library's own.
+        expect(LIBRARY.items?.map((i) => i.to)).not.toContain('/apps')
+        for (const old of ['/apps', '/play', '/games']) expect(isOwn(LIBRARY, old)).toBe(true)
+        expect(LIBRARY.items?.[0]?.to).toBe('/installed-mods')
     })
 
     it('lists Assets above Mods in Discover, and no Apps there', () => {

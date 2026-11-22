@@ -135,9 +135,9 @@ export function GameAvatarPage() {
     const game = useGameBySlug(slug)
 
     if (!slug || !isPlatformSlug(slug))
-        return <Note back="/apps">That is not a GameSpice game.</Note>
+        return <Note back="/library">That is not a GameSpice game.</Note>
     if (game.isPending) return <Note>Loading…</Note>
-    if (!game.data) return <Note back="/apps">No such game.</Note>
+    if (!game.data) return <Note back="/library">No such game.</Note>
 
     const appId = game.data.id
 

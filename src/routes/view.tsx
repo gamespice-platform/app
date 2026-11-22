@@ -237,7 +237,7 @@ export default function ViewRoute() {
                     // 'default' is the key of the first entry: a deep link or fresh open has nothing to go back to.
                     onClick={() =>
                         location.key === 'default'
-                            ? navigate('/apps')
+                            ? navigate('/library')
                             : navigate(-1)
                     }
                     aria-label="Back"

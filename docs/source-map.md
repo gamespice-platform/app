@@ -114,9 +114,11 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `lib/hooks/use-deep-link.tsx` | Turns a `gs://` link into a route. Never into an action |
 | `lib/downloads/provider.tsx` | The queue, pushed from Rust and coalesced |
 | `lib/library/provider.tsx` | The subscription sync loop |
+| `lib/library/mods.ts` | Library > Mods rows, filters and sorts (pure) |
+| `lib/library/sandbox-games.ts` | The games New sandbox offers: every supported slug resolved with `/apps?slugs=`, not the mod facets |
 | `lib/external.ts` | Which content kinds are handed to the system browser |
 | `components/shell.tsx` | Sidebar ≥768px, bottom tabs below; draws the tree in `lib/nav.ts` |
-| `lib/nav.ts` | The primary navigation as data: Library first (Apps, Sandboxes, My apps, Workshop, Downloads, Stores), then Discover (Assets, Mods, Servers > RCON, More), Avatar, My GameSpice, Store, Stats, Friends, Console, Settings. Feeds the rail, the bottom bar and the landing cards. There is no Play page: `/play` and `/games` redirect to Apps |
+| `lib/nav.ts` | The primary navigation as data: Library first (Mods, Sandboxes, My apps, Workshop, Downloads, Stores), then Discover (Assets, Mods, Servers > RCON, More), Avatar, My GameSpice, Store, Stats, Friends, Console, Settings. Feeds the rail, the bottom bar and the landing cards. There is no Play page: `/apps`, `/play` and `/games` redirect to Library |
 | `components/section-cards.tsx` | The card grid on the Discover and Library landing pages |
 | `components/titlebar.tsx` | The app's own window frame — [frontend.md](frontend.md#the-window-frame-is-the-apps-not-the-oss) |
 | `components/update-banner.tsx` | "There is a newer version", with an Install button when this build can verify one |
@@ -136,7 +138,7 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `components/server-table.tsx` | The server browser's default view: table, expandable rows |
 | `components/browse-filters.tsx` | The filter panel: collapsible groups, kind-aware, URL-backed |
 | `components/server-panel.tsx` | The live panel on a server's page |
-| `routes/apps.tsx` | **The front door** (Library > Apps). The catalogue: every game and app with tabs (All, Managed, Unmanaged, GameSpice, Installed, Multiplayer, Singleplayer), search, sort, and per card Quick play, Play solo, install, Manage, sandbox, workshop and a detail drawer. Absorbed the former Play page (party bar, quick match) |
+| `components/catalog.tsx` | **The front door** (Library's Games view). The catalogue: every game and app with tabs (All, Managed, Unmanaged, GameSpice, Installed, Multiplayer, Singleplayer), search, sort, and per card Quick play, Play solo, install, Manage, sandbox, workshop and a detail drawer. Absorbed the former Play page (party bar, quick match) |
 | `components/catalog-card.tsx` | One catalogue card: GameSpice games lead with `GameCardStats`, managed ones are ringed in the accent; play/install/manage buttons and the overflow menu, shared with the drawer |
 | `components/catalog-drawer.tsx` | The catalogue's detail drawer (modal side panel) |
 | `lib/catalog/filter.ts` | Pure tab logic: joins `/apps` and `/play/page` rows by id, GameSpice first and always managed |
@@ -152,7 +154,8 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `components/add-friend-button.tsx` | "Add friend" on a member's page |
 | `routes/my-apps.tsx` | Library → My apps: every game, its install folder, and Find my games; unplaced and unsupported scan results |
 | `lib/app-manage/rows.ts` | The My apps rows as pure data: places scan results by `appId` (slug fallback), `sameDir`, unplaced and unsupported lists |
-| `routes/library.tsx` | Three views: the games on this machine, the games TMC published here, and what the account subscribed to |
+| `routes/library.tsx` | Library: the catalogue (Games), On this device (games found here and GameSpice games installed) and Subscribed, above the cards for its sub-pages |
+| `routes/installed-mods.tsx` | Library > Mods: every installed mod per game (subscribed and imported), filters in the URL, enable/disable, update, uninstall, open folder, workshop page |
 | `components/library-tmc.tsx` | TMC's own games: install, update, auto-update, remove |
 | `routes/join.tsx` | Where a `gs://play/<host>:<port>` link lands. Shows what is there; joins nothing on its own |
 | `components/library-games.tsx` | Installed games, their sandboxes, play time, and what is running |

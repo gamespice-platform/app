@@ -135,7 +135,7 @@ export function useDeepLink() {
                         if (link.solo && link.soloVersion)
                             query.set('soloVersion', link.soloVersion)
 
-                        void navigate(`/apps?${query.toString()}`)
+                        void navigate(`/library?${query.toString()}`)
                     }
 
                     return

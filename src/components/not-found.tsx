@@ -26,7 +26,7 @@ export default function NotFound() {
                     Go back
                 </button>
                 <Link
-                    to="/apps"
+                    to="/library"
                     replace
                     className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >

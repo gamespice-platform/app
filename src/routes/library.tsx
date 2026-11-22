@@ -1,37 +1,36 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { FiLayers, FiPackage, FiZap } from 'react-icons/fi'
+import { FiGrid, FiHardDrive, FiLayers, FiPackage } from 'react-icons/fi'
 
 import { useAuth } from '~/lib/auth/provider'
 import { useLibrary } from '~/lib/library/provider'
 import LibraryGames from '~/components/library-games'
 import LibraryContent from '~/components/library-content'
 import LibraryTmcGames from '~/components/library-tmc'
+import Catalog from '~/components/catalog'
 import SectionCards from '~/components/section-cards'
 import { LIBRARY, type NavNode } from '~/lib/nav'
 
 /**
- * **Library** — this device's half of the app, and the landing page for the
- * Library group in the rail.
+ * **Library**: the app's front door. Its own page IS the games catalogue;
+ * there is no separate Apps or Play page any more (`/apps`, `/play` and
+ * `/games` redirect here with their query, so `gs://play/app` deep links and
+ * old bookmarks still work).
  *
- * The cards on top link to every child of the group (the bottom bar cannot
- * nest, so on a phone this is the only way in); the views below are what the
- * screen showed before it became a landing page.
+ * The cards on top link to every child of the group (Mods, Sandboxes,
+ * Workshop, Downloads, Stores, Installs); the bottom bar cannot nest, so on a
+ * phone they are the only way in. Below them, three views:
  *
- * Three views, because the screen was answering the wrong question. It used to
- * be a list of subscriptions, which tells somebody what they subscribed to; the
- * question people open a mod manager for is *what have I got installed, and how
- * do I play it*. That is now the view it opens on, and the subscription list is
- * a tab rather than the whole screen.
+ *   * **Games** (default): the unified catalogue (`components/catalog.tsx`),
+ *     with its own All / Managed / Unmanaged / GameSpice tabs, search and
+ *     sort. It replaced the old "Games" and "GameSpice Games" views.
+ *   * **On this device**: the two device lists those views used to be,
+ *     sandboxes and play time for other launchers' games, and the GameSpice
+ *     builds this app installed with their update and auto-update controls.
+ *     The catalogue says what a game IS; this says what this machine holds.
+ *   * **Subscribed**: what the ACCOUNT subscribed to, mirrored down.
  *
- * The split is not cosmetic. The three lists come from different places and
- * mean genuinely different things, and one list holding all of them would have
- * to explain, per row, which kind of thing it was:
- *
- *   * **Games** — what somebody ELSE's launcher installed, assembled from this
- *     machine's sandboxes and configured folders. The app mods these.
- *   * **TMC Games** — what THIS app installed, from a build TMC published. The
- *     app owns these folders outright and keeps them current.
- *   * **Subscribed** — what the ACCOUNT subscribed to, mirrored down.
+ * The view is in the URL (`view=`) so a link to one half survives a reload;
+ * the retired `view=tmc` lands on the device view.
  */
 
 /*
@@ -43,39 +42,35 @@ const INSTALLS: NavNode = {
     to: '/installs',
     label: 'Installs',
     icon: FiPackage,
-    description: 'Mods and assets installed on this device.',
+    description: 'Sandbox installs saved to your account.',
 }
 
-type View = 'games' | 'content' | 'tmc'
+type View = 'games' | 'device' | 'content'
+
+function viewOf(raw: string | null): View {
+    if (raw === 'content') return 'content'
+    if (raw === 'device' || raw === 'tmc') return 'device'
+
+    return 'games'
+}
 
 export default function LibraryRoute() {
     const { status } = useAuth()
     const { rows } = useLibrary()
     const [params, setParams] = useSearchParams()
-
-    /*
-     * In the URL, like every other durable view choice in this app: a link to
-     * the content view has to survive a reload and the back button, and it is
-     * what lets another screen point at one half of this one.
-     */
-    const raw = params.get('view')
-    const view: View =
-        raw === 'content' ? 'content' : raw === 'tmc' ? 'tmc' : 'games'
+    const view = viewOf(params.get('view'))
 
     const setView = (next: View) => {
-        const updated = new URLSearchParams(params)
-
-        if (next === 'games') updated.delete('view')
-        else updated.set('view', next)
+        // The catalogue's own filters belong to the games view only.
+        const updated = next === 'games' ? new URLSearchParams() : new URLSearchParams({ view: next })
 
         setParams(updated, { replace: true })
     }
 
     /*
-     * The Games view works signed out — sandboxes, game folders and play time
-     * are all facts about this machine, and a user who has not signed in can
-     * still mod a game they own. Only the subscription list needs an account,
-     * so only that half asks for one.
+     * The catalogue and the device lists work signed out: game folders,
+     * sandboxes and play time are facts about this machine. Only the
+     * subscription list needs an account, so only that view asks for one.
      */
     if (status !== 'signedIn' && view === 'content')
         return (
@@ -102,8 +97,16 @@ export default function LibraryRoute() {
             <Landing />
             <Header view={view} onChange={setView} count={rows.length} />
 
-            {view === 'games' && <LibraryGames />}
-            {view === 'tmc' && <LibraryTmcGames />}
+            {view === 'games' && <Catalog />}
+            {view === 'device' && (
+                <div className="flex flex-col gap-6">
+                    <LibraryGames />
+                    <section className="flex flex-col gap-2">
+                        <h2 className="text-sm font-semibold">GameSpice games on this device</h2>
+                        <LibraryTmcGames />
+                    </section>
+                </div>
+            )}
             {view === 'content' && <LibraryContent />}
         </div>
     )
@@ -115,8 +118,8 @@ function Landing() {
             <header>
                 <h1 className="text-lg font-bold">Library</h1>
                 <p className="text-xs text-muted">
-                    Everything on this device: sandboxes, downloads, stores and
-                    what is installed.
+                    Every game, and what this device does with it: play,
+                    install, mod and manage.
                 </p>
             </header>
 
@@ -140,14 +143,14 @@ function Header({
                 <Tab
                     active={view === 'games'}
                     onClick={() => onChange('games')}
-                    icon={FiLayers}
+                    icon={FiGrid}
                     label="Games"
                 />
                 <Tab
-                    active={view === 'tmc'}
-                    onClick={() => onChange('tmc')}
-                    icon={FiZap}
-                    label="GameSpice Games"
+                    active={view === 'device'}
+                    onClick={() => onChange('device')}
+                    icon={FiHardDrive}
+                    label="On this device"
                 />
                 <Tab
                     active={view === 'content'}

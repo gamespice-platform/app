@@ -4,7 +4,11 @@
 
 The device's answer to the account's subscriptions: which of them this machine holds, which are on disk, and how they got there.
 
-> The Library SCREEN has three views and they are genuinely different nouns: **Games** is what somebody else's launcher installed and this app mods, **TMC Games** is what this app installed from a build TMC published (see [playing.md](playing.md#games-tmc-publishes)), and **Subscribed** is what the account subscribed to. One list holding all three would have to explain, per row, which kind of thing it was.
+> The Library SCREEN has three views and they are genuinely different nouns: **Games** is the catalogue of every game, **On this device** lists what somebody else's launcher installed and this app mods, then what this app installed from a build TMC published (see [playing.md](playing.md#games-tmc-publishes)), and **Subscribed** is what the account subscribed to. One list holding all of them would have to explain, per row, which kind of thing it was.
+
+**Library > Mods** (`/installed-mods`) is the per-mod view of the same data: installed or disabled subscriptions plus imported local mods. Disabling a subscription removes its files and pauses it (a paused row is never installed by sync), so the row stays listed and Enable resumes and installs it. Open folder is `library_reveal`/`local_reveal`, which take an id and reveal the first installed file, or the local mod's store folder, in the OS file manager; the webview never sees the path.
+
+**New sandbox offers every game this build has a manage rule for**, resolved from the supported slugs with `/apps?slugs=` (`lib/library/sandbox-games.ts`). It used to be the site's mod facets, which only list games with a mod published on the site, so a game set up through Find games with no site mods (Minecraft) was missing.
 
 **SQLite, not a JSON file** (`library/db.rs`). Everything else the app persists — settings, the plugin registry — is a small file rewritten whole, and that is right for those: read at launch, written on a click, never contended. The library is not like that. The sync loop writes it on a timer while the UI reads it on every render and the installer writes single rows mid-install, and a whole-file rewrite under that pattern loses one writer to another exactly when somebody is watching a progress bar.
 

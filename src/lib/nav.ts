@@ -7,7 +7,6 @@ import {
     FiFileText,
     FiFolder,
     FiGlobe,
-    FiGrid,
     FiHardDrive,
     FiCompass,
     FiLayers,
@@ -196,22 +195,22 @@ export const LIBRARY: NavNode = {
     to: '/library',
     label: 'Library',
     icon: FiDownloadCloud,
-    description: 'What is on this device: installs, sandboxes and downloads.',
-    match: ['/installs'],
+    description: 'Every game, and what is on this device: mods, sandboxes and downloads.',
+    // Library's own page is the catalogue, the app's front door. It absorbed
+    // the old Play and Apps screens, so those paths land here too.
+    match: ['/installs', '/apps', '/play', '/games'],
     collapsible: true,
     items: [
         {
-            // The catalogue, and the app's front door: every game with what
-            // this device can do for it (play, quick play, install, manage,
-            // sandboxes). It absorbed the old Play screen, so `/play` and
-            // `/games` land here too.
-            id: 'apps',
-            to: '/apps',
-            label: 'Apps',
-            icon: FiGrid,
-            description:
-                'Every game, the GameSpice ones first: play, install and manage.',
-            match: ['/play', '/games'],
+            // Every mod on this device, per game, whatever installed it: the
+            // subscribed ones and the imported ones in one list to enable,
+            // update, remove or open. The catalogue itself is Library's own
+            // page, so it has no item here.
+            id: 'installed-mods',
+            to: '/installed-mods',
+            label: 'Mods',
+            icon: FiBox,
+            description: 'Installed mods for each game: enable, update, remove.',
         },
         {
             // The mod manager proper: where somebody SPENDS time reordering,

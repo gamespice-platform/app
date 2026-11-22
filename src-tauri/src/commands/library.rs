@@ -255,6 +255,45 @@ pub async fn library_uninstall(
     Ok(uninstall_one(&state.library, &entry, &holder.ctx(&state), false).await)
 }
 
+/// Show an installed item's files in the system file manager.
+///
+/// Takes the library id, never a path: the path is the first file the
+/// installer recorded (`installed_files`) that is still on disk. Revealing
+/// opens a file-manager window and nothing else, so an edited database row can
+/// at worst point it at some other folder; it never reads, writes or runs it.
+#[tauri::command]
+pub fn library_reveal(app: tauri::AppHandle, state: State<'_, AppState>, id: String) -> AppResult<()> {
+    let entry = state
+        .library
+        .get(&id)?
+        .ok_or_else(|| AppError::invalid("That item is not in your library."))?;
+
+    let path = first_present(&entry.installed_files)
+        .ok_or_else(|| AppError::invalid("Nothing of that item is on this device to show."))?;
+
+    reveal(&app, &path)
+}
+
+/// The first recorded file that still exists. `removed <path>` entries are the
+/// executor's note of a delete, not a file.
+fn first_present(files: &[String]) -> Option<PathBuf> {
+    files
+        .iter()
+        .filter(|f| !f.starts_with("removed "))
+        .map(PathBuf::from)
+        .find(|p| p.is_absolute() && p.exists())
+}
+
+/// Reveal a path Rust resolved, in the OS file manager. Desktop only; the
+/// opener answers "unsupported" on a phone and that is surfaced as-is.
+pub(crate) fn reveal(app: &tauri::AppHandle, path: &std::path::Path) -> AppResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+
+    app.opener()
+        .reveal_item_in_dir(path)
+        .map_err(|e| AppError::internal(format!("could not show the folder: {e}")))
+}
+
 /// The cloud installs this device has mirrored, as raw payloads.
 ///
 /// Raw because the shape is the API contract's and the frontend already parses
@@ -498,4 +537,24 @@ pub struct RuleInfo {
     pub extensions: Vec<String>,
     pub loaders: Vec<String>,
     pub manages: bool,
+}
+
+#[cfg(test)]
+mod reveal_tests {
+    use super::first_present;
+
+    #[test]
+    fn first_present_skips_removals_relative_and_missing_paths() {
+        let dir = std::env::temp_dir();
+        let here = dir.to_string_lossy().into_owned();
+        let files = vec![
+            format!("removed {here}"),
+            "relative/thing".to_string(),
+            dir.join("tmc-reveal-test-does-not-exist").to_string_lossy().into_owned(),
+            here.clone(),
+        ];
+
+        assert_eq!(first_present(&files), Some(dir));
+        assert_eq!(first_present(&files[..3]), None);
+    }
 }

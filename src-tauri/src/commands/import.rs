@@ -443,6 +443,23 @@ pub fn local_get(state: State<'_, AppState>, id: i64) -> AppResult<Option<LocalM
     state.library.local_get(id)
 }
 
+/// Show an imported mod's folder in the system file manager, by id.
+#[tauri::command]
+pub fn local_reveal(app: tauri::AppHandle, state: State<'_, AppState>, id: i64) -> AppResult<()> {
+    state
+        .library
+        .local_get(id)?
+        .ok_or_else(|| AppError::invalid("That imported mod is not on this device."))?;
+
+    let root = store::local_root(&state.paths.local_mods_dir(), id);
+
+    if !root.is_dir() {
+        return Err(AppError::invalid("That imported mod's files are missing."));
+    }
+
+    crate::commands::library::reveal(&app, &root)
+}
+
 /// Rename it, re-version it, note something about it, or move where it lands.
 ///
 /// Changing `relPath` MOVES the files, which is why it is not just a column

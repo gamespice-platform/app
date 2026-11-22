@@ -37,9 +37,10 @@ import {
 import { CatalogDrawer } from '~/components/catalog-drawer'
 
 /**
- * **Apps**: the Library's catalogue of every game, engine and platform TMC
- * tracks, and what can be done with each one from this device. It replaced the
- * Play page: GameSpice's own games lead with the website's live stats, and
+ * The Library's catalogue of every game, engine and platform TMC tracks, and
+ * what can be done with each one from this device. Mounted as the Library
+ * page's Games view (`/library`); it replaced the Play page and the old Games
+ * and GameSpice Games views: GameSpice's own games lead with the website's live stats, and
  * every card can Quick play, Play solo, install, manage, open a sandbox or the
  * workshop.
  *
@@ -68,7 +69,7 @@ const SORT_LABELS: Record<AppSortT, string> = {
     name: 'Name',
 }
 
-export default function AppsRoute() {
+export default function Catalog() {
     const [params, setParams] = useSearchParams()
     const [target, setTarget] = useState<PlayTargetT | null>(null)
     const [detailId, setDetailId] = useState<number | null>(null)
@@ -356,8 +357,8 @@ export default function AppsRoute() {
     const loading = listing.isPending && pinnedQuery.isPending
 
     return (
-        <div className="flex h-full flex-col">
-            <header className="flex flex-col gap-3 border-b border-border p-4">
+        <div className="flex flex-col">
+            <div className="flex flex-col gap-3 border-b border-border pb-3">
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="relative min-w-48 flex-1">
                         <FiSearch className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
@@ -421,15 +422,15 @@ export default function AppsRoute() {
                         shown. Everything else on this screen still works.
                     </p>
                 )}
-            </header>
+            </div>
 
             <div
                 id="catalog-panel"
                 role="tabpanel"
                 aria-labelledby={`catalog-tab-${tab}`}
-                className="flex-1 overflow-y-auto p-4"
+                className="pt-3"
             >
-                <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
+                <div className="flex flex-col gap-4">
                     {firstPlay?.party && (
                         <PartyBar party={firstPlay.party} busy={join.isPending} onJoin={(t) => join.mutate(t)} />
                     )}

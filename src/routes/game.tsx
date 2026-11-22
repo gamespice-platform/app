@@ -22,7 +22,7 @@ import { GameIcon } from '~/components/game-icon'
 import PlayDialog, { type PlayTargetT } from '~/components/play-dialog'
 
 /**
- * **One game** — `/apps/:id`. What the Apps card is a summary of.
+ * **One game** — `/apps/:id`. What a Library catalogue card is a summary of.
  *
  * Three things the card has no room for, all of which a Dot game grew in the
  * platform's September work:
@@ -70,7 +70,7 @@ export default function GameRoute() {
     return (
         <div className="flex flex-col gap-4 p-3">
             <Link
-                to="/apps"
+                to="/library"
                 className="flex w-fit items-center gap-1 text-xs text-muted hover:text-foreground"
             >
                 <FiArrowLeft className="size-3" />

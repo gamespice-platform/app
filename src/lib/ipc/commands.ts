@@ -346,6 +346,8 @@ export const ipc = {
         call('library_install', InstallOutcomeSchema, { id }),
     libraryUninstall: (id: string) =>
         call('library_uninstall', InstallOutcomeSchema, { id }),
+    /** Show an installed item's files in the OS file manager. Rust picks the path. */
+    libraryReveal: (id: string) => call('library_reveal', z.null().or(z.undefined()), { id }),
     /**
      * The cloud installs this device has mirrored, as raw payloads.
      *
@@ -1017,6 +1019,8 @@ export const ipc = {
         call('local_list', z.array(LocalModSchema), { appId }),
 
     localGet: (id: number) => call('local_get', LocalModSchema.nullable(), { id }),
+    /** Show an imported mod's folder in the OS file manager. */
+    localReveal: (id: number) => call('local_reveal', z.null().or(z.undefined()), { id }),
 
     /**
      * Rename it, re-version it, note something, or move where it lands.
