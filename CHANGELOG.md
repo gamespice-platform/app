@@ -16,6 +16,7 @@ The GameSpice App's releases, newest first. A version here is the one in `packag
 - New: Export .mrpack and Export share zip buttons on the sandbox screen.
 - New: a plugin path root `prefix` for a Steam game's Proton/Wine prefix (Linux only), limited to an allowlist of user-data folders and jailed like the others. Rules for The Sims 4 and Baldur's Gate 3.
 - New: a `download` step can list `mirrors`; each passes the same https and host checks, a pinned SHA-256 is required, and it fails over only on a network error or a mismatch.
+- Fixed: `rusqlite` 0.40 to 0.41 (bundled SQLite, `libsqlite3-sys` 0.38 to 0.39), which clears RUSTSEC-2026-0459; the advisory ignore is gone from `audit.toml`.
 - New: `CREDITS.md` names the projects the rules were drafted from.
 
 ## 0.5.16

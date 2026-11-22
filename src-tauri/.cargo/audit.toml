@@ -90,12 +90,4 @@ ignore = [
     # `unmaintained`, no fixed release. Pulled in by Tauri and our own date
     # handling; drop when a replacement lands.
     "RUSTSEC-2026-0543", # chrono
-
-    # --- libsqlite3-sys 0.38.2 (bundled SQLite) ------------------------------------
-    #
-    # A real advisory, NOT a notice: the fix is libsqlite3-sys >= 0.39, which
-    # needs a newer `rusqlite` than the 0.40 pinned in `tmc-core`'s Cargo.toml.
-    # That bump is a core change and is on the nightly board; the database holds
-    # only the user's own library and is never fed untrusted SQL.
-    "RUSTSEC-2026-0459", # libsqlite3-sys
 ]

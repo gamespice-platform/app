@@ -77,7 +77,7 @@ time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
 # writes it on a timer while the UI reads it on every render, and a whole-file
 # rewrite loses one of those to the other. `bundled` so there is no libsqlite3
 # on the target — Android in particular ships one we may not link against.
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
 
 # YAML for app-scoped plugins, alongside JSON. Both are supported because a
 # plugin is hand-authored and YAML is what people reach for when a manifest has
