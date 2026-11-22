@@ -16,6 +16,14 @@
 //! A layer is reused when its marker is there and every file still has its
 //! size; a file whose mtime is not older than the build is hashed again. A
 //! layer that fails the check is rebuilt.
+//!
+//! A finished layer's files are made read-only ([`seal`]). The hardlink and
+//! symlink strategies put the layer's own file in the game folder, so a program
+//! that rewrote one in place would change it for every sandbox sharing the
+//! layer. Read-only, such a write fails where it happens; a program that
+//! replaces the file (write a new one, rename over) only breaks its own link,
+//! and the ledger then leaves that file alone as the user's. Direct copies are
+//! made writable again ([`crate::deploy::link::copy_file`]).
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
@@ -28,11 +36,14 @@ use crate::download::DownloadManager;
 use crate::error::{AppError, AppResult};
 use crate::layers::checks::{self, LayerFile, Limits};
 use crate::layers::plan::{InstallPlan, PlannedLayer};
+use crate::layers::progress::{self, PlanStepEvent, PlanStepSink, StepSink, StepStatus};
 use crate::logging::Audit;
 use crate::plugins::jail::Jail;
 use crate::plugins::manifest::WhenContext;
 use crate::plugins::steps::Executor;
-use crate::plugins::steps_install::{install_manifest, install_roots, InstallEnv, OutputSink, RuntimeExe};
+use crate::plugins::steps_install::{
+    install_manifest, install_roots, InstallEnv, OutputSink, RuntimeExe,
+};
 
 pub const MARKER: &str = ".tmc-layer.json";
 
@@ -51,6 +62,9 @@ pub struct BuildCtx<'a> {
     /// proxy setting yet, and an installer that needs one fails with its log.
     pub proxy: Vec<(String, String)>,
     pub on_output: Option<OutputSink>,
+    /// Each layer step's progress (`deploy://plan-step`). The events carry
+    /// `sandbox_id` 0; the deploy that owns the build fills it in.
+    pub on_step: Option<PlanStepSink>,
 }
 
 impl BuildCtx<'_> {
@@ -109,6 +123,7 @@ pub async fn ensure_layer(
     };
 
     if verify(&dir, layer).is_ok() {
+        report_reused(ctx, plan, layer);
         return Ok(built);
     }
 
@@ -116,14 +131,21 @@ pub async fn ensure_layer(
 
     // Another deploy may have built it while this one waited.
     match verify(&dir, layer) {
-        Ok(()) => return Ok(built),
+        Ok(()) => {
+            report_reused(ctx, plan, layer);
+            return Ok(built);
+        }
         Err(why) if dir.exists() => {
             crate::audit!(
                 ctx.audit,
                 Warn,
                 Install,
                 "layer.rebuild",
-                format!("Rebuilding {} ({}): {why}", layer.manifest_key, short(&layer.layer_hash))
+                format!(
+                    "Rebuilding {} ({}): {why}",
+                    layer.manifest_key,
+                    short(&layer.layer_hash)
+                )
             );
             std::fs::remove_dir_all(&dir)?;
         }
@@ -132,7 +154,71 @@ pub async fn ensure_layer(
 
     build(ctx, plan, layer, runtimes, &dir).await?;
 
-    Ok(BuiltLayer { reused: false, ..built })
+    Ok(BuiltLayer {
+        reused: false,
+        ..built
+    })
+}
+
+fn event(
+    plan: &InstallPlan,
+    layer: &PlannedLayer,
+    index: usize,
+    status: StepStatus,
+) -> PlanStepEvent {
+    PlanStepEvent {
+        sandbox_id: 0,
+        plan_hash: plan.plan_hash.clone(),
+        layer: layer.manifest_key.clone(),
+        index,
+        total: layer.steps.len(),
+        status,
+        bytes: None,
+        total_bytes: None,
+        log_tail: None,
+    }
+}
+
+/// A reused layer ran nothing: every step it shows is already done.
+fn report_reused(ctx: &BuildCtx<'_>, plan: &InstallPlan, layer: &PlannedLayer) {
+    if let Some(sink) = &ctx.on_step {
+        for index in 0..layer.steps.len() {
+            sink(event(plan, layer, index, StepStatus::Done));
+        }
+    }
+}
+
+/// The executor's step reports as plan-step events: indices mapped to the
+/// preview's, steps the preview does not show dropped, and a failure given the
+/// tail of the installer's log when there is one.
+fn step_sink(
+    ctx: &BuildCtx<'_>,
+    plan: &InstallPlan,
+    layer: &PlannedLayer,
+    partial: &Path,
+) -> Option<StepSink> {
+    let sink = ctx.on_step.clone()?;
+    let plan = plan.clone();
+    let layer = layer.clone();
+    let log = partial.join("work").join("installer.log");
+    Some(std::sync::Arc::new(
+        move |at: usize, status: StepStatus, error: Option<String>| {
+            let Some(index) = layer.preview_index.get(at).copied().flatten() else {
+                return;
+            };
+            let mut e = event(&plan, &layer, index, status);
+            if status == StepStatus::Failed {
+                let installer = std::fs::read_to_string(&log)
+                    .ok()
+                    .map(|t| progress::tail(&t));
+                e.log_tail = match (installer, error) {
+                    (Some(log), Some(err)) => Some(format!("{log}\n{err}")),
+                    (log, err) => log.or(err),
+                };
+            }
+            sink(e);
+        },
+    ))
 }
 
 async fn build(
@@ -187,6 +273,7 @@ async fn build(
             std::fs::remove_dir_all(&work)?;
         }
         let files = checks::scan(&partial.join("files"), ctx.limits)?;
+        seal(&partial.join("files"))?;
         let marker = LayerMarker {
             manifest_key: layer.manifest_key.clone(),
             revision: layer.revision,
@@ -215,7 +302,11 @@ async fn build(
         Info,
         Install,
         "layer.built",
-        format!("Built {} ({})", layer.manifest_key, short(&layer.layer_hash))
+        format!(
+            "Built {} ({})",
+            layer.manifest_key,
+            short(&layer.layer_hash)
+        )
     );
     Ok(())
 }
@@ -247,9 +338,13 @@ async fn run(
             consents: plan.consent_ids().into_iter().collect::<BTreeSet<_>>(),
         },
         artifacts: layer.artifacts.clone(),
-        runtimes: runtimes.iter().map(|(k, (exe, _))| (k.clone(), exe.clone())).collect(),
+        runtimes: runtimes
+            .iter()
+            .map(|(k, (exe, _))| (k.clone(), exe.clone()))
+            .collect(),
         proxy: ctx.proxy.clone(),
         on_output: ctx.on_output.clone(),
+        on_step: step_sink(ctx, plan, layer, partial),
     };
 
     let report = exec.run_install(&layer.install_steps, &env).await;
@@ -257,7 +352,11 @@ async fn run(
         return Ok(());
     }
 
-    let at = report.run.failed_at.map(|i| format!(" at step {}", i + 1)).unwrap_or_default();
+    let at = report
+        .run
+        .failed_at
+        .map(|i| format!(" at step {}", i + 1))
+        .unwrap_or_default();
     Err(AppError::invalid(format!(
         "Installing {} failed{at}: {}",
         layer.title,
@@ -278,12 +377,16 @@ pub fn verify(dir: &Path, layer: &PlannedLayer) -> Result<(), String> {
     let mut seen = 0usize;
     count_files(&files, &mut seen)?;
     if seen != marker.files.len() {
-        return Err(format!("{seen} files where the marker lists {}", marker.files.len()));
+        return Err(format!(
+            "{seen} files where the marker lists {}",
+            marker.files.len()
+        ));
     }
 
     for f in &marker.files {
         let path = files.join(&f.path);
-        let meta = std::fs::symlink_metadata(&path).map_err(|_| format!("{} is missing", f.path))?;
+        let meta =
+            std::fs::symlink_metadata(&path).map_err(|_| format!("{} is missing", f.path))?;
         if !meta.file_type().is_file() {
             return Err(format!("{} is not a regular file", f.path));
         }
@@ -320,6 +423,33 @@ fn count_files(dir: &Path, seen: &mut usize) -> Result<(), String> {
             return Err(format!("{} is not a regular file", entry.path().display()));
         }
     }
+    Ok(())
+}
+
+/// Take the write bits off every file under `dir` (Unix). Removing a sealed
+/// file needs only its folder to be writable, so rebuilding or purging a layer
+/// is unaffected.
+///
+/// Windows is not sealed yet: its read-only attribute also blocks deleting the
+/// file, so every removal path would have to clear it first.
+pub fn seal(dir: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let kind = entry.file_type()?;
+            if kind.is_dir() {
+                seal(&entry.path())?;
+            } else if kind.is_file() {
+                let mut perm = entry.metadata()?.permissions();
+                perm.set_mode(perm.mode() & !0o222);
+                std::fs::set_permissions(entry.path(), perm)?;
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = dir;
     Ok(())
 }
 

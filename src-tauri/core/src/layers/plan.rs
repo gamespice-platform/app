@@ -163,7 +163,10 @@ impl PlanSource {
         }
 
         for (path, sig) in sigs {
-            if let Some(entry) = by_path.get(&path).and_then(|id| source.manifests.get_mut(id)) {
+            if let Some(entry) = by_path
+                .get(&path)
+                .and_then(|id| source.manifests.get_mut(id))
+            {
                 entry.sig = Some(sig);
             }
         }
@@ -222,6 +225,10 @@ pub struct PlannedLayer {
     pub steps: Vec<Value>,
     #[serde(skip)]
     pub install_steps: Vec<InstallStep>,
+    /// For each of `install_steps`, its index in `steps`, or `None` for a step
+    /// that does not apply here: how a progress event names a step.
+    #[serde(skip)]
+    pub preview_index: Vec<Option<usize>>,
     pub values: BTreeMap<String, String>,
     #[serde(skip)]
     pub artifacts: HashMap<String, ArtifactPin>,
@@ -349,7 +356,10 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
     }
 
     let version_bindings = catalog
-        .pointer(&format!("/versionBindings/{}", escape_pointer(&req.game_version)))
+        .pointer(&format!(
+            "/versionBindings/{}",
+            escape_pointer(&req.game_version)
+        ))
         .cloned()
         .unwrap_or(json!({}));
 
@@ -357,7 +367,10 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
     let mut picks: Vec<(String, Value, Option<u64>)> =
         vec![(version_key.clone(), version_bindings.clone(), None)];
 
-    let loader = req.loader.as_deref().filter(|_| !is_vanilla(req.loader.as_deref()));
+    let loader = req
+        .loader
+        .as_deref()
+        .filter(|_| !is_vanilla(req.loader.as_deref()));
     if let Some(loader) = loader {
         if let Some(pick) = pick_build(catalog, req, loader)? {
             picks.push(pick);
@@ -389,7 +402,11 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
             ))
         })?;
         let doc = &entry.doc;
-        let title = doc.get("title").and_then(Value::as_str).unwrap_or(key).to_string();
+        let title = doc
+            .get("title")
+            .and_then(Value::as_str)
+            .unwrap_or(key)
+            .to_string();
         let revision = doc.get("revision").and_then(Value::as_u64).unwrap_or(0);
 
         if let Some(want) = build_revision {
@@ -420,7 +437,12 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
         }
 
         let earlier: HashSet<&str> = picks[..index].iter().map(|(k, _, _)| k.as_str()).collect();
-        for need in doc.get("requires").and_then(Value::as_array).into_iter().flatten() {
+        for need in doc
+            .get("requires")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
             let need = need.as_str().unwrap_or_default();
             if !earlier.contains(need) {
                 return Err(AppError::invalid(format!(
@@ -457,12 +479,15 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
             .unwrap_or_default();
         let install_steps = parse_install_steps(&Value::Array(raw_steps.clone()))?;
         let mut steps = Vec::new();
+        let mut preview_index = Vec::new();
         let mut exec = false;
         let mut used_artifacts = BTreeSet::new();
         for (raw, step) in raw_steps.iter().zip(&install_steps) {
             if !applies(step.when.as_ref(), &when_all) {
+                preview_index.push(None);
                 continue;
             }
+            preview_index.push(Some(steps.len()));
             if raw.get("action").and_then(Value::as_str) == Some("runInstaller") {
                 exec = true;
             }
@@ -491,7 +516,9 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
         for name in &used_artifacts {
             let decl = declared.and_then(|d| d.get(name));
             if decl.is_none() {
-                return Err(AppError::invalid(format!("{key} downloads {name}, which it does not declare.")));
+                return Err(AppError::invalid(format!(
+                    "{key} downloads {name}, which it does not declare."
+                )));
             }
             let binding = bindings
                 .pointer(&format!("/artifacts/{}", escape_pointer(name)))
@@ -503,10 +530,15 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
                     ))
                 })?;
             let binding: ArtifactBinding = serde_json::from_value(binding).map_err(|e| {
-                AppError::invalid(format!("The catalog's download of {name} for {title} is invalid: {e}"))
+                AppError::invalid(format!(
+                    "The catalog's download of {name} for {title} is invalid: {e}"
+                ))
             })?;
             for url in std::iter::once(&binding.url).chain(&binding.mirrors) {
-                if let Some(host) = url::Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_string)) {
+                if let Some(host) = url::Url::parse(url)
+                    .ok()
+                    .and_then(|u| u.host_str().map(str::to_string))
+                {
                     hosts.insert(host);
                 }
             }
@@ -520,8 +552,16 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
             .cloned()
             .unwrap_or_default();
         for r in reqs {
-            let for_ = r.get("for").and_then(Value::as_str).unwrap_or("launch").to_string();
-            let kind = r.get("kind").and_then(Value::as_str).unwrap_or_default().to_string();
+            let for_ = r
+                .get("for")
+                .and_then(Value::as_str)
+                .unwrap_or("launch")
+                .to_string();
+            let kind = r
+                .get("kind")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
             let major = r.get("major").and_then(Value::as_str).unwrap_or_default();
             let install = for_ == "install";
             if install && !exec {
@@ -549,27 +589,46 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
                     req.platform
                 )));
             }
-            if let Some(existing) = runtimes.iter_mut().find(|e| e.kind == kind && e.major == major) {
+            if let Some(existing) = runtimes
+                .iter_mut()
+                .find(|e| e.kind == kind && e.major == major)
+            {
                 if install {
                     existing.for_ = for_;
                     existing.offer = offer;
                 }
                 continue;
             }
-            runtimes.push(PlannedRuntime { kind, major, for_, offer });
+            runtimes.push(PlannedRuntime {
+                kind,
+                major,
+                for_,
+                offer,
+            });
         }
 
         // The manifest's own consents, for this side.
-        for c in doc.get("consents").and_then(Value::as_array).into_iter().flatten() {
+        for c in doc
+            .get("consents")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
             let sides_ok = c
                 .get("sides")
                 .and_then(Value::as_array)
                 .is_none_or(|s| s.iter().any(|x| x.as_str() == Some(req.side.as_str())));
-            let Some(id) = c.get("id").and_then(Value::as_str) else { continue };
+            let Some(id) = c.get("id").and_then(Value::as_str) else {
+                continue;
+            };
             if sides_ok && !consents.iter().any(|k: &PlannedConsent| k.key == id) {
                 consents.push(PlannedConsent {
                     key: id.to_string(),
-                    text: c.get("text").and_then(Value::as_str).unwrap_or(id).to_string(),
+                    text: c
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .unwrap_or(id)
+                        .to_string(),
                     url: c.get("url").and_then(Value::as_str).map(str::to_string),
                 });
             }
@@ -585,7 +644,12 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
         }
 
         // Launch vars: a later layer overrides an earlier one.
-        for name in doc.pointer("/launch/vars").and_then(Value::as_array).into_iter().flatten() {
+        for name in doc
+            .pointer("/launch/vars")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
             let Some(name) = name.as_str() else { continue };
             let value = values
                 .0
@@ -598,10 +662,15 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
         }
 
         // The layer hash: nothing about the sandbox goes in.
-        let layer_values: BTreeMap<String, String> =
-            values.0.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-        let pinned: BTreeMap<&String, &String> =
-            artifacts.iter().map(|(k, p): (&String, &ArtifactPin)| (k, &p.sha256)).collect();
+        let layer_values: BTreeMap<String, String> = values
+            .0
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        let pinned: BTreeMap<&String, &String> = artifacts
+            .iter()
+            .map(|(k, p): (&String, &ArtifactPin)| (k, &p.sha256))
+            .collect();
         let layer_hash = hash_value(&json!({
             "manifest": doc,
             "values": layer_values,
@@ -618,6 +687,7 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
             exec,
             steps,
             install_steps,
+            preview_index,
             values: layer_values,
             artifacts,
             download_hosts: hosts.into_iter().collect(),
@@ -631,7 +701,10 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
                 "{} {} ({}) is downloaded to run the installer.",
                 rt.kind,
                 rt.major,
-                rt.offer.as_ref().and_then(|o| o.vendor_label.clone()).unwrap_or_default()
+                rt.offer
+                    .as_ref()
+                    .and_then(|o| o.vendor_label.clone())
+                    .unwrap_or_default()
             ),
             url: None,
         });
@@ -645,14 +718,24 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
             set_var(&mut v, name, value);
         }
         v.set("sandboxId", req.sandbox_id.clone());
-        v.set("sandboxName", req.sandbox_name.chars().take(64).collect::<String>());
+        v.set(
+            "sandboxName",
+            req.sandbox_name.chars().take(64).collect::<String>(),
+        );
         v.set("targetDir", req.target_dir.clone());
-        for p in doc.get("deployPatches").and_then(Value::as_array).into_iter().flatten() {
+        for p in doc
+            .get("deployPatches")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
             let when: Option<When> = p
                 .get("when")
                 .map(|w| serde_json::from_value(w.clone()))
                 .transpose()
-                .map_err(|e| AppError::invalid(format!("{key}: a deploy patch's when is invalid: {e}")))?;
+                .map_err(|e| {
+                    AppError::invalid(format!("{key}: a deploy patch's when is invalid: {e}"))
+                })?;
             if !applies(when.as_ref(), &when_all) {
                 continue;
             }
@@ -660,10 +743,14 @@ pub fn resolve(source: &PlanSource, req: &PlanRequest) -> AppResult<Option<Insta
                 p.get(field)
                     .map(|x| v.expand_json(x))
                     .transpose()
-                    .map_err(|e| AppError::invalid(format!("{key}: a deploy patch cannot be filled: {e}")))
+                    .map_err(|e| {
+                        AppError::invalid(format!("{key}: a deploy patch cannot be filled: {e}"))
+                    })
             };
             let text = |field: &str| -> AppResult<String> {
-                Ok(fill(field)?.and_then(|x| x.as_str().map(str::to_string)).unwrap_or_default())
+                Ok(fill(field)?
+                    .and_then(|x| x.as_str().map(str::to_string))
+                    .unwrap_or_default())
             };
             patches.push(JsonPatchSpec {
                 mod_key: format!("patch:{key}"),
@@ -711,7 +798,11 @@ fn pick_build(
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
-        .find(|l| l.get("key").and_then(Value::as_str).is_some_and(|k| k.eq_ignore_ascii_case(loader)))
+        .find(|l| {
+            l.get("key")
+                .and_then(Value::as_str)
+                .is_some_and(|k| k.eq_ignore_ascii_case(loader))
+        })
     else {
         return Ok(None);
     };
@@ -722,7 +813,9 @@ fn pick_build(
     let key = entry.get("key").and_then(Value::as_str).unwrap_or(loader);
 
     let Some(wanted) = req.loader_version.as_deref().filter(|v| !v.is_empty()) else {
-        return Err(AppError::invalid(format!("Pick a {name} version for this sandbox.")));
+        return Err(AppError::invalid(format!(
+            "Pick a {name} version for this sandbox."
+        )));
     };
 
     let listed = catalog
@@ -742,7 +835,9 @@ fn pick_build(
                 return Ok(None);
             }
         }
-        None if entry.get("customVersions").and_then(Value::as_bool) == Some(true) => return Ok(None),
+        None if entry.get("customVersions").and_then(Value::as_bool) == Some(true) => {
+            return Ok(None)
+        }
         None => {
             return Err(AppError::invalid(format!(
                 "{name} has no version {wanted}. Pick another version."
@@ -768,7 +863,11 @@ fn pick_build(
         })?;
 
     Ok(Some((
-        build.get("manifestKey").and_then(Value::as_str).unwrap_or_default().to_string(),
+        build
+            .get("manifestKey")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
         build.get("bindings").cloned().unwrap_or(json!({})),
         build.get("revision").and_then(Value::as_u64),
     )))
@@ -787,7 +886,12 @@ fn withdrawn(item: &Value) -> Option<String> {
 }
 
 fn absorb_vars(values: &mut Values, bindings: &Value) {
-    for (name, value) in bindings.get("vars").and_then(Value::as_object).into_iter().flatten() {
+    for (name, value) in bindings
+        .get("vars")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+    {
         if let Some(value) = value.as_str() {
             set_var(values, name, value);
         }

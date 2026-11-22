@@ -34,9 +34,9 @@ The index. `CLAUDE.md` in the repository root is the always-loaded summary; this
 | [live-queries.md](live-queries.md) | querying game servers from the device: which port, which protocols, parser rules, the registry, latency display and history |
 | [plugins.md](plugins.md) | plugins as data: the four types, the step vocabulary, the defences, approval, signatures, app rules per game |
 | [sandboxes.md](sandboxes.md) | the library database and sync, sandboxes, stage then deploy, the four strategies (USVFS included), the ledger, conflicts, `sandbox.json`, share codes |
-| [loaders-and-versions.md](loaders-and-versions.md) | game versions, loaders and loader versions (design, not built): the catalog data model, the AdminCP Mods tab, the public catalog API, pickers, layers, deploy patches, launch vars, migration, wire examples |
-| [loader-manifests.md](loader-manifests.md) | install manifests (design; schemas, seeds, check and sign built): the JSON Schema, install-only steps, `runInstaller` rules, layer checks, trust and signing, repository layout, import and export, seeds |
-| [loaders-work-split.md](loaders-work-split.md) | the build units for game versions and loaders (A1 built), their order, acceptance tests, the end-to-end plan and the gap list |
+| [loaders-and-versions.md](loaders-and-versions.md) | game versions, loaders and loader versions (tmc-app side built): the catalog data model, the AdminCP Mods tab, the public catalog API, pickers, layers, deploy patches, launch vars, migration, wire examples |
+| [loader-manifests.md](loader-manifests.md) | install manifests (built; "What blocks a release" lists what the seeds still need): the JSON Schema, install-only steps, `runInstaller` rules, layer checks, trust and signing, repository layout, import and export, seeds |
+| [loaders-work-split.md](loaders-work-split.md) | the build units for game versions and loaders (A1 to A6 built; A6 is the end-to-end test and release gate), their order, acceptance tests, the end-to-end plan and the gap list |
 | [local-mods.md](local-mods.md) | importing dropped files, adopting what is in a game folder, reading another mod manager, `tmc.json` |
 | [config-editor.md](config-editor.md) | editing a game's own settings files: the two bounds, `config.json`, why it is a text box |
 | [playing.md](playing.md) | the four launch modes, the web player's isolation, games TMC publishes, launch argument vectors, play sessions |

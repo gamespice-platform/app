@@ -554,6 +554,7 @@ impl AppState {
             // The compiled-in plans; a command that deploys or plans swaps in
             // the served one from `catalog_plan_source`.
             plan_source: None,
+            on_plan_step: None,
         }
     }
 

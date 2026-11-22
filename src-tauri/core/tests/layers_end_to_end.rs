@@ -13,27 +13,31 @@
 
 #![cfg(unix)]
 
-use std::collections::{BTreeMap, HashMap};
-use std::io::{Read, Write};
+mod support;
+
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use base64::Engine;
 use ed25519_dalek::Signer;
 use serde_json::{json, Value};
-use sha2::Digest;
 
 use tmc_core::deploy::{self, Strategy};
 use tmc_core::error::AppError;
 use tmc_core::layers::plan::{self, InstallPlan, PlanSource, Trust};
 use tmc_core::layers::{canonical, consent};
 use tmc_core::library::db::LibraryDb;
-use tmc_core::library::deploy::{deploy_sandbox, install_plan, launch_plan, purge_sandbox, SandboxCtx};
+use tmc_core::library::deploy::{
+    deploy_sandbox, install_plan, launch_plan, purge_sandbox, SandboxCtx,
+};
 use tmc_core::library::sandbox::{NewSandbox, Sandbox};
 use tmc_core::logging::Audit;
 use tmc_core::plugins::apps::AppPlugins;
 use tmc_core::plugins::JailRoots;
 use tmc_core::settings::AppSettings;
+
+use support::{pin, repo, serve, snapshot, Served};
 
 const GAME: &str = "1.21.4";
 const FABRIC: &str = "0.16.9";
@@ -44,133 +48,6 @@ const FORGE_ID: &str = "1.21.4-forge-54.1.0";
 const VERSION_JSON: &[u8] = br#"{"id":"1.21.4","type":"release"}"#;
 const PROFILE_JSON: &[u8] = br#"{"id":"fabric-loader-0.16.9-1.21.4","inheritsFrom":"1.21.4"}"#;
 const INSTALLER_JAR: &[u8] = b"PK\x03\x04 not really a jar";
-
-// ------------------------------------------------------------ HTTPS fixture
-
-/// Files served by path over TLS, and how often each was asked for.
-#[derive(Clone, Default)]
-struct Served {
-    files: Arc<Mutex<HashMap<String, Vec<u8>>>>,
-    hits: Arc<Mutex<HashMap<String, usize>>>,
-}
-
-impl Served {
-    fn put(&self, path: &str, body: Vec<u8>) {
-        self.files.lock().unwrap().insert(path.to_string(), body);
-    }
-
-    fn hits(&self, path: &str) -> usize {
-        self.hits.lock().unwrap().get(path).copied().unwrap_or(0)
-    }
-
-    fn total(&self) -> usize {
-        self.hits.lock().unwrap().values().sum()
-    }
-}
-
-/// A self-signed certificate made by openssl, as DER (cert, PKCS#8 key).
-fn certificate(dir: &Path) -> (Vec<u8>, Vec<u8>) {
-    let run = |args: &[&str]| {
-        let out = std::process::Command::new("openssl")
-            .args(args)
-            .current_dir(dir)
-            .output()
-            .expect("openssl runs");
-        assert!(out.status.success(), "openssl {args:?}: {}", String::from_utf8_lossy(&out.stderr));
-    };
-
-    run(&[
-        "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes",
-        "-keyout", "key.pem", "-out", "cert.der", "-outform", "DER", "-days", "1", "-subj",
-        "/CN=127.0.0.1",
-    ]);
-    run(&["pkcs8", "-topk8", "-nocrypt", "-in", "key.pem", "-outform", "DER", "-out", "key.der"]);
-
-    (
-        std::fs::read(dir.join("cert.der")).unwrap(),
-        std::fs::read(dir.join("key.der")).unwrap(),
-    )
-}
-
-/// Serve `served` over HTTPS on loopback; returns the port.
-fn serve(dir: &Path, served: Served) -> u16 {
-    use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
-
-    let (cert, key) = certificate(dir);
-    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
-        rustls::crypto::ring::default_provider(),
-    ))
-    .with_safe_default_protocol_versions()
-    .expect("tls versions")
-    .with_no_client_auth()
-    .with_single_cert(
-        vec![CertificateDer::from(cert)],
-        PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key)),
-    )
-    .expect("certificate");
-    let config = Arc::new(config);
-
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-    let port = listener.local_addr().unwrap().port();
-
-    std::thread::spawn(move || {
-        for stream in listener.incoming() {
-            let Ok(stream) = stream else { return };
-            let config = config.clone();
-            let served = served.clone();
-
-            std::thread::spawn(move || {
-                let Ok(conn) = rustls::ServerConnection::new(config) else { return };
-                let mut tls = rustls::StreamOwned::new(conn, stream);
-                let mut request = Vec::new();
-                let mut buf = [0u8; 2048];
-
-                while !request.windows(4).any(|w| w == b"\r\n\r\n") {
-                    match tls.read(&mut buf) {
-                        Ok(0) | Err(_) => return,
-                        Ok(n) => request.extend_from_slice(&buf[..n]),
-                    }
-                }
-
-                let line = String::from_utf8_lossy(&request);
-                let path = line.split_whitespace().nth(1).unwrap_or("/").to_string();
-                let body = served.files.lock().unwrap().get(&path).cloned();
-                *served.hits.lock().unwrap().entry(path).or_default() += 1;
-
-                let (status, body) = match body {
-                    Some(b) => ("200 OK", b),
-                    None => ("404 Not Found", Vec::new()),
-                };
-                let mut response = format!(
-                    "HTTP/1.1 {status}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
-                    body.len()
-                )
-                .into_bytes();
-                response.extend_from_slice(&body);
-
-                let _ = tls.write_all(&response);
-                tls.conn.send_close_notify();
-                let _ = tls.flush();
-            });
-        }
-    });
-
-    port
-}
-
-// ----------------------------------------------------------------- Sources
-
-fn repo() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
-
-fn sha(bytes: &[u8]) -> String {
-    hex::encode(sha2::Sha256::digest(bytes))
-}
-
-fn pin(port: u16, path: &str, body: &[u8]) -> Value {
-    json!({ "url": format!("https://127.0.0.1:{port}{path}"), "sha256": sha(body), "size": body.len() })
-}
 
 /// The fake Java: a tar.gz holding `bin/java`, a script steered by `control`.
 fn runtime_archive(control: &Path) -> Vec<u8> {
@@ -188,12 +65,16 @@ exit 0
         id = FORGE_ID,
     );
 
-    let mut tar = tar::Builder::new(flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast()));
+    let mut tar = tar::Builder::new(flate2::write::GzEncoder::new(
+        Vec::new(),
+        flate2::Compression::fast(),
+    ));
     let mut header = tar::Header::new_gnu();
     header.set_size(script.len() as u64);
     header.set_mode(0o755);
     header.set_cksum();
-    tar.append_data(&mut header, "bin/java", script.as_bytes()).expect("tar");
+    tar.append_data(&mut header, "bin/java", script.as_bytes())
+        .expect("tar");
 
     tar.into_inner().expect("tar").finish().expect("gzip")
 }
@@ -210,8 +91,11 @@ fn source(port: u16, forge_revision: u64) -> PlanSource {
 
     let version = read("minecraft/version.manifest.json");
     let fabric = read("minecraft/loaders/fabric.manifest.json");
-    let forge = read("minecraft/loaders/forge.manifest.json")
-        .replacen("\"revision\": 1,", &format!("\"revision\": {forge_revision},"), 1);
+    let forge = read("minecraft/loaders/forge.manifest.json").replacen(
+        "\"revision\": 1,",
+        &format!("\"revision\": {forge_revision},"),
+        1,
+    );
     assert!(forge.contains(&format!("\"revision\": {forge_revision},")));
 
     let key = signing_key();
@@ -220,7 +104,9 @@ fn source(port: u16, forge_revision: u64) -> PlanSource {
     let b64 = base64::engine::general_purpose::STANDARD;
     let sig = json!({ "alg": "ed25519", "keyId": "test-key", "signature": b64.encode(signature.to_bytes()) })
         .to_string();
-    let keys = json!([{ "keyId": "test-key", "ed25519": b64.encode(key.verifying_key().to_bytes()) }]).to_string();
+    let keys =
+        json!([{ "keyId": "test-key", "ed25519": b64.encode(key.verifying_key().to_bytes()) }])
+            .to_string();
 
     let fabric_artifact = serde_json::from_str::<Value>(&fabric).unwrap()["steps"][0]["artifact"]
         .as_str()
@@ -266,7 +152,9 @@ fn source(port: u16, forge_revision: u64) -> PlanSource {
     })
     .to_string();
 
-    let runtime = RUNTIME.with(|r| r.borrow().clone()).expect("runtime archive made first");
+    let runtime = RUNTIME
+        .with(|r| r.borrow().clone())
+        .expect("runtime archive made first");
     let runtimes = json!({ "runtimes": [{
         "kind": "java", "major": "21", "platform": plan::current_platform(),
         "vendorLabel": "Test JRE", "entry": "bin/java", "stripSingleRoot": false,
@@ -341,10 +229,16 @@ fn world() -> World {
     served.put("/mojang/1.21.4.json", VERSION_JSON.to_vec());
     served.put("/fabric/profile.json", PROFILE_JSON.to_vec());
     served.put("/forge/installer.jar", INSTALLER_JAR.to_vec());
-    served.put("/runtime/jre.tar.gz", RUNTIME.with(|r| r.borrow().clone()).unwrap());
+    served.put(
+        "/runtime/jre.tar.gz",
+        RUNTIME.with(|r| r.borrow().clone()).unwrap(),
+    );
 
     let plugins = AppPlugins::load(&repo().join("plugins"));
-    assert!(plugins.sandbox_spec("minecraft").is_some(), "the shipped minecraft plugin loads");
+    assert!(
+        plugins.sandbox_spec("minecraft").is_some(),
+        "the shipped minecraft plugin loads"
+    );
 
     // A home with the Flatpak launcher in it, for the launch plan.
     let home = dir("home");
@@ -364,7 +258,10 @@ fn world() -> World {
     World {
         db: LibraryDb::open(base.join("library.db")).expect("db"),
         plugins,
-        roots: JailRoots { data: dir("data"), cache: dir("cache") },
+        roots: JailRoots {
+            data: dir("data"),
+            cache: dir("cache"),
+        },
         exec_roots: tmc_core::detect::DetectRoots {
             home: Some(home),
             ..Default::default()
@@ -407,6 +304,7 @@ impl World {
             data_root: &self.data_root,
             log_dir: &self.data_root,
             plan_source: Some(source),
+            on_plan_step: None,
         }
     }
 
@@ -454,32 +352,15 @@ impl World {
     }
 
     fn plan(&self, sandbox: &Sandbox) -> InstallPlan {
-        install_plan(sandbox, &self.ctx(), None).expect("plan").expect("a managed install")
+        install_plan(sandbox, &self.ctx(), None)
+            .expect("plan")
+            .expect("a managed install")
     }
 
     fn agree(&self, sandbox: &Sandbox) {
         let plan = self.plan(sandbox);
         consent::record(&self.db, sandbox.id, &plan, &plan.plan_hash).expect("consent");
     }
-}
-
-/// Every file under `root`, symlinks read through, as (path, bytes).
-fn snapshot(root: &Path) -> BTreeMap<String, Vec<u8>> {
-    fn walk(dir: &Path, base: &Path, out: &mut BTreeMap<String, Vec<u8>>) {
-        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
-            let path = entry.path();
-            let meta = std::fs::symlink_metadata(&path).unwrap();
-            let rel = path.strip_prefix(base).unwrap().to_string_lossy().into_owned();
-            if meta.is_dir() {
-                walk(&path, base, out);
-            } else {
-                out.insert(rel, std::fs::read(&path).unwrap_or_else(|_| b"<dangling>".to_vec()));
-            }
-        }
-    }
-    let mut out = BTreeMap::new();
-    walk(root, root, &mut out);
-    out
 }
 
 /// What the deploy patch's undo writes when it has to re-render a file: four
@@ -506,8 +387,15 @@ fn strategies(world: &World, game: &Path) -> Vec<Strategy> {
 }
 
 fn layer_dir(world: &World, plan: &InstallPlan, key: &str) -> PathBuf {
-    let layer = plan.layers.iter().find(|l| l.manifest_key == key).expect(key);
-    world.data_root.join("layers/minecraft").join(&layer.layer_hash)
+    let layer = plan
+        .layers
+        .iter()
+        .find(|l| l.manifest_key == key)
+        .expect(key);
+    world
+        .data_root
+        .join("layers/minecraft")
+        .join(&layer.layer_hash)
 }
 
 // ------------------------------------------------------------------- Tests
@@ -529,25 +417,55 @@ async fn a_fabric_plan_deploys_with_every_strategy_and_undoes_byte_for_byte() {
         let report = deploy_sandbox(&world.db, &sandbox, &world.ctx(), false)
             .await
             .unwrap_or_else(|e| panic!("{strategy:?}: {}", e.detail()));
-        assert_eq!(report.used, strategy.as_str(), "{strategy:?} fell back: {:?}", report.fell_back);
+        assert_eq!(
+            report.used,
+            strategy.as_str(),
+            "{strategy:?} fell back: {:?}",
+            report.fell_back
+        );
 
         let fabric_id = format!("fabric-loader-{FABRIC}-{GAME}");
         assert_eq!(
             std::fs::read(game.join(format!("versions/{fabric_id}/{fabric_id}.json"))).unwrap(),
             PROFILE_JSON
         );
-        assert_eq!(std::fs::read(game.join("versions/1.21.4/1.21.4.json")).unwrap(), VERSION_JSON);
+        assert_eq!(
+            std::fs::read(game.join("versions/1.21.4/1.21.4.json")).unwrap(),
+            VERSION_JSON
+        );
+
+        // A linked layer file cannot be rewritten in place from the game
+        // folder: the write would land in the layer every sandbox shares.
+        if matches!(strategy, Strategy::Hardlink | Strategy::Symlink)
+            && !writes_ignore_modes(&world)
+        {
+            let linked = game.join("versions/1.21.4/1.21.4.json");
+            assert!(
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .open(&linked)
+                    .is_err(),
+                "{strategy:?}: a shared layer file is writable through the game folder"
+            );
+        }
 
         let ours = &profiles(&game)["profiles"][format!("tmc-{}", sandbox.id)];
         assert_eq!(ours["lastVersionId"], fabric_id);
         assert_eq!(ours["gameDir"], game.display().to_string());
         assert_eq!(profiles(&game)["profiles"]["other"]["name"], "Other");
 
-        let state = world.reload(sandbox.id).install_state.expect("install state");
+        let state = world
+            .reload(sandbox.id)
+            .install_state
+            .expect("install state");
         assert_eq!(state.launch_vars["launchVersionId"], fabric_id);
 
         purge_sandbox(&world.db, &world.reload(sandbox.id), &world.ctx()).expect("purge");
-        assert_eq!(snapshot(&game), stock, "{strategy:?} left the folder changed");
+        assert_eq!(
+            snapshot(&game),
+            stock,
+            "{strategy:?} left the folder changed"
+        );
     }
 
     // Test 3, second half: another profile edited between deploy and undo.
@@ -558,7 +476,9 @@ async fn a_fabric_plan_deploys_with_every_strategy_and_undoes_byte_for_byte() {
     });
     std::fs::write(game.join("launcher_profiles.json"), render4(&original)).unwrap();
     let sandbox = world.sandbox(&game, Strategy::Direct, "fabric", FABRIC);
-    deploy_sandbox(&world.db, &sandbox, &world.ctx(), false).await.expect("deploy");
+    deploy_sandbox(&world.db, &sandbox, &world.ctx(), false)
+        .await
+        .expect("deploy");
 
     let mut edited = profiles(&game);
     edited["profiles"]["other"]["name"] = json!("Other, renamed by the user");
@@ -580,7 +500,9 @@ async fn undo_keeps_a_patched_value_the_user_changed() {
     let world = world();
     let game = world.game("kept");
     let sandbox = world.sandbox(&game, Strategy::Direct, "fabric", FABRIC);
-    deploy_sandbox(&world.db, &sandbox, &world.ctx(), false).await.expect("deploy");
+    deploy_sandbox(&world.db, &sandbox, &world.ctx(), false)
+        .await
+        .expect("deploy");
 
     let ours = format!("tmc-{}", sandbox.id);
     let mut doc = profiles(&game);
@@ -592,7 +514,10 @@ async fn undo_keeps_a_patched_value_the_user_changed() {
     let after = profiles(&game);
     assert_eq!(after["profiles"][&ours]["name"], "My own name");
     assert_eq!(after["profiles"]["other"]["name"], "Other");
-    assert!(!game.join("versions").join(format!("fabric-loader-{FABRIC}-{GAME}")).exists());
+    assert!(!game
+        .join("versions")
+        .join(format!("fabric-loader-{FABRIC}-{GAME}"))
+        .exists());
 }
 
 /// Tests 5 and 8: an installer that fails, or one that plants a symlink out of
@@ -614,7 +539,13 @@ async fn a_failed_or_escaping_build_leaves_the_game_folder_untouched() {
         assert!(e.detail().contains(expect), "{mode}: {}", e.detail());
         if mode == "fail" {
             // The message names a log that outlives the discarded build.
-            let log = e.detail().rsplit("The installer's log is ").next().unwrap().trim_end_matches('.').to_string();
+            let log = e
+                .detail()
+                .rsplit("The installer's log is ")
+                .next()
+                .unwrap()
+                .trim_end_matches('.')
+                .to_string();
             let log = std::fs::read_to_string(&log).unwrap_or_else(|_| panic!("no log at {log}"));
             assert!(log.contains("installer failed on purpose"), "{log}");
         }
@@ -630,15 +561,23 @@ async fn layers_are_reused_rebuilt_when_tampered_and_name_the_launch_version() {
     let world = world();
 
     let first = world.sandbox(&world.game("first"), Strategy::Direct, "fabric", FABRIC);
-    deploy_sandbox(&world.db, &first, &world.ctx(), false).await.expect("first");
+    deploy_sandbox(&world.db, &first, &world.ctx(), false)
+        .await
+        .expect("first");
     let after_first = world.served.total();
     assert_eq!(world.served.hits("/fabric/profile.json"), 1);
 
     // Test 6.
     let second_game = world.game("second");
     let second = world.sandbox(&second_game, Strategy::Direct, "fabric", FABRIC);
-    deploy_sandbox(&world.db, &second, &world.ctx(), false).await.expect("second");
-    assert_eq!(world.served.total(), after_first, "the second sandbox downloaded again");
+    deploy_sandbox(&world.db, &second, &world.ctx(), false)
+        .await
+        .expect("second");
+    assert_eq!(
+        world.served.total(),
+        after_first,
+        "the second sandbox downloaded again"
+    );
     assert!(second_game.join("versions/1.21.4/1.21.4.json").is_file());
 
     // Test 7: same size, other bytes.
@@ -646,12 +585,34 @@ async fn layers_are_reused_rebuilt_when_tampered_and_name_the_launch_version() {
     let fabric_id = format!("fabric-loader-{FABRIC}-{GAME}");
     let file = layer_dir(&world, &plan, "minecraft/loader/fabric")
         .join(format!("files/versions/{fabric_id}/{fabric_id}.json"));
+    // A built layer is sealed: a program writing through a link is refused.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(&file).unwrap().permissions().mode();
+        assert_eq!(mode & 0o222, 0, "the layer file is writable");
+        // A Direct copy is the game folder's own file, and writable.
+        let copy = second_game.join(format!("versions/{fabric_id}/{fabric_id}.json"));
+        let copy_mode = std::fs::metadata(&copy).unwrap().permissions().mode();
+        assert_ne!(copy_mode & 0o200, 0, "the Direct copy is read-only");
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(mode | 0o200)).unwrap();
+    }
     std::fs::write(&file, vec![b'x'; PROFILE_JSON.len()]).unwrap();
 
     let third = world.sandbox(&world.game("third"), Strategy::Direct, "fabric", FABRIC);
-    deploy_sandbox(&world.db, &third, &world.ctx(), false).await.expect("third");
-    assert_eq!(world.served.hits("/fabric/profile.json"), 2, "the tampered layer was not rebuilt");
-    assert_eq!(world.served.hits("/mojang/1.21.4.json"), 1, "an intact layer was rebuilt");
+    deploy_sandbox(&world.db, &third, &world.ctx(), false)
+        .await
+        .expect("third");
+    assert_eq!(
+        world.served.hits("/fabric/profile.json"),
+        2,
+        "the tampered layer was not rebuilt"
+    );
+    assert_eq!(
+        world.served.hits("/mojang/1.21.4.json"),
+        1,
+        "an intact layer was rebuilt"
+    );
     assert_eq!(std::fs::read(&file).unwrap(), PROFILE_JSON);
 
     // Test 12.
@@ -662,12 +623,22 @@ async fn layers_are_reused_rebuilt_when_tampered_and_name_the_launch_version() {
     deploy_sandbox(&world.db, &forge, &world.ctx(), false)
         .await
         .unwrap_or_else(|e| panic!("{}", e.detail()));
-    assert!(game.join(format!("versions/{FORGE_ID}/{FORGE_ID}.json")).is_file());
+    assert!(game
+        .join(format!("versions/{FORGE_ID}/{FORGE_ID}.json"))
+        .is_file());
     assert!(!game.join("work").exists() && !game.join("launcher_profiles.json.tmp").exists());
-    assert_eq!(profiles(&game)["profiles"][format!("tmc-{}", forge.id)]["lastVersionId"], FORGE_ID);
+    assert_eq!(
+        profiles(&game)["profiles"][format!("tmc-{}", forge.id)]["lastVersionId"],
+        FORGE_ID
+    );
 
-    let launch = launch_plan(&world.db, &world.reload(forge.id), &world.ctx()).expect("launch plan");
-    let at = launch.args.iter().position(|a| a == "--version").expect("--version");
+    let launch =
+        launch_plan(&world.db, &world.reload(forge.id), &world.ctx()).expect("launch plan");
+    let at = launch
+        .args
+        .iter()
+        .position(|a| a == "--version")
+        .expect("--version");
     assert_eq!(launch.args[at + 1], FORGE_ID, "{:?}", launch.args);
 }
 
@@ -680,9 +651,15 @@ async fn a_withdrawn_build_is_refused_at_resolve() {
     let sandbox = world.sandbox(&game, Strategy::Direct, "forge", FORGE_WITHDRAWN);
 
     let e = install_plan(&sandbox, &world.ctx(), None).expect_err("withdrawn");
-    assert!(e.detail().contains("withdrawn") && e.detail().contains("corrupts worlds"), "{}", e.detail());
+    assert!(
+        e.detail().contains("withdrawn") && e.detail().contains("corrupts worlds"),
+        "{}",
+        e.detail()
+    );
 
-    let e = deploy_sandbox(&world.db, &sandbox, &world.ctx(), false).await.expect_err("withdrawn");
+    let e = deploy_sandbox(&world.db, &sandbox, &world.ctx(), false)
+        .await
+        .expect_err("withdrawn");
     assert!(e.detail().contains("withdrawn"), "{}", e.detail());
     assert_eq!(world.served.total(), 0);
     assert_eq!(snapshot(&game), stock);
@@ -702,12 +679,19 @@ async fn consent_is_asked_again_after_a_revision_bump() {
         Err(AppError::NeedsConsent(hash)) => hash,
         other => panic!("expected NeedsConsent, got {other:?}"),
     };
-    assert_eq!(world.served.total(), 0, "nothing is downloaded before consent");
+    assert_eq!(
+        world.served.total(),
+        0,
+        "nothing is downloaded before consent"
+    );
     assert_eq!(snapshot(&game), stock);
 
     let plan = world.plan(&sandbox);
     assert_eq!(plan.plan_hash, hash);
-    assert!(plan.consents.iter().any(|c| c.key == "exec:minecraft/loader/forge"));
+    assert!(plan
+        .consents
+        .iter()
+        .any(|c| c.key == "exec:minecraft/loader/forge"));
     assert!(plan.consents.iter().any(|c| c.key == "runtime:java-21"));
     consent::record(&world.db, sandbox.id, &plan, "not-the-hash").expect_err("a stale hash");
     consent::record(&world.db, sandbox.id, &plan, &hash).expect("consent");
@@ -718,7 +702,9 @@ async fn consent_is_asked_again_after_a_revision_bump() {
     let bumped = source(world.port, 2);
     let ctx = world.ctx_with(&bumped);
     let sandbox = world.reload(sandbox.id);
-    let plan2 = install_plan(&sandbox, &ctx, None).expect("plan").expect("managed");
+    let plan2 = install_plan(&sandbox, &ctx, None)
+        .expect("plan")
+        .expect("managed");
     assert_ne!(plan2.plan_hash, hash);
     assert!(matches!(
         consent::check(&world.db, sandbox.id, &plan2),
@@ -728,4 +714,23 @@ async fn consent_is_asked_again_after_a_revision_bump() {
         deploy_sandbox(&world.db, &sandbox, &ctx, false).await,
         Err(AppError::NeedsConsent(_))
     ));
+}
+
+/// Whether this process may write a file without write permission (root),
+/// which makes a "the write is refused" check meaningless.
+fn writes_ignore_modes(world: &World) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let probe = world.tmp.path().join("mode-probe");
+        let _ = std::fs::remove_file(&probe);
+        std::fs::write(&probe, b"x").unwrap();
+        std::fs::set_permissions(&probe, std::fs::Permissions::from_mode(0o444)).unwrap();
+        std::fs::OpenOptions::new().write(true).open(&probe).is_ok()
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = world;
+        true
+    }
 }

@@ -249,7 +249,24 @@ pub fn copy_file(src: &Path, dst: &Path) -> Result<(), LinkFailure> {
         }
     }
 
-    std::fs::copy(src, dst).map(|_| ()).map_err(LinkFailure::Io)
+    std::fs::copy(src, dst).map_err(LinkFailure::Io)?;
+
+    // A copy is the game folder's own file. The source may be a sealed
+    // (read-only) layer file, and `fs::copy` carries its mode across; a
+    // program that rewrites the copy in place must still be able to.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perm = std::fs::metadata(dst)
+            .map_err(LinkFailure::Io)?
+            .permissions();
+        if perm.mode() & 0o200 == 0 {
+            perm.set_mode(perm.mode() | 0o200);
+            std::fs::set_permissions(dst, perm).map_err(LinkFailure::Io)?;
+        }
+    }
+
+    Ok(())
 }
 
 /// Place one file by whichever mechanism `kind` names.

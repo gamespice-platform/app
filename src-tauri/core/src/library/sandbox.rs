@@ -573,7 +573,11 @@ impl LibraryDb {
         let explicit = patch.loader_version.clone();
 
         let (loader, version, game) = match (&patch.loader, explicit) {
-            (_, Some(v)) => (None, Some(v.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())), None),
+            (_, Some(v)) => (
+                None,
+                Some(v.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())),
+                None,
+            ),
             (Some(Some(text)), None) => {
                 let (l, v, g) = normalize_loader(Some(text), None);
 
@@ -585,7 +589,10 @@ impl LibraryDb {
 
         self.with(|conn| {
             if let Some(l) = loader {
-                conn.execute("UPDATE sandbox SET loader = ?2 WHERE id = ?1", params![id, l])?;
+                conn.execute(
+                    "UPDATE sandbox SET loader = ?2 WHERE id = ?1",
+                    params![id, l],
+                )?;
             }
             if let Some(v) = version {
                 conn.execute(
@@ -640,6 +647,12 @@ impl LibraryDb {
     }
 
     /// Record consent to a plan: the hash, and the consent ids shown.
+    ///
+    /// Only the newest accepted plan stands. Every other plan's consent for
+    /// this sandbox is dropped in the same transaction, so a plan that comes
+    /// back (a withdrawn revision, a stale cached plan, a rolled-back loader
+    /// build) asks again instead of replaying an agreement the user gave to
+    /// it before moving on.
     pub fn sandbox_record_consent(
         &self,
         id: i64,
@@ -650,13 +663,21 @@ impl LibraryDb {
         let shown = serde_json::to_string(consents)?;
 
         self.with(|conn| {
-            conn.execute(
+            let tx = conn.unchecked_transaction()?;
+
+            tx.execute(
+                "DELETE FROM sandbox_consent WHERE sandbox_id = ?1 AND plan_hash <> ?2",
+                params![id, plan_hash],
+            )?;
+            tx.execute(
                 "INSERT INTO sandbox_consent (sandbox_id, plan_hash, consents, accepted_at)
                  VALUES (?1, ?2, ?3, ?4)
                  ON CONFLICT (sandbox_id, plan_hash)
                  DO UPDATE SET consents = excluded.consents, accepted_at = excluded.accepted_at",
                 params![id, plan_hash, shown, now],
             )?;
+
+            tx.commit()?;
 
             Ok(())
         })
@@ -1363,7 +1384,8 @@ pub fn normalize_loader(
     }
 
     let forge_id = FORGE_ID.get_or_init(|| {
-        regex::Regex::new(r"^([0-9][0-9.]*)-(forge|neoforge)-([0-9][0-9.]*)$").expect("static regex")
+        regex::Regex::new(r"^([0-9][0-9.]*)-(forge|neoforge)-([0-9][0-9.]*)$")
+            .expect("static regex")
     });
 
     if let Some(c) = forge_id.captures(&lower) {
@@ -1784,7 +1806,11 @@ mod tests {
             (None, None, (None, None, None)),
             (Some(""), Some(" 1.21.4 "), (None, None, Some("1.21.4"))),
             (Some("  "), None, (None, None, None)),
-            (Some("Vanilla"), Some("1.21.4"), (None, None, Some("1.21.4"))),
+            (
+                Some("Vanilla"),
+                Some("1.21.4"),
+                (None, None, Some("1.21.4")),
+            ),
             (Some("none"), None, (None, None, None)),
             (Some("Minecraft"), None, (None, None, None)),
             (Some("fabric"), None, (Some("fabric"), None, None)),
@@ -1795,21 +1821,73 @@ mod tests {
             (Some("neo-forge"), None, (Some("neoforge"), None, None)),
             (Some("NeoForged"), None, (Some("neoforge"), None, None)),
             (Some("neoforge"), None, (Some("neoforge"), None, None)),
-            (Some("Fabric 0.16.9"), Some("1.21.4"), (Some("fabric"), Some("0.16.9"), Some("1.21.4"))),
-            (Some("fabric-0.16.9"), None, (Some("fabric"), Some("0.16.9"), None)),
-            (Some("fabric@0.16.9"), None, (Some("fabric"), Some("0.16.9"), None)),
-            (Some("fabric_0.16.9"), None, (Some("fabric"), Some("0.16.9"), None)),
-            (Some("quilt:v0.27.1"), None, (Some("quilt"), Some("0.27.1"), None)),
-            (Some("forge 54.1.0"), None, (Some("forge"), Some("54.1.0"), None)),
-            (Some("NeoForge 21.4.0-beta"), None, (Some("neoforge"), Some("21.4.0-beta"), None)),
-            (Some("neoforged-21.4.1"), None, (Some("neoforge"), Some("21.4.1"), None)),
-            (Some("1.21.4-forge-54.1.0"), None, (Some("forge"), Some("54.1.0"), Some("1.21.4"))),
-            (Some("1.21.4-forge-54.1.0"), Some("1.21.3"), (Some("forge"), Some("54.1.0"), Some("1.21.3"))),
-            (Some("fabric-loader-0.16.9-1.21.4"), None, (Some("fabric"), Some("0.16.9"), Some("1.21.4"))),
+            (
+                Some("Fabric 0.16.9"),
+                Some("1.21.4"),
+                (Some("fabric"), Some("0.16.9"), Some("1.21.4")),
+            ),
+            (
+                Some("fabric-0.16.9"),
+                None,
+                (Some("fabric"), Some("0.16.9"), None),
+            ),
+            (
+                Some("fabric@0.16.9"),
+                None,
+                (Some("fabric"), Some("0.16.9"), None),
+            ),
+            (
+                Some("fabric_0.16.9"),
+                None,
+                (Some("fabric"), Some("0.16.9"), None),
+            ),
+            (
+                Some("quilt:v0.27.1"),
+                None,
+                (Some("quilt"), Some("0.27.1"), None),
+            ),
+            (
+                Some("forge 54.1.0"),
+                None,
+                (Some("forge"), Some("54.1.0"), None),
+            ),
+            (
+                Some("NeoForge 21.4.0-beta"),
+                None,
+                (Some("neoforge"), Some("21.4.0-beta"), None),
+            ),
+            (
+                Some("neoforged-21.4.1"),
+                None,
+                (Some("neoforge"), Some("21.4.1"), None),
+            ),
+            (
+                Some("1.21.4-forge-54.1.0"),
+                None,
+                (Some("forge"), Some("54.1.0"), Some("1.21.4")),
+            ),
+            (
+                Some("1.21.4-forge-54.1.0"),
+                Some("1.21.3"),
+                (Some("forge"), Some("54.1.0"), Some("1.21.3")),
+            ),
+            (
+                Some("fabric-loader-0.16.9-1.21.4"),
+                None,
+                (Some("fabric"), Some("0.16.9"), Some("1.21.4")),
+            ),
             // Unknown values are kept exactly as typed.
-            (Some(" OptiFine HD_U_J2 "), Some("1.21.4"), (Some("OptiFine HD_U_J2"), None, Some("1.21.4"))),
+            (
+                Some(" OptiFine HD_U_J2 "),
+                Some("1.21.4"),
+                (Some("OptiFine HD_U_J2"), None, Some("1.21.4")),
+            ),
             (Some("liteloader"), None, (Some("liteloader"), None, None)),
-            (Some("fabric latest"), None, (Some("fabric latest"), None, None)),
+            (
+                Some("fabric latest"),
+                None,
+                (Some("fabric latest"), None, None),
+            ),
         ];
 
         for (loader, game, (want_l, want_v, want_g)) in cases {
@@ -1886,5 +1964,25 @@ mod tests {
             Some(vec!["exec".to_string()])
         );
         assert_eq!(db.sandbox_consent(id, "bbb").expect("read"), None);
+    }
+
+    #[test]
+    fn consent_to_a_new_plan_retires_the_old_one() {
+        let db = db();
+        let id = db.sandbox_create(&new_sandbox("Replay")).expect("create");
+        let other = db.sandbox_create(&new_sandbox("Other")).expect("create");
+
+        db.sandbox_record_consent(id, "old", &["exec".into()])
+            .expect("record");
+        db.sandbox_record_consent(other, "old", &["exec".into()])
+            .expect("record");
+        db.sandbox_record_consent(id, "new", &["exec".into()])
+            .expect("record");
+
+        // The old plan coming back asks again; the new one stands.
+        assert_eq!(db.sandbox_consent(id, "old").expect("read"), None);
+        assert!(db.sandbox_consent(id, "new").expect("read").is_some());
+        // Another sandbox's agreement is its own.
+        assert!(db.sandbox_consent(other, "old").expect("read").is_some());
     }
 }

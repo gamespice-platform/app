@@ -1,4 +1,4 @@
-Game versions, loaders and loader versions: what a sandbox runs, where the lists come from, and how picking one makes a deploy install it. This is the design and wire contract for a cross-repository feature (`tmc-app` and `website-city`). **Status: the tmc-app side of A1 to A5 is built (manifests, executor, plan and deploy, the catalog client in "Lists" below, and the pickers, plan preview, consent dialog and deploy progress); the website units are not.** Every part below is to be built by the units in [loaders-work-split.md](loaders-work-split.md); once a unit lands, the section it covers is rewritten to describe what was built.
+Game versions, loaders and loader versions: what a sandbox runs, where the lists come from, and how picking one makes a deploy install it. This is the design and wire contract for a cross-repository feature (`tmc-app` and `website-city`). **Status: the tmc-app side (A1 to A6) is built: manifests, executor, plan and deploy, the catalog client in "Lists" below, the pickers, plan preview, consent dialog and deploy progress, and a hermetic end-to-end test against the website's wire fixtures. The website units live in website-city. What still blocks a release is listed in [loader-manifests.md](loader-manifests.md#what-blocks-a-release); the open items are in [gaps.md](gaps.md).** Sections that differ from what was built say so with an **As built** note.
 
 Three documents make up the design:
 
@@ -608,7 +608,7 @@ The sync shape of `AppInstall` adds one field:
   - It is flagged `source: "compiled"`.
 - Because the seed manifests are compiled in too, an offline first run can still resolve plans for the snapshot's versions from compiled data. The downloads themselves still need the network: Maven, Mojang and the CDN. An offline first run therefore gets a complete picker and a clear "needs a connection to install" at deploy time, never an empty list.
 - A 410 (withdrawn) is an error carrying the server's `note`; a 404 or 422 drops the cached copy and falls back to the snapshot; a 5xx or a body of an unknown shape is treated like a network failure.
-- Deploy, `install_plan_preview` and `install_plan_consent` resolve against the served install plan through the same cache policy, after checking it answers the request and that each manifest it carries hashes to its stated sha256; it then goes through the same resolver, lint and signature check as the compiled manifests. With no served plan they use the compiled-in manifests.
+- Deploy, `install_plan_preview` and `install_plan_consent` resolve against the served install plan through the same cache policy, after checking it answers the request and that each manifest it carries hashes to its stated sha256; it then goes through the same resolver, lint and signature check as the compiled manifests. The signature check uses only the exec keys compiled into the app (`manifests/keys/exec-keys.json`); a served plan never brings keys of its own, and one signed by any other key is refused before anything is downloaded. With no served plan they use the compiled-in manifests.
 - IPC commands are in `src-tauri/src/commands/catalog.rs`, and their wrappers (`catalogGet`, `catalogLoaderVersions`) in `src/lib/ipc/commands.ts`. The webview names only slugs and ids:
   - `catalog_get(appId, appSlug, {channels, limit, refresh})`, where `limit` defaults to the setting `versionListCount` (default 30, `0` is all) and `refresh: true` revalidates now (there is no separate `catalog_refresh`);
   - `catalog_loader_versions(appId, appSlug, loader, {gameVersion, channels, limit, refresh})`;
@@ -628,6 +628,7 @@ The sync shape of `AppInstall` adds one field:
 - The exception is a loader that is `customVersions: true` and whose manifest declares that its artifact URLs are fully templated (`urlTemplate`) with `linkHashPolicy: "fetch"`. For such a loader the plan can be resolved for a typed version: the app downloads the URL, records its sha256, and shows "unverified version: hash recorded on first install" in the preview.
   - This is never allowed for an exec manifest. A typed Forge version cannot run an installer whose hash nobody pinned.
   - None of the seed loaders set it. It exists for games whose loaders are plain archives.
+  - **As built:** the schema accepts `linkHashPolicy: "fetch"`, but the Rust resolver does not implement it yet, so a typed version of such a loader is unmanaged like any other custom value ([gaps.md](gaps.md)).
 
 ### Deploy consumption
 
@@ -641,6 +642,7 @@ Deploy (`library/deploy.rs`, `deploy/engine.rs`) gains one phase before the merg
    - If the plan has exec steps, runtime downloads or `consents` that have not been accepted for this `plan_hash`, the deploy stops with `NeedsConsent(plan)`.
    - The UI shows the preview and calls `install_plan_consent`, then deploys again.
    - Consent is stored per sandbox and per `plan_hash`. A new revision or a new artifact asks again.
+   - Recording consent for a plan hash deletes the sandbox's consents for every other hash in the same transaction, so switching back to an earlier plan asks again rather than replaying an old consent.
 3. **Runtimes.** Each required runtime is ensured under `<app data>/runtimes/<kind>/<major>/<platform>/<sha256-12>/`. It is downloaded with its pinned hash, extracted with the existing Extract step and its bounds, and marked complete with `.tmc-runtime.json`.
 4. **Layers.** Each layer is built at `<app data>/layers/<appSlug>/<layer_hash>/`.
    - A layer whose `.tmc-layer.json` says complete is reused. The marker holds the manifest key, the revision, the `files` list with sizes and sha256, and the build time.
@@ -660,7 +662,9 @@ Deploy (`library/deploy.rs`, `deploy/engine.rs`) gains one phase before the merg
    - With usvfs, patches go to a per-sandbox overlay copy (`<app data>/sandboxes/<id>/patched/`), mapped at the highest priority. The real file is never edited, which keeps usvfs's empty ledger true.
 7. **Record.** `install_state` is written with the plan hash, the layers and the `launch_vars`.
 
-Undo (`undeploy`) is unchanged in shape: it walks the ledger, which now includes layer files and JSON patches. Layers themselves are kept for reuse. `Settings → Storage → Clear unused layers` removes layers that no sandbox's `install_state` names. It is never automatic, because a layer may be gigabytes of Forge libraries that took minutes to build.
+Undo (`undeploy`) is unchanged in shape: it walks the ledger, which now includes layer files and JSON patches. Layers themselves are kept for reuse. `Settings → Storage → Clear unused layers` is meant to remove layers that no sandbox's `install_state` names. It is never automatic, because a layer may be gigabytes of Forge libraries that took minutes to build. **As built:** the command behind it does not exist yet ([gaps.md](gaps.md)).
+
+A finished layer is sealed: on Linux and macOS its `files/` lose their write bits, so an edit through a hard link in one game folder fails instead of changing every sandbox that shares the layer. A Direct copy is made writable again. Windows is not sealed yet; there the verify on reuse catches the edit and rebuilds the layer.
 
 A partial deploy writes its ledger as today. JSON patches are applied after all files, so a failure during the merge leaves no patch behind.
 
@@ -679,7 +683,7 @@ A partial deploy writes its ledger as today. JSON patches are applied after all 
     - one checkbox per `consents` entry (for example, the game's EULA, with its link);
     - for exec steps, an explicit statement: "This runs a program from <host> on your computer with your user's permissions. TMC checked its fingerprint; it is not sandboxed."
     The buttons are **Install** and **Cancel**. There is no "don't ask again" across plan hashes.
-  - **During the deploy**, as live progress. The executor emits `deploy://plan-step` events, `{sandboxId, planHash, layer, index, total, status: "running"|"done"|"skipped"|"failed", bytes?, totalBytes?, logTail?}`. For `runInstaller`, `logTail` is the last 20 lines of the installer's output, streamed.
+  - **During the deploy**, as live progress. The executor emits `deploy://plan-step` events, `{sandboxId, planHash, layer, index, total, status: "running"|"done"|"skipped"|"failed", bytes?, totalBytes?, logTail?}`. **As built:** events are emitted per step as the executor runs it (`tmc_core::layers::progress`), with `index` mapped to the step's position in the preview, so a step the preview does not list sends nothing. A reused layer reports all its steps done. `bytes` and `totalBytes` are not filled yet. `logTail` is sent only on failure: the last 40 lines of the installer's log, then the error; output is not streamed while the installer runs.
 - On failure the panel keeps the list. The failed step is marked, the executor's error is shown, and the full installer log opens from `<layer>.partial/work/installer.log`, which is copied to the app log directory before `.partial` is deleted.
 - A skipped step (its `when` did not match) is shown as skipped, never hidden.
 

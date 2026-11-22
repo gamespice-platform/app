@@ -313,7 +313,7 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
   - Free-text values from before the catalog are not rewritten. A4's migration 12 already split them. A value the catalog does not know shows as a custom or unknown row and is kept until the user picks another.
   - `e2e/review/catalog.mjs` runs against the mocked bridge (`e2e/review/mock.ts`, catalog fixtures). It covers all seven acceptance flows (25 checks) and writes `docs/review/catalog-*.png` in dark and `-light`.
   - Left open:
-    - Rust does not emit `deploy://plan-step` yet. Until it does, the view marks every step done on success, and on failure marks the first unfinished step.
+    - Rust did not emit `deploy://plan-step` yet; A6 added it. The view shows each step as its events report it; on failure it still marks the first unfinished step when no step reported `failed`.
     - Settings → Storage "Clear unused layers" and Settings → Advanced "Install manifest from file" have no command to call yet.
     - The pack panel cannot show a loader version because `local/modpack.rs` does not parse one.
 - **Step labels:** `step-label.tsx` is the one table of human labels per step action. W3's manifest panel needs the same text. It reads a JSON copy, `schemas/step-labels.en.json`, owned by A1 and synced by `catalog:schema:sync`, so neither side hand-writes the other's labels.
@@ -330,6 +330,23 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
   - the `README.md` feature section ("Game versions and loaders").
 - **Depends on:** everything else.
 - **Acceptance:** the end-to-end plan below runs green on a release build.
+- **What was built:**
+  - The end-to-end test is Rust, not `e2e/catalog/*`: `src-tauri/core/tests/catalog_end_to_end.rs` (6 tests) serves the website's wire shapes from a local plain-HTTP server (`TMC_API_BASE`, debug builds) and drives the real `CatalogClient`, plan, consent, layer build, deploy, check and purge. It covers:
+    - the pickers reading remote, then the cache (TTL, `304`), then stale when offline, then the compiled snapshot with no cache;
+    - the app's own install plan resolving, the website fixture refused for a manifest that does not hash to its sha256, a `410` refused with its note, and offline giving no served plan;
+    - a served Fabric plan deploying and undoing to the stock folder;
+    - a served Forge plan running a fake installer through a fake Java runtime, emitting a `deploy://plan-step` event per previewed step, and undoing;
+    - a served Forge plan signed by a key that is not built in being refused before anything downloads;
+    - a second game, Valheim with a BepInEx-style archive loader (`Direct`), going through the same catalog, plan, deploy and undo, from test data only.
+  - `core/tests/support/mod.rs` holds the TLS fixture server `layers_end_to_end.rs` already used, now shared.
+  - Migrations: `db.rs` `a_pre_a2_database_at_10_upgrades_through_11_and_12` builds a version-10 database with sandboxes holding free-text loaders and checks that 11 adds the catalog cache, 12 splits the loaders and keeps unknown values, and nothing else changes.
+  - Closed gaps:
+    - `layers::progress` and `SandboxCtx.on_plan_step`: the executor reports each step's index, mapped to the preview's index, as `deploy://plan-step`, with the installer log's last 40 lines on failure. A reused layer reports all its steps done.
+    - Hardlink edits reaching a shared layer: a finished layer's `files/` is sealed read-only on Unix (`build::seal`), and a Direct copy is made writable again (`link::copy_file`). Windows is not sealed.
+    - The consent replay guard: recording consent deletes the sandbox's consents for other plan hashes in the same transaction.
+  - Release gate: `release.yml` has a `manifests` job running `manifests:check --release`, and `build`, `android` and `ios` need it. It fails today with 12 problems, listed in [loader-manifests.md](loader-manifests.md#what-blocks-a-release); none is faked.
+  - Docs: README ("Game versions and loaders"), CHANGELOG, the docs index, [sandboxes.md](sandboxes.md) (layers, sealing, the `JsonPatch` entry, the `.mrpack` loader), [plugins.md](plugins.md) (install-only steps refused), the design docs' as-built notes, and [gaps.md](gaps.md).
+  - Left open (in [gaps.md](gaps.md); nightly `app-loaders-release-1`, `app-loaders-followups-1`, `app-loaders-wire-fixture-1`): the release blockers, `linkHashPolicy: "fetch"`, Windows sealing, the "Clear unused layers" and "Install manifest from file" commands, the modpack loader version, byte counts and a streamed log in plan-step events, and the website's wire install-plan fixture, whose hashes are placeholders. The end-to-end plan below against the dev site and on Windows has not been run.
 
 ## Order and parallelism
 
@@ -393,6 +410,7 @@ Each item is either closed by a unit, which is named, or **open**, with the reas
 | Offline first run | compiled snapshot plus compiled manifests; installs need a connection (A2, A4) |
 | Telemetry | none: catalog requests carry nothing about the sandbox |
 | Docs, CHANGELOG, README | A6 |
+| Plan-step progress, hardlink edits to shared layers, consent replay | A6 (Windows layer sealing **open**) |
 | Exec signing key | **Open:** the owner creates the real offline Ed25519 key and replaces the test key. Release CI refuses `tmc-exec-test` |
 | Installer confinement | **Open:** `bwrap` on Linux and AppContainer on Windows (Phase 2). The design discloses that installers are not sandboxed |
 | Launcher-less launch (no official launcher) | **Open (Phase 2):** needs Microsoft account sign-in for Minecraft, with an Azure app id that Mojang approves, plus libraries, natives, assets and argument rules from the version JSON. `downloadList` and `mergeJson` are the building blocks |
@@ -400,6 +418,6 @@ Each item is either closed by a unit, which is named, or **open**, with the reas
 | Quilt server install | **Open:** placeholder; needs an exec template |
 | NeoForge installer flags | **Open:** placeholder until verified with `--help` on three version lines |
 | Detected system Java | **Open (Phase 2):** `auto` uses the managed runtime |
-| Games other than Minecraft | the schema and the Rust are generic. **Open:** no second game's manifests are seeded; the first one should be a game with a plain-archive loader (a BepInEx-style loader), to prove `linkHashPolicy: fetch` |
+| Games other than Minecraft | the schema and the Rust are generic; A6's end-to-end test runs a Valheim plan with a BepInEx-style archive loader through the same pipeline. **Open:** no second game's manifests are seeded, and `linkHashPolicy: fetch` is not implemented in Rust |
 | Per-feature admin permission | **Open:** the site has none; admin only until it does |
 | Layer garbage collection | manual ("Clear unused layers"), never automatic (A5) |

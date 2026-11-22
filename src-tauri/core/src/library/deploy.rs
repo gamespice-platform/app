@@ -86,6 +86,8 @@ pub struct SandboxCtx<'a> {
     /// cached, `crate::catalog::plan_source`), or `None` for the compiled-in
     /// fallback.
     pub plan_source: Option<&'a crate::layers::plan::PlanSource>,
+    /// Where `deploy://plan-step` events go while the plan's layers build.
+    pub on_plan_step: Option<crate::layers::progress::PlanStepSink>,
 }
 
 /// What staging one mod did.
@@ -597,6 +599,7 @@ fn ensure_instance_dir(
 /// A dry run builds nothing: a layer that is already built is listed, one
 /// that is not is a warning.
 async fn layer_mods(
+    sandbox_id: i64,
     plan: &crate::layers::plan::InstallPlan,
     ctx: &SandboxCtx<'_>,
     dry_run: bool,
@@ -615,6 +618,12 @@ async fn layer_mods(
         // keeps its log.
         proxy: Vec::new(),
         on_output: None,
+        on_step: ctx.on_plan_step.clone().map(|sink| {
+            std::sync::Arc::new(move |mut e: crate::layers::progress::PlanStepEvent| {
+                e.sandbox_id = sandbox_id;
+                sink(e)
+            }) as crate::layers::progress::PlanStepSink
+        }),
     };
 
     let mut runtimes = std::collections::HashMap::new();
@@ -727,7 +736,7 @@ pub async fn deploy_sandbox(
 
     let mut warnings = Vec::new();
     let mut mods = match &plan {
-        Some(plan) => layer_mods(plan, ctx, dry_run, &mut warnings).await?,
+        Some(plan) => layer_mods(sandbox.id, plan, ctx, dry_run, &mut warnings).await?,
         None => Vec::new(),
     };
 
@@ -1291,6 +1300,7 @@ mod tests {
             data_root: tmp.path(),
             log_dir: tmp.path(),
             plan_source: None,
+            on_plan_step: None,
         };
 
         let mods = deployable(&sandbox, &ctx);
@@ -1357,6 +1367,7 @@ mod tests {
             data_root: tmp.path(),
             log_dir: tmp.path(),
             plan_source: None,
+            on_plan_step: None,
         };
 
         let err = deploy_sandbox(&db, &sandbox, &ctx, true)

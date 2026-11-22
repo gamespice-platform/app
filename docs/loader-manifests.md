@@ -1,4 +1,4 @@
-An install manifest describes, as data, how to install one game version or one loader build into a layer folder. This document covers the JSON Schema, the steps it adds to the plugin step vocabulary, the jail roots they run in, the security model, the trust tiers, where manifests live in this repository, how they move to and from the AdminCP, and the seed manifests. **Status: partly built: the schemas, seeds, `manifests:check` and `manifests:sign` (unit A1), the Rust steps, roots, lint and executor (unit A3), and the install plan, layers, runtimes, consent and deploy patches (unit A4).** It is part of [loaders-and-versions.md](loaders-and-versions.md); the build units are in [loaders-work-split.md](loaders-work-split.md).
+An install manifest describes, as data, how to install one game version or one loader build into a layer folder. This document covers the JSON Schema, the steps it adds to the plugin step vocabulary, the jail roots they run in, the security model, the trust tiers, where manifests live in this repository, how they move to and from the AdminCP, and the seed manifests. **Status: partly built: the schemas, seeds, `manifests:check` and `manifests:sign` (unit A1), the Rust steps, roots, lint and executor (unit A3), the install plan, layers, runtimes, consent and deploy patches (unit A4), and the release gate in CI (unit A6). The seed manifests still carry placeholders and the test key; see [What blocks a release](#what-blocks-a-release).** It is part of [loaders-and-versions.md](loaders-and-versions.md); the build units are in [loaders-work-split.md](loaders-work-split.md).
 
 ## What it is, and how it differs from a plugin
 
@@ -244,6 +244,25 @@ The repository is the source of truth for **templates** (`*.manifest.json`). The
 | `exec-keys`, `step-labels` | `exec-keys.json` is malformed; `step-labels.en.json` does not label exactly the schema's actions |
 | `fixture` | an ok fixture has problems, or a bad fixture's set of codes is not exactly its own |
 | `placeholder-marker`, `test-key` | `--release` only: an `x-tmc-placeholder`, or a use of `tmc-exec-test` |
+
+## What blocks a release
+
+`.github/workflows/release.yml` runs `npm run manifests:check -- --release` in its `manifests` job, and `build`, `android` and `ios` need that job, so a tag whose manifests still carry a placeholder or the test key builds nothing and publishes nothing. On this branch `--release` fails with 12 problems on purpose. None of them can be closed from the repository alone, and none is faked:
+
+| Blocker | Where | What closes it |
+| --- | --- | --- |
+| The real exec key | `manifests/keys/exec-keys.json` lists only `tmc-exec-test` (one marker, one `test-key`) | The owner creates the offline Ed25519 exec key, adds its public half and removes the test key. The key file is compiled in, and a plan served by the site is verified against these built-in keys only (`catalog_end_to_end.rs`, `a_served_plan_signed_by_a_foreign_key_is_refused`), so the release binary trusts exactly what this file lists |
+| Re-signing | `forge.manifest.json.sig`, `neoforge.manifest.json.sig` (one marker and one `test-key` each) | `npm run manifests:sign` with the owner's key, after the manifests below are final. Any change to a signed manifest needs this again |
+| Legacy Forge | `forge.manifest.json` `/requirements` | Either a template for the pre-1.13 installer layout, or an accepted statement that only 1.13 and later are built; then the marker goes |
+| Forge server `expectFiles` | `forge.manifest.json` `/steps/4` | A server install of each line from 1.17 to 1.21, confirming `run.sh` (older lines write `forge-*.jar`) |
+| NeoForge installer flags | `neoforge.manifest.json` `/steps/2`, `/steps/4` | `java -jar <installer> --help` on the 20.4, 21.1 and 21.4 lines |
+| NeoForge for 1.20.1 | `neoforge.manifest.json` (top level) | A template for `net/neoforged/forge`, or an accepted statement that 1.20.1 is not built |
+| Quilt server install | `quilt.manifest.json` (top level) | An exec step for `quilt-installer install server`, signed like the others |
+
+Two more block a release and are not checked by any job, because neither can be checked from Linux CI:
+
+- **USVFS on a real Windows launch.** The strategy is EXPERIMENTAL and its injection has never run against a game ([gaps.md](gaps.md)). Before a release offers it for Minecraft, someone deploys a sandbox with `usvfs` on Windows, launches it and confirms that the game sees the mods and that the instance folder is unchanged afterwards.
+- **Sealing layers on Windows.** On Linux and macOS a finished layer's files are made read-only, so an edit through a hardlink fails instead of changing every sandbox that shares the layer ([sandboxes.md](sandboxes.md#layers)). On Windows the layer is not sealed yet, so an edit through a hardlink still reaches the shared copy.
 
 ## Seed manifests
 

@@ -35,6 +35,35 @@ env:
     RUST_TOOLCHAIN: '1.98'
 
 jobs:
+    # NO RELEASE SHIPS A PLACEHOLDER OR THE TEST KEY.
+    #
+    # `manifests:check --release` fails on every `x-tmc-placeholder` marker
+    # (manifests, signatures, the exec key list) and on the test exec key
+    # `tmc-exec-test` still being listed. Every build job waits for it, so a
+    # tag cut before the owner's exec key exists and the exec manifests are
+    # re-signed with it stops here, before anything is built or published.
+    # What still blocks it: docs/loader-manifests.md, "What blocks a release".
+    manifests:
+        runs-on: ubuntu-22.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.inputs.tag || github.ref }}
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  registry-url: https://npm.pkg.github.com
+                  scope: '@modcommunity'
+
+            - name: Install
+              run: npm ci
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+
+            - name: Manifests are release-ready
+              run: npm run manifests:check -- --release
+
     # THE `tmc` COMMAND-LINE TOOL, FROZEN, ONCE PER TARGET.
     #
     # The Console runs a `tmc` shipped inside the app so it works with no pip
@@ -44,6 +73,7 @@ jobs:
     # exactly what the commit says. TMC_CLI_TOKEN (a read-only PAT for the
     # tmc-cli repository) is needed while that repository is private.
     tmc-cli:
+        needs: manifests
         strategy:
             fail-fast: true
             matrix:
@@ -80,7 +110,7 @@ jobs:
                   if-no-files-found: error
 
     build:
-        needs: tmc-cli
+        needs: [manifests, tmc-cli]
         strategy:
             fail-fast: false
             matrix:
@@ -370,6 +400,7 @@ jobs:
     # line in checksums.txt. A failed mobile job does not stop the desktop
     # release from publishing (see `publish`'s `if`).
     android:
+        needs: manifests
         runs-on: ubuntu-22.04
         env:
             ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -506,6 +537,7 @@ jobs:
                   if-no-files-found: error
 
     ios:
+        needs: manifests
         runs-on: macos-latest
         env:
             APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}

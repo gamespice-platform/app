@@ -6,6 +6,11 @@
 //! the user agreed to that exact plan. The agreement is stored per sandbox and
 //! plan hash (`sandbox_consent`), so a new manifest revision, another build or
 //! another runtime changes the hash and asks again.
+//!
+//! Only the newest accepted plan stands for a sandbox: recording consent drops
+//! the sandbox's other agreements ([`LibraryDb::sandbox_record_consent`]), so
+//! an older plan that comes back (a stale cached plan, a rolled-back build)
+//! asks again rather than replaying the agreement given to it once.
 
 use crate::error::{AppError, AppResult};
 use crate::layers::plan::InstallPlan;
@@ -34,7 +39,12 @@ pub fn check(db: &LibraryDb, sandbox_id: i64, plan: &InstallPlan) -> AppResult<(
 
 /// Record that the user agreed to `plan_hash`. The hash must be the one the
 /// current plan has: a consent to a plan the user never saw is refused.
-pub fn record(db: &LibraryDb, sandbox_id: i64, plan: &InstallPlan, plan_hash: &str) -> AppResult<()> {
+pub fn record(
+    db: &LibraryDb,
+    sandbox_id: i64,
+    plan: &InstallPlan,
+    plan_hash: &str,
+) -> AppResult<()> {
     if plan.plan_hash != plan_hash {
         return Err(AppError::invalid(
             "The install plan changed since it was shown. Review it again.",

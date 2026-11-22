@@ -132,6 +132,17 @@ Why the gate exists at all is a confidence split, stated in `usvfs/src/lib.rs`:
 
 It is written even when a deploy reported errors — a partial deploy put files on disk, and losing the record of them creates exactly the orphans the ledger exists to prevent.
 
+### Layers
+
+A sandbox with a game version or a loader also gets **layers**: the files an install manifest produces (a loader's jars and version JSON, an installer's output), built once per content hash under `<data>/layers/<app>/<layer hash>/` and shared by every sandbox that resolves to the same hash. The plan, the manifests and the consent rules are in [loaders-and-versions.md](loaders-and-versions.md#deploy-consumption) and [loader-manifests.md](loader-manifests.md); what matters here is how a layer meets the game folder.
+
+- A layer is merged into the deploy as the lowest-priority source, so a mod with the same path wins, and it goes through the same strategies, ledger and purge as any mod.
+- A layer is built in a `.partial` folder and renamed into place only when it is complete, then verified again each time it is reused. A file that changed since the build fails verification and the layer is rebuilt.
+- **A finished layer is sealed.** On Linux and macOS the write bits come off every file under the layer's `files/`, so an edit through a hard link fails instead of changing the copy every other sandbox shares. A Direct (copy) deploy makes its copy writable again, because that copy belongs to the game folder. Windows does not seal yet ([gaps.md](gaps.md)); there the next verify still catches the edit and rebuilds the layer.
+- Deploy patches (a `launcher_profiles.json` profile, for instance) are a `JsonPatch` ledger entry. Undo restores the original bytes when the file is untouched, and otherwise puts back only the values that are still ours, so a value the user changed is kept. Under USVFS the patch goes to an overlay copy and the real file is never touched.
+- A plan that runs code (an installer, a runtime download) needs consent, which is stored per sandbox and **plan hash**. Recording consent for a new hash deletes the sandbox's consents for every other hash in the same transaction, so going back to an earlier plan asks again instead of replaying an old yes.
+- Each step of each layer reports `deploy://plan-step` (running, done, skipped, failed with the end of its log) to the deploy-progress view.
+
 ### Conflicts
 
 The merge tree decides one winner per path before anything touches the disk, by priority, with ties broken on the mod key so the answer is stable across runs. Losers are **reported**, never merged: nothing here understands any game's file formats, and a manager that silently produces a file neither author wrote is how "it works for me" bug reports are made.
@@ -172,7 +183,7 @@ Options reach a command line only through `optionArgs` in the game's own `launch
 
 The sandbox screen's Actions row has the buttons: `ipc.sandboxExportPack` (zod-parsed `ExportReportSchema`) and a notice with the saved name, size and the export's notes.
 
-- **`mrpack`** (`library::export`): the sandbox's enabled, staged mods go in as `overrides/`, resolved through the same merge tree a deploy uses (so priority winners are what is written, and symlinks are skipped). `files` is empty: a subscribed mod has no host the format permits, so its bytes travel in the archive. Only Minecraft sandboxes with a game version export; the loader dependency is left out because only a name is recorded. The report's notes list skipped and unstaged mods. A test imports the result with the real importer and compares SHA-512 of every file.
+- **`mrpack`** (`library::export`): the sandbox's enabled, staged mods go in as `overrides/`, resolved through the same merge tree a deploy uses (so priority winners are what is written, and symlinks are skipped). `files` is empty: a subscribed mod has no host the format permits, so its bytes travel in the archive. Only Minecraft sandboxes with a game version export. The loader goes in as its dependency key (`fabric-loader`, `quilt-loader`, `forge`, `neoforge`) with the sandbox's `loaderVersion`; a loader with no recorded version, or with no `.mrpack` key, is left out and the report says why, because a made-up version would read as a promise. The report's notes list skipped and unstaged mods. A test imports the result with the real importer and compares SHA-512 of every file.
 - **`share`**: a zip of the same `sandbox.json` and code `share` produces, with nothing about this machine.
 
 Both are written to a `.tmcpart` file and renamed on success, so a failure leaves nothing behind.

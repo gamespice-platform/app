@@ -19,6 +19,7 @@ pub mod consent;
 pub mod lint;
 pub mod placeholders;
 pub mod plan;
+pub mod progress;
 pub mod runtime;
 pub mod schema;
 

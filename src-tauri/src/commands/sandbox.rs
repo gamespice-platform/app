@@ -923,6 +923,7 @@ pub struct QuickInstallReport {
 /// second place for the two to drift.
 #[tauri::command]
 pub async fn sandbox_install_item(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     id: i64,
     kind: String,
@@ -1036,7 +1037,7 @@ pub async fn sandbox_install_item(
      * missing, and the report says it worked.
      */
     if deploy.unwrap_or(true) && staged_ok {
-        match sandbox_deploy(state.clone(), id, Some(false)).await {
+        match sandbox_deploy(app.clone(), state.clone(), id, Some(false)).await {
             Ok(deployed) => report.deployed = Some(deployed),
             Err(err) => report.warnings.push(err.to_string()),
         }
@@ -1211,6 +1212,7 @@ pub async fn install_plan_consent(
 /// [`install_plan_preview`] and calls [`install_plan_consent`].
 #[tauri::command]
 pub async fn sandbox_deploy(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     id: i64,
     dry_run: Option<bool>,
@@ -1228,6 +1230,13 @@ pub async fn sandbox_deploy(
 
     let mut ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
     ctx.plan_source = served.as_ref();
+    // Each install-plan step as it runs, for the deploy-progress dialog.
+    ctx.on_plan_step = Some(std::sync::Arc::new(
+        move |event: tmc_core::layers::progress::PlanStepEvent| {
+            use tauri::Emitter;
+            let _ = app.emit("deploy://plan-step", event);
+        },
+    ));
 
     let mut report =
         deploy_sandbox(&state.library, &sandbox, &ctx, dry_run.unwrap_or(false)).await?;

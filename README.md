@@ -17,6 +17,10 @@ Shot from the running app in its dark theme, with a demo account on the dev site
 - **One-click Install**: Simply click to install or uninstall mods that support installing via the app. The list of [supported games](#supported-games) are at the bottom of this page.
 - **Sandboxes**: Named mod profiles per game, with their own load order and their own deployment method.
   - Switching between them does not re-download anything, and your game folder is recoverable either way!
+### Game versions and loaders
+- **Pick a version, then a loader**: A sandbox picks its game version, its mod loader (Fabric, Forge, NeoForge, Quilt for Minecraft) and the loader's build from lists the website keeps up to date. The app caches them, says when a list is out of date, and still works offline from the last copy or the list built into the app.
+- **See what installing does before it happens**: Every download, every program an installer runs (with its full command line) and every licence is listed before you agree. A loader installer that runs a program needs your consent once per plan, and only runs if it is signed by a key built into the app.
+- **Shared, sealed layers**: A loader build is installed once into a read-only layer and shared by every sandbox that uses it; removing the sandbox puts the game folder back byte for byte. The same pipeline is data-driven, so other games and loaders need manifests, not code. See [`docs/loaders-and-versions.md`](docs/loaders-and-versions.md).
 ### Server Management
 - **Server Browser**: A full server browser like the one on the website, but with **real-time latency** and **server status** along with latency charts & graphs. You can also filter by game version, mod list, and more.
 - **RCON**: Remote console access to your servers, with a full command history and logging. You can also send commands to multiple servers at once, and even schedule commands to be sent at a later time.

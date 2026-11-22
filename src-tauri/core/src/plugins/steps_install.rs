@@ -25,11 +25,14 @@ use sha2::{Digest, Sha256};
 use crate::audit;
 use crate::error::{AppError, AppResult};
 use crate::layers::placeholders::Values;
+use crate::layers::progress::StepStatus;
 use crate::plugins::manifest::{
     FsGrant, FsRoot, InstallStep, Manifest, MergeMode, MergeRule, PathRef, Permissions, Step,
     WhenContext,
 };
-use crate::plugins::steps::{display, ensure_parent, is_sha256_hex, step_label, Executor, RunContext, RunReport};
+use crate::plugins::steps::{
+    display, ensure_parent, is_sha256_hex, step_label, Executor, RunContext, RunReport,
+};
 
 /// `runInstaller.timeoutSecs` when the manifest does not set one.
 pub const DEFAULT_INSTALLER_TIMEOUT_SECS: u64 = 900;
@@ -82,6 +85,8 @@ pub struct InstallEnv {
     /// The app's proxy variables (`HTTPS_PROXY`, ...), when the user set one.
     pub proxy: Vec<(String, String)>,
     pub on_output: Option<OutputSink>,
+    /// Each step's start, end, skip or failure, by its index in the steps run.
+    pub on_step: Option<crate::layers::progress::StepSink>,
 }
 
 /// The state one install run carries from step to step.
@@ -180,18 +185,39 @@ impl Executor<'_> {
         let mut applied = Vec::new();
         let mut skipped = Vec::new();
         let total = steps.len();
+        let report = |index: usize, status, log: Option<String>| {
+            if let Some(sink) = &env.on_step {
+                sink(index, status, log);
+            }
+        };
 
         for (index, item) in steps.iter().enumerate() {
             let label = item.label.clone().unwrap_or_else(|| step_label(&item.step));
             let at = format!("[{}/{total}] {label}", index + 1);
 
             if item.when.as_ref().is_some_and(|w| !w.matches(&env.when)) {
-                audit!(self.audit, Info, Install, "install.step.skip", at, plugin = self.manifest.id);
+                audit!(
+                    self.audit,
+                    Info,
+                    Install,
+                    "install.step.skip",
+                    at,
+                    plugin = self.manifest.id
+                );
                 skipped.push(index);
+                report(index, StepStatus::Skipped, None);
                 continue;
             }
 
-            audit!(self.audit, Info, Install, "install.step.start", at.clone(), plugin = self.manifest.id);
+            audit!(
+                self.audit,
+                Info,
+                Install,
+                "install.step.start",
+                at.clone(),
+                plugin = self.manifest.id
+            );
+            report(index, StepStatus::Running, None);
 
             if let Err(err) = self.install_step(&item.step, &mut run, &mut applied).await {
                 audit!(
@@ -202,6 +228,7 @@ impl Executor<'_> {
                     format!("{at}: {}", err.detail()),
                     plugin = self.manifest.id
                 );
+                report(index, StepStatus::Failed, Some(err.detail()));
 
                 return InstallReport {
                     run: RunReport {
@@ -216,7 +243,15 @@ impl Executor<'_> {
                 };
             }
 
-            audit!(self.audit, Info, Install, "install.step.ok", at, plugin = self.manifest.id);
+            audit!(
+                self.audit,
+                Info,
+                Install,
+                "install.step.ok",
+                at,
+                plugin = self.manifest.id
+            );
+            report(index, StepStatus::Done, None);
         }
 
         InstallReport {
@@ -253,10 +288,15 @@ impl Executor<'_> {
                 })?;
 
                 if !is_sha256_hex(&pin.sha256) {
-                    return Err(AppError::jail(format!("The artifact '{key}' has no pinned sha256.")));
+                    return Err(AppError::jail(format!(
+                        "The artifact '{key}' has no pinned sha256."
+                    )));
                 }
 
-                if sha256.as_deref().is_some_and(|s| !s.eq_ignore_ascii_case(&pin.sha256)) {
+                if sha256
+                    .as_deref()
+                    .is_some_and(|s| !s.eq_ignore_ascii_case(&pin.sha256))
+                {
                     return Err(AppError::jail(format!(
                         "The artifact '{key}' is bound to another sha256 than the step pins."
                     )));
@@ -274,7 +314,8 @@ impl Executor<'_> {
                 self.run_step(&bound, &ctx, applied, Some(run)).await?;
 
                 let target = self.jail.resolve(to, true)?;
-                run.pinned.insert(target.clone(), pin.sha256.to_ascii_lowercase());
+                run.pinned
+                    .insert(target.clone(), pin.sha256.to_ascii_lowercase());
                 run.artifacts.insert(key.clone(), target);
             }
 
@@ -332,7 +373,8 @@ fn expand_step(step: &Step, values: &Values) -> AppResult<Step> {
     let raw = serde_json::to_value(step).map_err(|e| AppError::internal(e.to_string()))?;
     let filled = values.expand_json(&raw).map_err(unresolved)?;
 
-    serde_json::from_value(filled).map_err(|e| AppError::invalid(format!("Step is invalid after expansion: {e}")))
+    serde_json::from_value(filled)
+        .map_err(|e| AppError::invalid(format!("Step is invalid after expansion: {e}")))
 }
 
 /// The four install-only steps. `step` is already expanded.
@@ -418,7 +460,10 @@ fn read_json(path: &Path) -> AppResult<Value> {
         .map_err(|e| AppError::invalid(format!("{}: {e}", display(path))))?;
 
     if meta.len() > MAX_DOC_BYTES {
-        return Err(AppError::jail(format!("{} is too large to read.", display(path))));
+        return Err(AppError::jail(format!(
+            "{} is too large to read.",
+            display(path)
+        )));
     }
 
     serde_json::from_slice(&std::fs::read(path)?)
@@ -540,7 +585,11 @@ fn set_pointer(doc: &mut Value, pointer: &str, value: Value) -> AppResult<()> {
             map.insert(last.clone(), value);
         }
         Value::Array(items) => {
-            let slot = last.parse::<usize>().ok().and_then(|i| items.get_mut(i)).ok_or_else(bad)?;
+            let slot = last
+                .parse::<usize>()
+                .ok()
+                .and_then(|i| items.get_mut(i))
+                .ok_or_else(bad)?;
             *slot = value;
         }
         _ => return Err(bad()),
@@ -591,7 +640,9 @@ async fn download_list(
     };
 
     if sha1_field.is_none() && sha256_field.is_none() {
-        return Err(AppError::invalid("downloadList needs sha1Field or sha256Field."));
+        return Err(AppError::invalid(
+            "downloadList needs sha1Field or sha256Field.",
+        ));
     }
 
     /*
@@ -653,11 +704,17 @@ async fn download_list(
         let sha256 = text(sha256_field);
 
         if sha1.is_none() && sha256.is_none() {
-            return Err(AppError::jail(format!("downloadList: entry {i} has no hash.")));
+            return Err(AppError::jail(format!(
+                "downloadList: entry {i} has no hash."
+            )));
         }
 
-        if sha1.as_deref().is_some_and(|s| !is_hex(s, 40)) || sha256.as_deref().is_some_and(|s| !is_hex(s, 64)) {
-            return Err(AppError::jail(format!("downloadList: entry {i} has a malformed hash.")));
+        if sha1.as_deref().is_some_and(|s| !is_hex(s, 40))
+            || sha256.as_deref().is_some_and(|s| !is_hex(s, 64))
+        {
+            return Err(AppError::jail(format!(
+                "downloadList: entry {i} has a malformed hash."
+            )));
         }
 
         // Jail-checked under `to`: the entry's path is joined below it, so
@@ -678,7 +735,9 @@ async fn download_list(
         let base = exec.jail.resolve(to, true)?;
 
         if !target.starts_with(&base) || target == base {
-            return Err(AppError::jail(format!("downloadList: entry {i} escapes its folder.")));
+            return Err(AppError::jail(format!(
+                "downloadList: entry {i} escapes its folder."
+            )));
         }
 
         exec.check_url(url)?;
@@ -688,7 +747,10 @@ async fn download_list(
             target,
             sha1,
             sha256,
-            size: size_field.as_deref().and_then(|n| field(item, n)).and_then(Value::as_u64),
+            size: size_field
+                .as_deref()
+                .and_then(|n| field(item, n))
+                .and_then(Value::as_u64),
         });
     }
 
@@ -701,8 +763,15 @@ async fn download_list(
             continue;
         }
 
-        exec.download(&entry.url, &entry.target, entry.sha256.as_deref(), entry.size, &ctx, 0)
-            .await?;
+        exec.download(
+            &entry.url,
+            &entry.target,
+            entry.sha256.as_deref(),
+            entry.size,
+            &ctx,
+            0,
+        )
+        .await?;
 
         if !entry_matches(&entry)? {
             let _ = std::fs::remove_file(&entry.target);
@@ -745,7 +814,13 @@ fn entry_matches(entry: &ListEntry) -> AppResult<bool> {
 /// swapped transfer, not the root of trust. Kept here rather than adding a
 /// crate for forty lines.
 pub fn sha1_hex(data: &[u8]) -> String {
-    let mut h: [u32; 5] = [0x6745_2301, 0xEFCD_AB89, 0x98BA_DCFE, 0x1032_5476, 0xC3D2_E1F0];
+    let mut h: [u32; 5] = [
+        0x6745_2301,
+        0xEFCD_AB89,
+        0x98BA_DCFE,
+        0x1032_5476,
+        0xC3D2_E1F0,
+    ];
     let mut msg = data.to_vec();
     let bit_len = (data.len() as u64).wrapping_mul(8);
 
@@ -908,8 +983,14 @@ pub fn run_installer(spec: &InstallerSpec) -> AppResult<()> {
     let mut readers = 0;
 
     let streams: [Option<Box<dyn Read + Send>>; 2] = [
-        child.stdout.take().map(|s| Box::new(s) as Box<dyn Read + Send>),
-        child.stderr.take().map(|s| Box::new(s) as Box<dyn Read + Send>),
+        child
+            .stdout
+            .take()
+            .map(|s| Box::new(s) as Box<dyn Read + Send>),
+        child
+            .stderr
+            .take()
+            .map(|s| Box::new(s) as Box<dyn Read + Send>),
     ];
 
     for stream in streams.into_iter().flatten() {
@@ -1059,7 +1140,11 @@ async fn run_installer_step(
     }
 
     for arg in args {
-        argv.push(values.expand(arg).map_err(|e| AppError::invalid(e.to_string()))?);
+        argv.push(
+            values
+                .expand(arg)
+                .map_err(|e| AppError::invalid(e.to_string()))?,
+        );
     }
 
     let secs = timeout_secs.unwrap_or(DEFAULT_INSTALLER_TIMEOUT_SECS);
@@ -1088,7 +1173,9 @@ async fn run_installer_step(
 
     for expected in expect_files {
         if expected.root != FsRoot::Layer {
-            return Err(AppError::jail("runInstaller.expectFiles must be under layer."));
+            return Err(AppError::jail(
+                "runInstaller.expectFiles must be under layer.",
+            ));
         }
 
         let path = exec.jail.resolve(expected, false)?;

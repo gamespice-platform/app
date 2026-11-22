@@ -1742,6 +1742,60 @@ mod tests {
         .unwrap();
     }
 
+    #[test]
+    fn a_pre_a2_database_at_10_upgrades_through_11_and_12() {
+        // What a build before A2 left: steps 1 to 10, version 10, a sandbox
+        // with a free-text loader and a deployment row.
+        let conn = Connection::open_in_memory().unwrap();
+        for step in [
+            SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
+            SCHEMA_V9, SCHEMA_V10,
+        ] {
+            conn.execute_batch(step).unwrap();
+        }
+        conn.pragma_update(None, "user_version", 10).unwrap();
+        assert!(!has_column(&conn, "sandbox", "loader_version").unwrap());
+        conn.execute(
+            "INSERT INTO sandbox (app_id, name, environment, strategy, game_version, \
+             loader, options, created_at, updated_at) \
+             VALUES (1, 'old', 'client', 'copy', '1.21.4', 'Fabric 0.16.9', '{}', 'now', 'now')",
+            [],
+        )
+        .unwrap();
+
+        let db = LibraryDb {
+            conn: Mutex::new(conn),
+            path: PathBuf::from(":memory:"),
+        };
+        db.migrate().unwrap();
+
+        db.with(|c| {
+            let v: i64 = c.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+            assert_eq!(v, SCHEMA_VERSION);
+            assert_eq!(SCHEMA_VERSION, 12);
+            assert!(has_column(c, "catalog_cache", "etag")?);
+            assert!(has_column(c, "sandbox", "install_state")?);
+            assert!(has_column(c, "deployment", "patch")?);
+            assert!(has_column(c, "sandbox_consent", "plan_hash")?);
+
+            let (loader, version, game): (Option<String>, Option<String>, Option<String>) = c
+                .query_row(
+                    "SELECT loader, loader_version, game_version FROM sandbox WHERE name = 'old'",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                )?;
+            assert_eq!(loader.as_deref(), Some("fabric"));
+            assert_eq!(version.as_deref(), Some("0.16.9"));
+            assert_eq!(game.as_deref(), Some("1.21.4"));
+
+            Ok(())
+        })
+        .unwrap();
+
+        // Migrating again is a no-op.
+        db.migrate().unwrap();
+    }
+
     fn temp_dir(tag: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("gs-db-{tag}-{}", std::process::id()));
 
