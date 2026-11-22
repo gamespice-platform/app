@@ -36,6 +36,8 @@ class ConsoleStore {
     running: Running | null = null
     finished: Finished | null = null
     version = 0
+    /** The command line the last `run` printed (redacted), for history. `null` if it did not start. */
+    lastDisplay: string | null = null
 
     /** Events that arrive before `consoleRun` resolves, so the command line is printed first. */
     private starting = false
@@ -116,6 +118,7 @@ class ConsoleStore {
         if (this.running || this.starting) return
 
         this.starting = true
+        this.lastDisplay = null
         this.queued = []
         this.finished = null
 
@@ -123,6 +126,7 @@ class ConsoleStore {
             const started = await ipc.consoleRun(line)
 
             appendLine(this.transcript, 'cmd', started.display)
+            this.lastDisplay = started.display
 
             if (!this.exited.has(started.runId)) {
                 this.running = {
@@ -145,6 +149,12 @@ class ConsoleStore {
             queued.forEach((e) => this.apply(e))
             this.bump()
         }
+    }
+
+    /** A line the Console itself prints (help, a message), not the tool's. */
+    note(text: string, kind: 'note' | 'cmd' = 'note') {
+        appendLine(this.transcript, kind, text)
+        this.bump()
     }
 
     /** Send text to the running process. `echo` false for a secret. */

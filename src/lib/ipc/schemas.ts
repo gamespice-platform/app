@@ -1491,6 +1491,8 @@ export const ConsoleProbeSchema = z.object({
     found: z.boolean(),
     path: z.string().nullish(),
     version: z.string().nullish(),
+    /** The app is signed in, so `tmc` runs as the same user. */
+    signedIn: z.boolean().default(false),
 })
 
 export type ConsoleProbeT = z.infer<typeof ConsoleProbeSchema>

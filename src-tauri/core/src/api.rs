@@ -333,6 +333,13 @@ impl ApiClient {
         })
     }
 
+    /// A fresh access token for the console's `tmc` child (its `TMC_APP_TOKEN`),
+    /// refreshing if needed. `None` when signed out or the refresh failed: the
+    /// console then runs unauthenticated, as a shell without a login would.
+    pub async fn bearer_for_console(&self) -> Option<String> {
+        self.access_token(false).await.ok().flatten()
+    }
+
     async fn access_token(&self, require_auth: bool) -> AppResult<Option<String>> {
         if let Some(token) = self.auth.access_token() {
             return Ok(Some(token));

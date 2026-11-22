@@ -367,14 +367,125 @@ fn is_runnable(p: &Path) -> bool {
     std::fs::metadata(p).map(|m| m.is_file()).unwrap_or(false)
 }
 
-/// `tmc` on this process's `PATH`.
+/// Directories a `pip install` puts `tmc` in that a GUI app's `PATH` often
+/// lacks: a desktop launcher on macOS and most Linux sessions starts with a
+/// minimal `PATH` that has neither `~/.local/bin` nor Homebrew. Searched AFTER
+/// the real `PATH`, and only absolute, fixed locations under the user's home or
+/// the usual package prefixes, so this widens nothing the user did not install.
+pub fn fallback_dirs(home: Option<&Path>, windows: bool) -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+
+    if let Some(home) = home {
+        dirs.push(home.join(".local").join("bin"));
+
+        if windows {
+            // `pip install --user` on Windows: %APPDATA%\Python\Python3xx\Scripts,
+            // reached from the profile as AppData\Roaming.
+            let python = home.join("AppData").join("Roaming").join("Python");
+
+            if let Ok(entries) = std::fs::read_dir(&python) {
+                let mut found: Vec<PathBuf> = entries
+                    .flatten()
+                    .map(|e| e.path().join("Scripts"))
+                    .filter(|p| p.is_dir())
+                    .collect();
+
+                found.sort();
+                found.reverse();
+                dirs.extend(found);
+            }
+        }
+    }
+
+    if !windows {
+        dirs.push(PathBuf::from("/opt/homebrew/bin"));
+        dirs.push(PathBuf::from("/usr/local/bin"));
+    }
+
+    dirs
+}
+
+/// `tmc` on this process's `PATH`, then in [`fallback_dirs`].
 pub fn locate() -> Option<PathBuf> {
-    find_program(
+    let pathext = std::env::var_os("PATHEXT");
+
+    if let Some(found) = find_program(
         PROGRAM,
         std::env::var_os("PATH").as_deref(),
-        std::env::var_os("PATHEXT").as_deref(),
+        pathext.as_deref(),
         cfg!(windows),
-    )
+    ) {
+        return Some(found);
+    }
+
+    let joined = std::env::join_paths(fallback_dirs(home_dir().as_deref(), cfg!(windows))).ok()?;
+
+    find_program(PROGRAM, Some(&joined), pathext.as_deref(), cfg!(windows))
+}
+
+// ---- Signing the CLI in with the app's own session ---------------------------
+
+/// Whether `arg` is (an abbreviation of) a flag that moves the CLI to another
+/// host. argparse accepts any unambiguous prefix, so `--ba` is `--base-url`.
+fn is_host_flag(arg: &str) -> bool {
+    let Some(name) = arg.strip_prefix("--") else {
+        return false;
+    };
+
+    let name = name.split('=').next().unwrap_or("");
+
+    !name.is_empty()
+        && ["base-url", "site-url", "status-url"]
+            .iter()
+            .any(|full| full.starts_with(name))
+}
+
+/// The extra environment that signs `tmc` in as the app's own user, or empty.
+///
+/// `TMC_APP_TOKEN` is an access token the CLI uses as-is (no refresh) for the
+/// app-user commands (`friends`, `party`, `installs`, ...). Because the CLI does
+/// not bind an env token to a host the way it binds a stored session, THIS
+/// function is where it is bound: the token is withheld when
+///
+///   * there is no session, or the user set their own `TMC_APP_TOKEN` (theirs wins);
+///   * the line carries a host flag (`--base-url ...`), so a typo or a pasted
+///     command cannot send the token to another origin;
+///   * the user's `TMC_BASE_URL` points anywhere but the app's own API base.
+///
+/// When the app runs against a non-production API (a dev build), the CLI is
+/// pointed at it with `TMC_BASE_URL` so token and host agree; on production the
+/// CLI keeps its own default, which is the same backend.
+pub fn app_session_env(
+    args: &[String],
+    token: Option<&str>,
+    app_base: &str,
+    prod_base: &str,
+    user_token_set: bool,
+    user_base_env: Option<&str>,
+) -> Vec<(String, String)> {
+    let Some(token) = token.filter(|t| !t.is_empty()) else {
+        return Vec::new();
+    };
+
+    let trim = |s: &str| s.trim_end_matches('/').to_ascii_lowercase();
+
+    if user_token_set || args.iter().any(|a| is_host_flag(a)) {
+        return Vec::new();
+    }
+
+    if let Some(base) = user_base_env.filter(|b| !b.is_empty()) {
+        if trim(base) != trim(app_base) {
+            return Vec::new();
+        }
+    }
+
+    let mut env = vec![("TMC_APP_TOKEN".to_string(), token.to_string())];
+
+    if trim(app_base) != trim(prod_base) {
+        env.push(("TMC_BASE_URL".to_string(), app_base.to_string()));
+    }
+
+    env
 }
 
 /// Where the child starts: the user's home, never a webview-chosen directory.
@@ -386,12 +497,16 @@ fn home_dir() -> Option<PathBuf> {
         .filter(|p| p.is_absolute() && p.is_dir())
 }
 
-fn command(program: &Path, args: &[String]) -> Command {
+fn command(program: &Path, args: &[String], extra_env: &[(String, String)]) -> Command {
     let mut cmd = Command::new(program);
 
     cmd.args(args);
 
     for (k, v) in FIXED_ENV {
+        cmd.env(k, v);
+    }
+
+    for (k, v) in extra_env {
         cmd.env(k, v);
     }
 
@@ -422,7 +537,7 @@ fn command(program: &Path, args: &[String]) -> Command {
 ///
 /// Bounded: a hung interpreter must not hang the screen.
 pub fn version_of(program: &Path) -> Option<String> {
-    let mut child = command(program, &["--version".to_string()])
+    let mut child = command(program, &["--version".to_string()], &[])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -523,13 +638,25 @@ impl Console {
     /// exactly one [`ConsoleEvent::Exit`], after both pipes have drained (or
     /// after a short grace, when a grandchild holds one open).
     pub fn start(&self, program: &Path, args: &[String], emit: Emit) -> Result<u64, StartError> {
+        self.start_with_env(program, args, &[], emit)
+    }
+
+    /// [`Console::start`] with extra environment variables for the child, set
+    /// after [`FIXED_ENV`]. Never from the webview; see [`app_session_env`].
+    pub fn start_with_env(
+        &self,
+        program: &Path,
+        args: &[String],
+        extra_env: &[(String, String)],
+        emit: Emit,
+    ) -> Result<u64, StartError> {
         let mut slot = self.active.lock().map_err(|_| StartError::Busy)?;
 
         if slot.is_some() {
             return Err(StartError::Busy);
         }
 
-        let mut child: Child = command(program, args)
+        let mut child: Child = command(program, args, extra_env)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -1044,6 +1171,109 @@ mod tests {
         assert_eq!(find_program("tmc", None, None, cfg!(windows)), None);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn host_flags_include_abbreviations() {
+        for a in [
+            "--base-url",
+            "--base-url=x",
+            "--ba",
+            "--site-url",
+            "--status-url=y",
+            "--b",
+        ] {
+            assert!(is_host_flag(a), "{a}");
+        }
+
+        for a in ["--base-urlx", "--mine", "-b", "mod", "--app", "--"] {
+            assert!(!is_host_flag(a), "{a}");
+        }
+    }
+
+    #[test]
+    fn app_token_is_bound_to_the_app_host() {
+        let prod = "https://moddingcommunity.com";
+        let none: Vec<String> = Vec::new();
+        let env = |args: &[String], tok, base, set, user| {
+            app_session_env(args, tok, base, prod, set, user)
+        };
+
+        // Production: only the token; the CLI keeps its own default base.
+        assert_eq!(
+            env(&none, Some("tmc_at_x"), prod, false, None),
+            vec![("TMC_APP_TOKEN".to_string(), "tmc_at_x".to_string())]
+        );
+
+        // A dev build points the CLI at the same host the token came from.
+        let dev = "https://tmcdev.net";
+
+        assert_eq!(
+            env(&none, Some("t"), dev, false, None),
+            vec![
+                ("TMC_APP_TOKEN".to_string(), "t".to_string()),
+                ("TMC_BASE_URL".to_string(), dev.to_string())
+            ]
+        );
+
+        // Withheld: no session, an empty token, the user's own token, a host
+        // flag (even abbreviated), a foreign TMC_BASE_URL.
+        assert!(env(&none, None, prod, false, None).is_empty());
+        assert!(env(&none, Some(""), prod, false, None).is_empty());
+        assert!(env(&none, Some("t"), prod, true, None).is_empty());
+        assert!(env(
+            &v(&["me", "--ba", "https://evil"]),
+            Some("t"),
+            prod,
+            false,
+            None
+        )
+        .is_empty());
+        assert!(env(&none, Some("t"), prod, false, Some("https://evil.example")).is_empty());
+
+        // The user's own TMC_BASE_URL equal to the app's is fine.
+        assert!(!env(
+            &none,
+            Some("t"),
+            prod,
+            false,
+            Some("https://moddingcommunity.com/")
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn fallback_dirs_are_absolute_and_include_local_bin() {
+        let home = Path::new("/home/someone");
+        let dirs = fallback_dirs(Some(home), false);
+
+        assert!(dirs.contains(&home.join(".local").join("bin")));
+        assert!(dirs.iter().all(|d| d.is_absolute()));
+        assert!(fallback_dirs(None, false).iter().all(|d| d.is_absolute()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn extra_env_reaches_the_child() {
+        let events: Arc<Mutex<Vec<ConsoleEvent>>> = Arc::default();
+        let sink = Arc::clone(&events);
+        let emit: Emit = Arc::new(move |e| sink.lock().unwrap().push(e));
+
+        Console::new()
+            .start_with_env(
+                Path::new("/bin/sh"),
+                &v(&["-c", "echo $TMC_APP_TOKEN"]),
+                &[("TMC_APP_TOKEN".to_string(), "abc".to_string())],
+                emit,
+            )
+            .unwrap();
+
+        wait_exit(&events);
+
+        assert!(events.lock().unwrap().iter().any(|e| matches!(
+            e,
+            ConsoleEvent::Output { text, .. } if text == "abc\n"
+        )));
     }
 
     #[cfg(unix)]

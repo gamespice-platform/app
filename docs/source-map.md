@@ -83,6 +83,7 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `commands/downloads.rs` | The queue. No command here takes a URL or a destination — `download_release` takes ids |
 | `commands/detect.rs` | Scan, and separately apply. A scan configures nothing |
 | `commands/rcon.rs` | Consoles. No command returns a password |
+| `commands/console.rs` | The Console screen: runs the installed `tmc` CLI (desktop only), streams `tmc://console` events; signs it in with the app's session via `TMC_APP_TOKEN` (`core/console.rs::app_session_env` withholds it when the line carries a host flag). `tmc` is found on `PATH` then `~/.local/bin`, Homebrew, `/usr/local/bin`, pip-user Scripts; it is not bundled |
 | `commands/library.rs` | Sync, install, uninstall, launch |
 | `commands/play.rs` | The two ways a game starts that the SERVER resolves. Names IDS, never a loader URL or a connect link |
 | `commands/games.rs` | Installing, updating and starting a TMC build. Names an APP ID — never a URL, never a path |
@@ -165,4 +166,5 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `routes/sandboxes.tsx` | The mod manager: what is in a sandbox, and whether it is applied |
 | `routes/downloads.tsx` | The queue, and everything to do when one is stuck |
 | `routes/rcon.tsx` | The server console |
+| `routes/console.tsx`, `lib/console/` | The TMC command-line tool as a terminal: transcript, history, `builtins.ts` (`clear`, `help`), the store that outlives the route |
 | `routes/` | Browse, view, library, installs, account, settings panes |

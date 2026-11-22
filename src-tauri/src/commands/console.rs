@@ -41,6 +41,9 @@ pub struct ConsoleProbe {
     pub path: Option<String>,
     /// `tmc --version`'s first line.
     pub version: Option<String>,
+    /// The app is signed in, so a run is signed in as the same user
+    /// (`TMC_APP_TOKEN`) without asking for a key.
+    pub signed_in: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -69,13 +72,16 @@ fn quote_for_display(arg: &str) -> String {
 }
 
 #[tauri::command]
-pub async fn console_probe() -> AppResult<ConsoleProbe> {
-    tauri::async_runtime::spawn_blocking(|| {
+pub async fn console_probe(state: State<'_, AppState>) -> AppResult<ConsoleProbe> {
+    let signed_in = state.auth.has_refresh();
+
+    tauri::async_runtime::spawn_blocking(move || {
         let Some(path) = console::locate() else {
             return ConsoleProbe {
                 found: false,
                 path: None,
                 version: None,
+                signed_in,
             };
         };
 
@@ -83,6 +89,7 @@ pub async fn console_probe() -> AppResult<ConsoleProbe> {
             found: true,
             version: console::version_of(&path),
             path: Some(path.display().to_string()),
+            signed_in,
         }
     })
     .await
@@ -90,7 +97,7 @@ pub async fn console_probe() -> AppResult<ConsoleProbe> {
 }
 
 #[tauri::command]
-pub fn console_run(
+pub async fn console_run(
     app: AppHandle,
     state: State<'_, AppState>,
     line: String,
@@ -107,9 +114,22 @@ pub fn console_run(
 
     let Some(program) = console::locate() else {
         return Err(AppError::invalid(
-            "The tmc command-line tool was not found on your PATH.",
+            "The tmc command-line tool was not found. Install it with pip, then reopen this screen.",
         ));
     };
+
+    // Signed in as the app's own user, unless the line or the user's own
+    // environment says otherwise; see `console::app_session_env`.
+    let token = state.api.bearer_for_console().await;
+    let session_env = console::app_session_env(
+        &args,
+        token.as_deref(),
+        tmc_core::api::api_base(),
+        tmc_core::api::PROD_API_BASE,
+        std::env::var_os("TMC_APP_TOKEN").is_some_and(|v| !v.is_empty()),
+        std::env::var("TMC_BASE_URL").ok().as_deref(),
+    );
+    let signed_in = !session_env.is_empty();
 
     let emitter = app.clone();
     let emit: console::Emit = Arc::new(move |event| {
@@ -141,12 +161,16 @@ pub fn console_run(
         let _ = emitter.emit(EVENT, payload);
     });
 
-    match state.console.start(&program, &args, emit) {
+    match state
+        .console
+        .start_with_env(&program, &args, &session_env, emit)
+    {
         Ok(run_id) => {
             let mut data = serde_json::Map::new();
 
             data.insert("argv".into(), serde_json::json!(redacted));
             data.insert("runId".into(), run_id.into());
+            data.insert("appSession".into(), signed_in.into());
 
             audit!(
                 state.audit,
