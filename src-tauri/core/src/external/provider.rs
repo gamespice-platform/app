@@ -14,7 +14,18 @@ use crate::error::{AppError, AppResult};
 /// A JSON GET. The only network surface the providers use, so tests hand in a
 /// [`MockFetch`] and nothing in this module's tests touches a socket.
 pub trait Fetch: Send + Sync {
-    fn get_json<'a>(&'a self, url: &'a str) -> BoxFuture<'a, AppResult<Value>>;
+    /// A GET carrying extra request headers (a provider's API key). Only the
+    /// providers that hold the user's own credential use this; the headers go
+    /// to the URL's host and nowhere else.
+    fn get_json_with<'a>(
+        &'a self,
+        url: &'a str,
+        headers: &'a [(&'a str, &'a str)],
+    ) -> BoxFuture<'a, AppResult<Value>>;
+
+    fn get_json<'a>(&'a self, url: &'a str) -> BoxFuture<'a, AppResult<Value>> {
+        self.get_json_with(url, &[])
+    }
 }
 
 /// The real thing: `reqwest` with the identifying `User-Agent`.
@@ -40,21 +51,32 @@ impl Default for HttpFetch {
 }
 
 impl Fetch for HttpFetch {
-    fn get_json<'a>(&'a self, url: &'a str) -> BoxFuture<'a, AppResult<Value>> {
+    fn get_json_with<'a>(
+        &'a self,
+        url: &'a str,
+        headers: &'a [(&'a str, &'a str)],
+    ) -> BoxFuture<'a, AppResult<Value>> {
         Box::pin(async move {
             if !url.starts_with("https://") {
                 return Err(AppError::invalid("provider lookups must use https"));
             }
-            let resp = self
-                .client
-                .get(url)
-                .header("accept", "application/json")
+            let mut req = self.client.get(url).header("accept", "application/json");
+            for (k, v) in headers {
+                req = req.header(*k, *v);
+            }
+            let resp = req
                 .send()
                 .await
                 .map_err(|e| AppError::Network(format!("could not reach {url}: {e}")))?;
             let status = resp.status();
             if status.as_u16() == 404 {
                 return Err(AppError::invalid("the provider has no such mod or version"));
+            }
+            if status.as_u16() == 401 {
+                return Err(AppError::invalid(format!(
+                    "{} rejected the credential ({status}); check the key in Settings",
+                    url.split('/').nth(2).unwrap_or("the provider")
+                )));
             }
             if status.as_u16() == 429 || status.as_u16() == 403 {
                 return Err(AppError::Network(format!(
@@ -72,15 +94,33 @@ impl Fetch for HttpFetch {
     }
 }
 
+/// One request a [`MockFetch`] saw: the URL and the headers sent.
+pub type SeenRequest = (String, Vec<(String, String)>);
+
 /// Canned answers by exact URL, for tests.
 #[derive(Default)]
 pub struct MockFetch {
     pub answers: BTreeMap<String, Value>,
+    /// Every `(url, headers)` asked for, so a test can see what was sent.
+    pub seen: std::sync::Mutex<Vec<SeenRequest>>,
 }
 
 impl Fetch for MockFetch {
-    fn get_json<'a>(&'a self, url: &'a str) -> BoxFuture<'a, AppResult<Value>> {
+    fn get_json_with<'a>(
+        &'a self,
+        url: &'a str,
+        headers: &'a [(&'a str, &'a str)],
+    ) -> BoxFuture<'a, AppResult<Value>> {
         Box::pin(async move {
+            if let Ok(mut seen) = self.seen.lock() {
+                seen.push((
+                    url.to_string(),
+                    headers
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect(),
+                ));
+            }
             self.answers
                 .get(url)
                 .cloned()
@@ -98,25 +138,35 @@ pub struct ResolveCtx {
 
 /// Which keyed providers the TMC AdminCP has switched on.
 ///
-/// TODO(site): the app API (`docs/api.md`) has no such endpoint yet. When the
-/// site grows one, `from_json` already reads its expected shape,
-/// `{"providers": {"curseforge": true, "nexus": false, "modio": false}}`, and
-/// the app fetches it where [`ProviderAvailability::disabled`] is used now.
-/// Until then every keyed provider is "not enabled". No key is ever held here:
-/// the flag says the *server* can broker the call, not that the app has a key.
+/// Fetched from `GET /api/app/v1/external/providers` (contract in
+/// `docs/external-mods.md`; see [`super::site`]). Until the site answers every
+/// proxied provider is "not enabled". No key is held here: the flag says the
+/// *server* can broker the call, not that the app has a key.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderAvailability {
     pub enabled: BTreeMap<ProviderId, bool>,
-    /// False while this is the stub, so the UI can say "not enabled yet"
-    /// rather than "disabled by the admin".
+    /// False when the site did not answer (no endpoint yet, offline, signed
+    /// out), so the UI can say "not enabled yet" rather than "disabled by the
+    /// admin".
     pub from_site: bool,
+    /// Why the site could not say, when `from_site` is false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 impl ProviderAvailability {
-    /// The stub: nothing keyed is on.
+    /// Nothing proxied is on.
     pub fn disabled() -> Self {
         Self::default()
+    }
+
+    /// Nothing is on because the site could not be asked.
+    pub fn unreachable(reason: impl Into<String>) -> Self {
+        Self {
+            reason: Some(reason.into()),
+            ..Self::default()
+        }
     }
 
     pub fn from_json(v: &Value) -> Self {
@@ -131,6 +181,7 @@ impl ProviderAvailability {
         Self {
             enabled,
             from_site: true,
+            reason: None,
         }
     }
 
@@ -185,9 +236,15 @@ pub struct Registry {
 }
 
 impl Registry {
+    /// No site and no user credentials: the keyed providers report that
+    /// plainly. For parsing and the providers that need neither.
     pub fn standard() -> Self {
+        Self::with_services(&super::Services::none())
+    }
+
+    pub fn with_services(services: &super::Services) -> Self {
         Self {
-            providers: providers::standard(),
+            providers: providers::standard(services),
         }
     }
 

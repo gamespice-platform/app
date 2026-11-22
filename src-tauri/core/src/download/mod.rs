@@ -68,8 +68,39 @@ pub const MAX_CONCURRENT: usize = 8;
 /// Default simultaneous transfers.
 pub const DEFAULT_CONCURRENT: usize = 3;
 
-/// Hard ceiling on one file.
+/// Default ceiling on one file, for requests that do not say otherwise.
 const MAX_FILE_BYTES: u64 = 32 * 1024 * 1024 * 1024;
+
+/// A request's own ceiling, in bytes, carried in [`DownloadRequest::meta`] so it
+/// is persisted with the row and survives a restart. `"0"` means unlimited;
+/// absent means [`MAX_FILE_BYTES`]; anything unparseable fails the download
+/// loudly rather than silently falling back to a limit the caller did not ask for.
+pub const META_MAX_BYTES: &str = "tmc.max_bytes";
+
+/// The ceiling a download runs under. `None` is unlimited.
+fn file_ceiling(meta: &BTreeMap<String, String>) -> Result<Option<u64>, TransferError> {
+    match meta.get(META_MAX_BYTES) {
+        None => Ok(Some(MAX_FILE_BYTES)),
+        Some(raw) => match raw.trim().parse::<u64>() {
+            Ok(0) => Ok(None),
+            Ok(n) => Ok(Some(n)),
+            Err(_) => Err(TransferError::fatal(format!(
+                "The download limit {raw:?} is not a number of bytes."
+            ))),
+        },
+    }
+}
+
+fn over_ceiling_message(ceiling: u64) -> String {
+    if ceiling == MAX_FILE_BYTES {
+        "That file is larger than this app will download.".to_string()
+    } else {
+        format!(
+            "That file is larger than the {} MB download limit in Settings (set it to 0 for no limit).",
+            ceiling / (1024 * 1024)
+        )
+    }
+}
 
 /// Automatic retries before a download is left failed for the user to decide.
 const MAX_ATTEMPTS: u32 = 3;
@@ -926,10 +957,12 @@ impl DownloadManager {
             .map(|len| len + start_at)
             .or(state.total);
 
-        if total.is_some_and(|t| t > MAX_FILE_BYTES) {
-            return Err(TransferError::fatal(
-                "That file is larger than this app will download.",
-            ));
+        let ceiling = file_ceiling(&state.meta)?;
+
+        if let (Some(c), Some(t)) = (ceiling, total) {
+            if t > c {
+                return Err(TransferError::fatal(over_ceiling_message(c)));
+            }
         }
 
         if !resuming {
@@ -991,13 +1024,13 @@ impl DownloadManager {
             state.done += chunk.len() as u64;
             since_tick += chunk.len() as u64;
 
-            if state.done > MAX_FILE_BYTES {
+            if ceiling.is_some_and(|c| state.done > c) {
                 drop(file);
                 let _ = std::fs::remove_file(&part);
 
-                return Err(TransferError::fatal(
-                    "That file is larger than this app will download.",
-                ));
+                return Err(TransferError::fatal(over_ceiling_message(
+                    ceiling.unwrap_or(MAX_FILE_BYTES),
+                )));
             }
 
             if tick.elapsed() >= TICK {
@@ -1527,6 +1560,19 @@ fn validate(request: &DownloadRequest) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_ceiling_zero_is_unlimited() {
+        let m = |v: Option<&str>| {
+            v.map(|v| (META_MAX_BYTES.to_string(), v.to_string()))
+                .into_iter()
+                .collect::<BTreeMap<_, _>>()
+        };
+        assert_eq!(file_ceiling(&m(None)).ok(), Some(Some(MAX_FILE_BYTES)));
+        assert_eq!(file_ceiling(&m(Some("0"))).ok(), Some(None));
+        assert_eq!(file_ceiling(&m(Some("100"))).ok(), Some(Some(100)));
+        assert!(file_ceiling(&m(Some("lots"))).is_err());
+    }
 
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;

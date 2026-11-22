@@ -53,6 +53,11 @@ pub struct AppState {
     /// parties refreshing one token family, which is the condition that revokes
     /// every device.
     pub api: Arc<ApiClient>,
+    /// The user's own mod-site keys (Nexus). Keychain first, encrypted file
+    /// when there is no keychain. Nothing reads a secret out over IPC.
+    pub credentials: Arc<tmc_core::external::credentials::CredentialStore>,
+    /// Which keyed mod providers the site has switched on (it holds our keys).
+    pub availability: Arc<tmc_core::external::site::AvailabilityCache>,
     pub plugins: Registry,
     pub latency: LatencyStore,
     pub version: String,
@@ -320,6 +325,7 @@ impl AppState {
             }));
         }
 
+        let paths_data = paths.data.clone();
         Ok(Self {
             paths,
             settings,
@@ -327,6 +333,10 @@ impl AppState {
             secure,
             auth,
             api,
+            credentials: Arc::new(tmc_core::external::credentials::CredentialStore::system(
+                &paths_data,
+            )),
+            availability: Arc::new(tmc_core::external::site::AvailabilityCache::standard()),
             plugins,
             latency: LatencyStore::new(),
             version,
