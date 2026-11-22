@@ -66,10 +66,36 @@ ignore = [
     "RUSTSEC-2026-0367",
     "RUSTSEC-2026-0368",
     "RUSTSEC-2026-0369",
+    "RUSTSEC-2026-0548", # ZipStreamReader local-header names
+    "RUSTSEC-2026-0429", # extract() symlink abort
+    "RUSTSEC-2026-0545", # AES entries without auth check on truncated data
 
     # --- serde_yaml_ng -> unsafe-libyaml ----------------------------------------
     #
     # `unmaintained`, not a vulnerability, and no serde_yaml_ng release leaves it.
     # Reads plugin and manager descriptors; the parser is bounded input and no memory-safety advisory is open against it.
     "RUSTSEC-2024-0449", # unsafe-libyaml
+
+    # --- zbus family (secret-service, tauri-plugin-opener, single-instance) ----
+    #
+    # `unmaintained` notices for zbus_names, zvariant and zvariant_derive, all
+    # Linux D-Bus plumbing reached through the keyring and Tauri plugins. No
+    # fixed release exists; moves when zbus does.
+    "RUSTSEC-2026-0371", # zbus_names
+    "RUSTSEC-2026-0370", # zvariant
+    "RUSTSEC-2026-0372", # zvariant_derive
+
+    # --- chrono -------------------------------------------------------------------
+    #
+    # `unmaintained`, no fixed release. Pulled in by Tauri and our own date
+    # handling; drop when a replacement lands.
+    "RUSTSEC-2026-0543", # chrono
+
+    # --- libsqlite3-sys 0.38.2 (bundled SQLite) ------------------------------------
+    #
+    # A real advisory, NOT a notice: the fix is libsqlite3-sys >= 0.39, which
+    # needs a newer `rusqlite` than the 0.40 pinned in `tmc-core`'s Cargo.toml.
+    # That bump is a core change and is on the nightly board; the database holds
+    # only the user's own library and is never fed untrusted SQL.
+    "RUSTSEC-2026-0459", # libsqlite3-sys
 ]

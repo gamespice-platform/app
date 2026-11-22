@@ -121,11 +121,13 @@ Where **libfuse2** is missing — Debian 13, Ubuntu 24.04 — the AppImage is un
 
 `release.yml` is separate and builds the bundle on all three desktop platforms. It is not duplicated here — proving that a `.dmg` links on every push would cost twenty minutes to re-prove something that matters only when a release is cut.
 
-`npm run audit:rust` is deliberately in neither: `cargo-audit` is a separate install, and wiring it into the definition of done would make a fresh clone fail its own check.
+`npm run audit:rust` is deliberately in neither: `cargo-audit` and `cargo-deny` are separate installs, and wiring it into the definition of done would make a fresh clone fail its own check.
 
 ### Supply chain: `npm run audit:rust`
 
-`cargo audit --deny warnings`, against `src-tauri/Cargo.lock`. Deliberately **not** part of `npm run check`: `cargo-audit` is a separate `cargo install` and is not in the toolchain `check` assumes, so wiring it in would make the definition of done depend on a tool a fresh clone does not have. Install it with `cargo install cargo-audit --locked`.
+`cargo audit --deny warnings`, against `src-tauri/Cargo.lock`. Deliberately **not** part of `npm run check`: `cargo-audit` is a separate `cargo install` and is not in the toolchain `check` assumes, so wiring it in would make the definition of done depend on a tool a fresh clone does not have. Install them with `cargo install --locked cargo-audit cargo-deny`. CI runs both in the `supply-chain` job (no GTK needed).
+
+**`cargo deny`** adds what audit does not check: licences against an allow-list in `src-tauri/deny.toml` (everything GPL-3.0-only-compatible, including the `sevenz-rust2` tree; a new licence fails until someone reads it and adds it), plus registry/git sources. Advisories stay in `audit.toml` so there is one list to maintain.
 
 **Deny-on-warning, with a reviewed allow-list** in `src-tauri/.cargo/audit.toml`. An unfiltered run reports the same advisories every time, which trains everyone to stop reading it — and then a real one lands unnoticed. Filtered, the command is silent until something new appears. Ignores are per **advisory id**, not per crate, so a genuine new advisory against `gtk` still fails the run.
 

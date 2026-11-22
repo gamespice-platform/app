@@ -151,8 +151,36 @@ jobs:
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
 
+            # `check:rust` is clippy over the WHOLE workspace with -D warnings, so
+            # it compiles the Tauri crate (commands/, lib.rs wiring) on Linux with
+            # the GTK dependencies installed above, not just tmc-core.
             - run: npm run check:rust
             - run: npm run test:rust
+
+    # Advisories, licences and sources of the whole dependency tree. Needs no GTK
+    # stack: cargo-audit and cargo-deny read Cargo.lock and the metadata, they
+    # compile nothing. Config: src-tauri/.cargo/audit.toml and src-tauri/deny.toml.
+    supply-chain:
+        name: cargo audit, cargo deny
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+            - uses: taiki-e/install-action@v2
+              with:
+                  tool: cargo-audit,cargo-deny
+
+            - name: Advisories
+              working-directory: src-tauri
+              run: cargo audit --deny warnings
+
+            - name: Licences, bans, sources
+              working-directory: src-tauri
+              run: cargo deny check licenses bans sources
 
     windows-crosscheck:
         # The Windows-only halves of `tmc-usvfs` — the IAT patch and the

@@ -1,0 +1,47 @@
+# cargo-deny configuration. Read by `npm run deny:rust` and the `supply-chain`
+# CI job. Advisories stay with cargo-audit and `.cargo/audit.toml`; this file
+# covers licences, sources and bans, which audit does not look at.
+
+[graph]
+all-features = true
+
+# Licences are checked against what this repo ships: GPL-3.0-only. Everything
+# below is GPL-3.0-compatible (permissive, or weak copyleft used unmodified).
+# `sevenz-rust2` and its tree (lzma-rust2, nt-time, typed-path, ...) are MIT or
+# Apache-2.0. Any licence NOT listed fails the run; add one here only after
+# reading what it requires.
+[licenses]
+confidence-threshold = 0.9
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-1-Clause",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "ISC",
+    "LGPL-2.1-or-later", # r-efi: offered alongside MIT and Apache-2.0
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+    "bzip2-1.0.6",
+]
+
+[bans]
+# Tauri's tree carries several majors of the same crate; that is noise we
+# cannot fix from here, so it is visible but not a failure.
+multiple-versions = "warn"
+wildcards = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
