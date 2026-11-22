@@ -204,7 +204,12 @@ impl Executor<'_> {
     /// `mods/{fileName}` is how nearly every install rule names its output, and
     /// without substitution it produces a file called `{fileName}` — one file
     /// that every mod for that game then overwrites.
-    pub(crate) fn resolve(&self, path_ref: &PathRef, ctx: &RunContext, write: bool) -> AppResult<PathBuf> {
+    pub(crate) fn resolve(
+        &self,
+        path_ref: &PathRef,
+        ctx: &RunContext,
+        write: bool,
+    ) -> AppResult<PathBuf> {
         self.jail.resolve(
             &PathRef {
                 root: path_ref.root,
@@ -225,10 +230,14 @@ impl Executor<'_> {
         install: Option<&InstallRun<'_>>,
     ) -> AppResult<()> {
         match step {
-            Step::Download { artifact: Some(_), .. } => {
+            Step::Download {
+                artifact: Some(_), ..
+            } => {
                 // `run_install` replaces an artifact download with its binding
                 // before it gets here; anything else is a plugin naming one.
-                return Err(AppError::invalid("download.artifact is not allowed in plugins"));
+                return Err(AppError::invalid(
+                    "download.artifact is not allowed in plugins",
+                ));
             }
 
             Step::Download {
@@ -1194,7 +1203,9 @@ pub(crate) fn step_label(step: &Step) -> String {
         Step::PatchJson { path, pointer, .. } => format!("patch {}{}", path.path, pointer),
         Step::RunInstaller { program, .. } => format!("run installer {program}"),
         Step::DownloadList { list, .. } => format!("download the list in {}", list.path),
-        Step::MergeJson { base, overlay, to, .. } => {
+        Step::MergeJson {
+            base, overlay, to, ..
+        } => {
             format!("merge {} + {} → {}", base.path, overlay.path, to.path)
         }
         Step::RequireFile { path, .. } => format!("require {}", path.path),

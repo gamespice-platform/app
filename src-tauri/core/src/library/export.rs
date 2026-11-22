@@ -166,7 +166,13 @@ fn index_json(sandbox: &Sandbox, notes: &mut Vec<String>) -> AppResult<String> {
             _ => None,
         };
 
-        match (key, sandbox.loader_version.as_deref().filter(|v| !v.trim().is_empty())) {
+        match (
+            key,
+            sandbox
+                .loader_version
+                .as_deref()
+                .filter(|v| !v.trim().is_empty()),
+        ) {
             (Some(key), Some(version)) => {
                 dependencies.insert(key.to_string(), version.trim().to_string());
             }

@@ -164,7 +164,9 @@ pub fn revert(target: &Path, entries: &[LedgerEntry]) -> RevertReport {
         };
 
         if let Err(e) = revert_file(target, &entry.path, record, &mut report) {
-            report.errors.push(format!("{}: {}", entry.path, e.detail()));
+            report
+                .errors
+                .push(format!("{}: {}", entry.path, e.detail()));
         }
     }
 
@@ -195,20 +197,22 @@ fn load(
             "it is a link; a deploy patch only edits plain files",
         )),
         Ok(meta) if !meta.is_file() => Err(AppError::invalid("it is not a file")),
-        Ok(meta) if meta.len() > MAX_FILE_BYTES => Err(AppError::invalid("it is too large to patch")),
+        Ok(meta) if meta.len() > MAX_FILE_BYTES => {
+            Err(AppError::invalid("it is too large to patch"))
+        }
         Ok(_) => {
             let text = std::fs::read_to_string(&abs)
                 .map_err(|e| AppError::invalid(format!("could not read it as text ({e})")))?;
-            let doc = serde_json::from_str(&text)
-                .map_err(|e| AppError::invalid(format!("it is not valid JSON ({e}); left alone")))?;
+            let doc = serde_json::from_str(&text).map_err(|e| {
+                AppError::invalid(format!("it is not valid JSON ({e}); left alone"))
+            })?;
 
             Ok((Some(text), doc, abs))
         }
         Err(_) => {
-            let ensure = group
-                .iter()
-                .find_map(|s| s.ensure.clone())
-                .ok_or_else(|| AppError::invalid("it does not exist and the patch has no `ensure`"))?;
+            let ensure = group.iter().find_map(|s| s.ensure.clone()).ok_or_else(|| {
+                AppError::invalid("it does not exist and the patch has no `ensure`")
+            })?;
 
             Ok((None, ensure, abs))
         }
@@ -230,7 +234,10 @@ fn apply_file(target: &Path, path: &str, group: &[&JsonPatchSpec]) -> AppResult<
         });
     }
 
-    let indent = original.as_deref().map(indent_of).unwrap_or_else(|| "  ".into());
+    let indent = original
+        .as_deref()
+        .map(indent_of)
+        .unwrap_or_else(|| "  ".into());
     let bytes = render(&doc, &indent)?;
 
     write_atomic(&abs, &bytes)?;
@@ -246,7 +253,11 @@ fn apply_file(target: &Path, path: &str, group: &[&JsonPatchSpec]) -> AppResult<
         patch: Some(JsonPatchRecord {
             created,
             original,
-            ensure: if created { group.iter().find_map(|s| s.ensure.clone()) } else { None },
+            ensure: if created {
+                group.iter().find_map(|s| s.ensure.clone())
+            } else {
+                None
+            },
             written_sha256: sha256_hex(&bytes),
             patches,
         }),
@@ -329,7 +340,9 @@ fn revert_file(
 /// Split an RFC 6901 pointer into its unescaped tokens.
 fn tokens(pointer: &str) -> AppResult<Vec<String>> {
     if pointer.is_empty() {
-        return Err(AppError::invalid("a deploy patch cannot replace the whole document"));
+        return Err(AppError::invalid(
+            "a deploy patch cannot replace the whole document",
+        ));
     }
 
     let rest = pointer
@@ -391,7 +404,10 @@ fn indent_of(text: &str) -> String {
     text.lines()
         .skip(1)
         .find_map(|line| {
-            let indent: String = line.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+            let indent: String = line
+                .chars()
+                .take_while(|c| *c == ' ' || *c == '\t')
+                .collect();
 
             (!indent.is_empty()).then_some(indent)
         })
@@ -415,7 +431,9 @@ fn write_atomic(abs: &Path, bytes: &[u8]) -> AppResult<()> {
 
     let tmp = abs.with_file_name(format!(
         ".{}.tmcpatch",
-        abs.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+        abs.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
     ));
 
     std::fs::write(&tmp, bytes)?;
@@ -451,12 +469,17 @@ mod tests {
 
         std::fs::write(tmp.path().join("launcher_profiles.json"), original).unwrap();
 
-        let (rows, errors) = apply(tmp.path(), &[spec("/profiles/tmc-1", json!({ "name": "TMC" }))]);
+        let (rows, errors) = apply(
+            tmp.path(),
+            &[spec("/profiles/tmc-1", json!({ "name": "TMC" }))],
+        );
 
         assert!(errors.is_empty(), "{errors:?}");
 
-        let patched: Value =
-            serde_json::from_slice(&std::fs::read(tmp.path().join("launcher_profiles.json")).unwrap()).unwrap();
+        let patched: Value = serde_json::from_slice(
+            &std::fs::read(tmp.path().join("launcher_profiles.json")).unwrap(),
+        )
+        .unwrap();
 
         assert_eq!(patched["profiles"]["tmc-1"]["name"], "TMC");
         assert_eq!(patched["profiles"]["a"]["name"], "A");
@@ -487,7 +510,10 @@ mod tests {
     fn a_value_the_user_changed_is_kept() {
         let tmp = tempfile::tempdir().unwrap();
         let file = tmp.path().join("launcher_profiles.json");
-        let (rows, _) = apply(tmp.path(), &[spec("/profiles/tmc-1", json!({ "name": "TMC" }))]);
+        let (rows, _) = apply(
+            tmp.path(),
+            &[spec("/profiles/tmc-1", json!({ "name": "TMC" }))],
+        );
         let mut doc: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
 
         doc["profiles"]["tmc-1"]["name"] = json!("Mine now");
@@ -495,7 +521,10 @@ mod tests {
 
         let report = revert(tmp.path(), &rows);
 
-        assert_eq!(report.kept, vec!["launcher_profiles.json/profiles/tmc-1".to_string()]);
+        assert_eq!(
+            report.kept,
+            vec!["launcher_profiles.json/profiles/tmc-1".to_string()]
+        );
 
         let after: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
 
@@ -508,7 +537,11 @@ mod tests {
 
         std::fs::write(tmp.path().join("real.json"), "{}").unwrap();
         #[cfg(unix)]
-        std::os::unix::fs::symlink(tmp.path().join("real.json"), tmp.path().join("launcher_profiles.json")).unwrap();
+        std::os::unix::fs::symlink(
+            tmp.path().join("real.json"),
+            tmp.path().join("launcher_profiles.json"),
+        )
+        .unwrap();
         #[cfg(not(unix))]
         return;
 
@@ -516,7 +549,10 @@ mod tests {
 
         assert!(rows.is_empty());
         assert_eq!(errors.len(), 1);
-        assert_eq!(std::fs::read_to_string(tmp.path().join("real.json")).unwrap(), "{}");
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join("real.json")).unwrap(),
+            "{}"
+        );
     }
 
     #[test]
@@ -537,7 +573,8 @@ mod tests {
         );
 
         let doc: Value =
-            serde_json::from_slice(&std::fs::read(overlay.join("launcher_profiles.json")).unwrap()).unwrap();
+            serde_json::from_slice(&std::fs::read(overlay.join("launcher_profiles.json")).unwrap())
+                .unwrap();
 
         assert_eq!(doc["profiles"]["tmc-1"], true);
     }

@@ -98,10 +98,18 @@ fn number(n: &serde_json::Number, at: &str) -> Result<String, CanonicalError> {
         ))
     };
     if let Some(u) = n.as_u64() {
-        return if u <= MAX_SAFE { Ok(u.to_string()) } else { Err(fail()) };
+        return if u <= MAX_SAFE {
+            Ok(u.to_string())
+        } else {
+            Err(fail())
+        };
     }
     if let Some(i) = n.as_i64() {
-        return if i.unsigned_abs() <= MAX_SAFE { Ok(i.to_string()) } else { Err(fail()) };
+        return if i.unsigned_abs() <= MAX_SAFE {
+            Ok(i.to_string())
+        } else {
+            Err(fail())
+        };
     }
     match n.as_f64() {
         // JS has one number type: 1e3 and -0 are integers there.
@@ -162,7 +170,13 @@ fn write(v: &Value, at: &str, out: &mut String) -> Result<(), CanonicalError> {
     Ok(())
 }
 
-fn pretty(v: &Value, indent: &str, at: &str, top: bool, out: &mut String) -> Result<(), CanonicalError> {
+fn pretty(
+    v: &Value,
+    indent: &str,
+    at: &str,
+    top: bool,
+    out: &mut String,
+) -> Result<(), CanonicalError> {
     let inner = format!("{indent}    ");
     match v {
         Value::Array(items) if items.is_empty() => out.push_str("[]"),
@@ -196,7 +210,13 @@ fn pretty(v: &Value, indent: &str, at: &str, top: bool, out: &mut String) -> Res
                 out.push_str(&inner);
                 escape(k, out);
                 out.push_str(": ");
-                pretty(&map[k], &inner, &format!("{at}/{}", pointer_token(k)), false, out)?;
+                pretty(
+                    &map[k],
+                    &inner,
+                    &format!("{at}/{}", pointer_token(k)),
+                    false,
+                    out,
+                )?;
             }
             out.push('\n');
             out.push_str(indent);
@@ -244,11 +264,19 @@ mod tests {
 
     #[test]
     fn floats_and_unsafe_integers_have_no_canonical_form() {
-        for text in ["{\"a\":1.5}", "[9007199254740992]", "[-9007199254740992]", "[1e300]"] {
+        for text in [
+            "{\"a\":1.5}",
+            "[9007199254740992]",
+            "[-9007199254740992]",
+            "[1e300]",
+        ] {
             let doc = parse(text).unwrap();
             assert!(canonical_string(&doc).is_err(), "{text}");
         }
-        assert_eq!(canonical_string(&parse("[-0, 1e3, 2.0]").unwrap()).unwrap(), "[0,1000,2]");
+        assert_eq!(
+            canonical_string(&parse("[-0, 1e3, 2.0]").unwrap()).unwrap(),
+            "[0,1000,2]"
+        );
         let err = canonical_string(&parse("{\"a\":[1.5]}").unwrap()).unwrap_err();
         assert!(err.0.starts_with("/a/0: 1.5 is not an integer"), "{err}");
     }
@@ -256,10 +284,16 @@ mod tests {
     #[test]
     fn a_lone_surrogate_is_a_canonical_problem_not_a_json_one() {
         for text in ["\"a \\ud800\"", "\"\\udc00\"", "\"\\ud800\\u0041\""] {
-            assert!(matches!(parse(text), Err(ParseError::Canonical(_))), "{text}");
+            assert!(
+                matches!(parse(text), Err(ParseError::Canonical(_))),
+                "{text}"
+            );
         }
         assert!(matches!(parse("{"), Err(ParseError::Json(_))));
-        assert_eq!(parse("\"\\ud83d\\ude00\"").unwrap(), Value::String("\u{1F600}".into()));
+        assert_eq!(
+            parse("\"\\ud83d\\ude00\"").unwrap(),
+            Value::String("\u{1F600}".into())
+        );
     }
 
     #[test]

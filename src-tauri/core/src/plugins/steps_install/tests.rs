@@ -153,7 +153,8 @@ fn plugin_with_run_installer_is_refused() {
     let err = check_plugin_steps(&steps, &[]).unwrap_err();
 
     assert!(
-        err.to_string().contains("runInstaller is not allowed in plugins"),
+        err.to_string()
+            .contains("runInstaller is not allowed in plugins"),
         "{err}"
     );
 }
@@ -178,7 +179,11 @@ fn install_manifest_using_game_dir_is_refused() {
     ]))
     .unwrap_err();
 
-    assert!(err.to_string().contains("gameDir is not valid in an install manifest"), "{err}");
+    assert!(
+        err.to_string()
+            .contains("gameDir is not valid in an install manifest"),
+        "{err}"
+    );
 }
 
 // ------------------------------------------------------------ downloadList
@@ -224,7 +229,12 @@ async fn download_list_refuses_a_list_no_pinned_download_wrote() {
     assert!(!report.run.ok);
     assert_eq!(report.run.failed_at, Some(1));
     assert!(
-        report.run.error.as_deref().unwrap().contains("was not written by a pinned download"),
+        report
+            .run
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("was not written by a pinned download"),
         "{:?}",
         report.run.error
     );
@@ -287,7 +297,11 @@ async fn download_list_refuses_a_list_changed_after_its_pin() {
         .await
         .unwrap_err();
 
-    assert!(err.to_string().contains("changed after its pinned download"), "{err}");
+    assert!(
+        err.to_string()
+            .contains("changed after its pinned download"),
+        "{err}"
+    );
 }
 
 #[tokio::test]
@@ -301,9 +315,11 @@ async fn download_list_refuses_an_entry_path_outside_its_folder() {
     ]});
     let run = pinned_list(&fx, &env, &list);
 
-    assert!(super::run(&fx.exec(), &list_step(&fx), &run, &mut Vec::new())
-        .await
-        .is_err());
+    assert!(
+        super::run(&fx.exec(), &list_step(&fx), &run, &mut Vec::new())
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
@@ -317,9 +333,11 @@ async fn download_list_refuses_a_host_not_in_download_hosts() {
     ]});
     let run = pinned_list(&fx, &env, &list);
 
-    assert!(super::run(&fx.exec(), &list_step(&fx), &run, &mut Vec::new())
-        .await
-        .is_err());
+    assert!(
+        super::run(&fx.exec(), &list_step(&fx), &run, &mut Vec::new())
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
@@ -341,7 +359,9 @@ async fn download_list_honours_max_and_skips_entries_already_present() {
     std::fs::write(fx.layer.join("files/libraries/a/a.jar"), "abc").unwrap();
 
     let mut applied = Vec::new();
-    super::run(&fx.exec(), &step, &run, &mut applied).await.unwrap();
+    super::run(&fx.exec(), &step, &run, &mut applied)
+        .await
+        .unwrap();
     assert_eq!(applied.len(), 1);
 
     if let Step::DownloadList { max, .. } = &mut step {
@@ -396,7 +416,10 @@ fn merge_json_follows_mojang_inherits_from() {
     .unwrap();
     let merged = merge_json(&vanilla(), &forge_child(), &rules).unwrap();
 
-    assert_eq!(merged["mainClass"], "cpw.mods.bootstraplauncher.BootstrapLauncher");
+    assert_eq!(
+        merged["mainClass"],
+        "cpw.mods.bootstraplauncher.BootstrapLauncher"
+    );
     assert_eq!(merged["id"], "1.20.1-forge-47.2.0");
     assert_eq!(
         merged["libraries"],
@@ -408,7 +431,12 @@ fn merge_json_follows_mojang_inherits_from() {
     );
     assert_eq!(
         merged["arguments"]["game"],
-        json!(["--username", "${auth_player_name}", "--launchTarget", "forgeclient"])
+        json!([
+            "--username",
+            "${auth_player_name}",
+            "--launchTarget",
+            "forgeclient"
+        ])
     );
     // Untouched by the child: kept from the parent.
     assert_eq!(merged["arguments"]["jvm"], json!(["-cp", "${classpath}"]));
@@ -423,10 +451,22 @@ fn merge_json_modes() {
         serde_json::from_value(json!([{ "pointer": pointer, "mode": mode }])).unwrap()
     };
 
-    assert_eq!(merge_json(&base, &over, &rule("/a", "prepend")).unwrap()["a"], json!([2, 3, 1, 2]));
-    assert_eq!(merge_json(&base, &over, &rule("/a", "union")).unwrap()["a"], json!([1, 2, 3]));
-    assert_eq!(merge_json(&base, &over, &rule("/o", "replace")).unwrap()["o"], json!({ "y": 2 }));
-    assert_eq!(merge_json(&base, &over, &[]).unwrap()["o"], json!({ "x": 1, "y": 2 }));
+    assert_eq!(
+        merge_json(&base, &over, &rule("/a", "prepend")).unwrap()["a"],
+        json!([2, 3, 1, 2])
+    );
+    assert_eq!(
+        merge_json(&base, &over, &rule("/a", "union")).unwrap()["a"],
+        json!([1, 2, 3])
+    );
+    assert_eq!(
+        merge_json(&base, &over, &rule("/o", "replace")).unwrap()["o"],
+        json!({ "y": 2 })
+    );
+    assert_eq!(
+        merge_json(&base, &over, &[]).unwrap()["o"],
+        json!({ "x": 1, "y": 2 })
+    );
     assert!(merge_json(&base, &over, &rule("/o", "append")).is_err());
 }
 
@@ -448,7 +488,10 @@ async fn merge_json_step_writes_the_merged_version_json() {
                 "rules": [{ "pointer": "/libraries", "mode": "append" }]
             }]),
             &InstallEnv {
-                values: Values(HashMap::from([("launchVersionId".into(), "forge-47".into())])),
+                values: Values(HashMap::from([(
+                    "launchVersionId".into(),
+                    "forge-47".into(),
+                )])),
                 ..Default::default()
             },
         )
@@ -456,12 +499,16 @@ async fn merge_json_step_writes_the_merged_version_json() {
 
     assert!(report.run.ok, "{:?}", report.run.error);
 
-    let out: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(fx.layer.join("files/versions/forge-47.json")).unwrap())
-            .unwrap();
+    let out: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(fx.layer.join("files/versions/forge-47.json")).unwrap(),
+    )
+    .unwrap();
 
     assert_eq!(out["libraries"].as_array().unwrap().len(), 3);
-    assert_eq!(out["mainClass"], "cpw.mods.bootstraplauncher.BootstrapLauncher");
+    assert_eq!(
+        out["mainClass"],
+        "cpw.mods.bootstraplauncher.BootstrapLauncher"
+    );
 }
 
 // ------------------------------------------------------------ the run
@@ -518,7 +565,10 @@ async fn write_text_if_missing_keeps_an_existing_file() {
         .await;
 
     assert!(report.run.ok, "{:?}", report.run.error);
-    assert_eq!(std::fs::read_to_string(fx.layer.join("files/p.json")).unwrap(), "mine");
+    assert_eq!(
+        std::fs::read_to_string(fx.layer.join("files/p.json")).unwrap(),
+        "mine"
+    );
 }
 
 #[tokio::test]
@@ -535,7 +585,12 @@ async fn an_unbound_artifact_or_placeholder_fails_the_step() {
         )
         .await;
 
-    assert!(report.run.error.as_deref().unwrap().contains("has no binding"));
+    assert!(report
+        .run
+        .error
+        .as_deref()
+        .unwrap()
+        .contains("has no binding"));
 
     let report = fx
         .install(
@@ -555,13 +610,26 @@ async fn require_file_checks_presence_and_digest() {
     std::fs::write(fx.downloads.join("abc.txt"), "abc").unwrap();
 
     let ok = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-    let step = |path: &str, sha: &str| {
-        json!([{ "action": "requireFile", "path": { "root": "downloads", "path": path }, "sha256": sha }])
-    };
+    let step = |path: &str, sha: &str| json!([{ "action": "requireFile", "path": { "root": "downloads", "path": path }, "sha256": sha }]);
 
-    assert!(fx.install(step("abc.txt", ok), &InstallEnv::default()).await.run.ok);
-    assert!(!fx.install(step("abc.txt", &"0".repeat(64)), &InstallEnv::default()).await.run.ok);
-    assert!(!fx.install(step("none.txt", ok), &InstallEnv::default()).await.run.ok);
+    assert!(
+        fx.install(step("abc.txt", ok), &InstallEnv::default())
+            .await
+            .run
+            .ok
+    );
+    assert!(
+        !fx.install(step("abc.txt", &"0".repeat(64)), &InstallEnv::default())
+            .await
+            .run
+            .ok
+    );
+    assert!(
+        !fx.install(step("none.txt", ok), &InstallEnv::default())
+            .await
+            .run
+            .ok
+    );
 }
 
 // ------------------------------------------------------------ runInstaller
@@ -639,9 +707,16 @@ fn java_gets_java_home_and_never_the_option_variables() {
         Path::new("/rt/java-17/bin/java"),
         true,
         Path::new("/l/work"),
-        &[("JAVA_TOOL_OPTIONS".into(), "x".into()), ("CLASSPATH".into(), "y".into())],
+        &[
+            ("JAVA_TOOL_OPTIONS".into(), "x".into()),
+            ("CLASSPATH".into(), "y".into()),
+        ],
     );
-    let get = |k: &str| env.iter().find(|(key, _)| key == k).map(|(_, v)| v.as_str());
+    let get = |k: &str| {
+        env.iter()
+            .find(|(key, _)| key == k)
+            .map(|(_, v)| v.as_str())
+    };
 
     assert_eq!(get("JAVA_HOME"), Some("/rt/java-17"));
     assert_eq!(get("PATH"), Some("/rt/java-17/bin"));
@@ -654,17 +729,27 @@ async fn run_installer_checks_expect_files() {
     let fx = Fixture::new();
 
     arm(&fx, "touch");
-    let report = fx.install(json!([probe_step(&["files/made.txt"], None)]), &probe_env()).await;
+    let report = fx
+        .install(json!([probe_step(&["files/made.txt"], None)]), &probe_env())
+        .await;
     assert!(report.run.ok, "{:?}", report.run.error);
 
     arm(&fx, "touch");
     let report = fx
-        .install(json!([probe_step(&["files/made.txt", "files/never.txt"], None)]), &probe_env())
+        .install(
+            json!([probe_step(&["files/made.txt", "files/never.txt"], None)]),
+            &probe_env(),
+        )
         .await;
 
     assert!(!report.run.ok);
     assert!(
-        report.run.error.as_deref().unwrap().contains("did not produce files/never.txt"),
+        report
+            .run
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("did not produce files/never.txt"),
         "{:?}",
         report.run.error
     );
@@ -676,10 +761,21 @@ async fn run_installer_fails_on_a_non_zero_exit() {
 
     arm(&fx, "exit3");
 
-    let report = fx.install(json!([probe_step(&[], None)]), &probe_env()).await;
+    let report = fx
+        .install(json!([probe_step(&[], None)]), &probe_env())
+        .await;
 
     assert!(!report.run.ok);
-    assert!(report.run.error.as_deref().unwrap().contains("installer failed"), "{:?}", report.run.error);
+    assert!(
+        report
+            .run
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("installer failed"),
+        "{:?}",
+        report.run.error
+    );
 }
 
 #[tokio::test]
@@ -703,10 +799,17 @@ async fn run_installer_timeout_kills_the_grandchild_too() {
     arm(&fx, "fork");
 
     let started = Instant::now();
-    let report = fx.install(json!([probe_step(&[], Some(3))]), &probe_env()).await;
+    let report = fx
+        .install(json!([probe_step(&[], Some(3))]), &probe_env())
+        .await;
 
     assert!(!report.run.ok);
-    assert!(report.run.error.as_deref().unwrap().contains("did not finish within 3s"));
+    assert!(report
+        .run
+        .error
+        .as_deref()
+        .unwrap()
+        .contains("did not finish within 3s"));
     assert!(started.elapsed() < Duration::from_secs(20));
 
     let pid = std::fs::read_to_string(fx.work().join("probe.pid")).expect("the probe forked");
@@ -717,7 +820,10 @@ async fn run_installer_timeout_kills_the_grandchild_too() {
         // Gone, or a zombie waiting for its new parent to reap it.
         let alive = std::fs::read_to_string(&stat)
             .ok()
-            .and_then(|s| s.rsplit_once(')').map(|(_, rest)| rest.trim_start().chars().next()))
+            .and_then(|s| {
+                s.rsplit_once(')')
+                    .map(|(_, rest)| rest.trim_start().chars().next())
+            })
             .flatten()
             .is_some_and(|state| state != 'Z' && state != 'X');
 
@@ -725,7 +831,11 @@ async fn run_installer_timeout_kills_the_grandchild_too() {
             break;
         }
 
-        assert!(Instant::now() < deadline, "grandchild {} survived the timeout", pid.trim());
+        assert!(
+            Instant::now() < deadline,
+            "grandchild {} survived the timeout",
+            pid.trim()
+        );
         std::thread::sleep(Duration::from_millis(50));
     }
 }

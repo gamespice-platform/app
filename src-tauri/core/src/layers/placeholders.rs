@@ -47,9 +47,11 @@ pub enum Position {
 impl Placeholder<'_> {
     pub fn position(&self) -> Position {
         match self {
-            Self::GameVersion | Self::Platform | Self::Side | Self::LaunchVersionId | Self::Var(_) => {
-                Position::Anywhere
-            }
+            Self::GameVersion
+            | Self::Platform
+            | Self::Side
+            | Self::LaunchVersionId
+            | Self::Var(_) => Position::Anywhere,
             Self::Loader | Self::LoaderVersion => Position::LoaderManifests,
             Self::Artifact(_) => Position::InstallerProgramAndArgs,
             Self::Runtime(_) => Position::InstallerProgram,
@@ -62,12 +64,18 @@ impl Placeholder<'_> {
 /// `^[A-Za-z][A-Za-z0-9]{0,31}$`
 pub fn is_ident(s: &str) -> bool {
     let b = s.as_bytes();
-    !b.is_empty() && b.len() <= 32 && b[0].is_ascii_alphabetic() && b.iter().all(u8::is_ascii_alphanumeric)
+    !b.is_empty()
+        && b.len() <= 32
+        && b[0].is_ascii_alphabetic()
+        && b.iter().all(u8::is_ascii_alphanumeric)
 }
 
 /// `^[a-z0-9-]{1,32}$`
 pub fn is_key(s: &str) -> bool {
-    !s.is_empty() && s.len() <= 32 && s.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+    !s.is_empty()
+        && s.len() <= 32
+        && s.bytes()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
 }
 
 /// Classifies the name inside a token; `None` is "not in the closed set".
@@ -106,7 +114,9 @@ pub fn tokens(s: &str) -> impl Iterator<Item = (std::ops::Range<usize>, &str)> {
         while i < b.len() {
             if b[i] == b'{' && i + 1 < b.len() && b[i + 1].is_ascii_alphabetic() {
                 let mut j = i + 2;
-                while j < b.len() && (b[j].is_ascii_alphanumeric() || matches!(b[j], b'_' | b'.' | b'-')) {
+                while j < b.len()
+                    && (b[j].is_ascii_alphanumeric() || matches!(b[j], b'_' | b'.' | b'-'))
+                {
                     j += 1;
                 }
                 if j < b.len() && b[j] == b'}' {
@@ -144,7 +154,10 @@ impl Values {
         let mut out = String::with_capacity(s.len());
         let mut last = 0;
         for (range, name) in tokens(s) {
-            let value = self.0.get(name).ok_or_else(|| Unresolved(name.to_string()))?;
+            let value = self
+                .0
+                .get(name)
+                .ok_or_else(|| Unresolved(name.to_string()))?;
             out.push_str(&s[last..range.start]);
             out.push_str(value);
             last = range.end;
@@ -158,7 +171,12 @@ impl Values {
         use serde_json::Value;
         Ok(match v {
             Value::String(s) => Value::String(self.expand(s)?),
-            Value::Array(items) => Value::Array(items.iter().map(|x| self.expand_json(x)).collect::<Result<_, _>>()?),
+            Value::Array(items) => Value::Array(
+                items
+                    .iter()
+                    .map(|x| self.expand_json(x))
+                    .collect::<Result<_, _>>()?,
+            ),
             Value::Object(map) => Value::Object(
                 map.iter()
                     .map(|(k, x)| Ok((k.clone(), self.expand_json(x)?)))
@@ -175,16 +193,24 @@ mod tests {
 
     #[test]
     fn tokens_match_the_typescript_regex() {
-        let found: Vec<_> = tokens("{{a} x{b.c-d_e} {1} {} {f").map(|(_, n)| n).collect();
+        let found: Vec<_> = tokens("{{a} x{b.c-d_e} {1} {} {f")
+            .map(|(_, n)| n)
+            .collect();
         assert_eq!(found, ["a", "b.c-d_e"]);
     }
 
     #[test]
     fn the_closed_set() {
         assert_eq!(classify("gameVersion"), Some(Placeholder::GameVersion));
-        assert_eq!(classify("var.javaMajor"), Some(Placeholder::Var("javaMajor")));
+        assert_eq!(
+            classify("var.javaMajor"),
+            Some(Placeholder::Var("javaMajor"))
+        );
         assert_eq!(classify("runtime.java"), Some(Placeholder::Runtime("java")));
-        assert_eq!(classify("artifact.installer"), Some(Placeholder::Artifact("installer")));
+        assert_eq!(
+            classify("artifact.installer"),
+            Some(Placeholder::Artifact("installer"))
+        );
         assert_eq!(classify("var.a.b"), None);
         assert_eq!(classify("var"), None);
         assert_eq!(classify("runtime.Java"), None);
@@ -197,7 +223,10 @@ mod tests {
         let mut v = Values::default();
         v.set("gameVersion", "{loader}");
         v.set("loader", "fabric");
-        assert_eq!(v.expand("mc-{gameVersion}/{loader}").unwrap(), "mc-{loader}/fabric");
+        assert_eq!(
+            v.expand("mc-{gameVersion}/{loader}").unwrap(),
+            "mc-{loader}/fabric"
+        );
         assert_eq!(v.expand("{nope}"), Err(Unresolved("nope".into())));
         assert_eq!(v.expand("{} {1}").unwrap(), "{} {1}");
     }

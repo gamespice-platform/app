@@ -521,8 +521,8 @@ impl<'de> Deserialize<'de> for InstallStep {
             Some(_) => return Err(D::Error::custom("label must be a string")),
         };
         value.remove("x-tmc-placeholder");
-        let step = serde_json::from_value(serde_json::Value::Object(value))
-            .map_err(D::Error::custom)?;
+        let step =
+            serde_json::from_value(serde_json::Value::Object(value)).map_err(D::Error::custom)?;
 
         Ok(Self { step, when, label })
     }

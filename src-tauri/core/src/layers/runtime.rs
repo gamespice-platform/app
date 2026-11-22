@@ -38,10 +38,17 @@ pub struct RuntimeMarker {
 /// Install `rt` unless it is there, and return its executable and folder.
 pub async fn ensure(ctx: &BuildCtx<'_>, rt: &PlannedRuntime) -> AppResult<(RuntimeExe, PathBuf)> {
     let offer = rt.offer.as_ref().ok_or_else(|| {
-        AppError::invalid(format!("No {} {} runtime is published for this computer.", rt.kind, rt.major))
+        AppError::invalid(format!(
+            "No {} {} runtime is published for this computer.",
+            rt.kind, rt.major
+        ))
     })?;
-    let entry = rel_path(&offer.entry)
-        .ok_or_else(|| AppError::invalid(format!("The runtime's entry {} is not a relative path.", offer.entry)))?;
+    let entry = rel_path(&offer.entry).ok_or_else(|| {
+        AppError::invalid(format!(
+            "The runtime's entry {} is not a relative path.",
+            offer.entry
+        ))
+    })?;
 
     let dir = ctx
         .data_root
@@ -51,7 +58,8 @@ pub async fn ensure(ctx: &BuildCtx<'_>, rt: &PlannedRuntime) -> AppResult<(Runti
         .join(&offer.platform)
         .join(short(&offer.artifact.sha256));
     let found = |dir: &Path| -> Option<(RuntimeExe, PathBuf)> {
-        let marker: RuntimeMarker = serde_json::from_slice(&std::fs::read(dir.join(MARKER)).ok()?).ok()?;
+        let marker: RuntimeMarker =
+            serde_json::from_slice(&std::fs::read(dir.join(MARKER)).ok()?).ok()?;
         let exe = dir.join("root").join(&entry);
         (marker.sha256 == offer.artifact.sha256 && exe.is_file()).then(|| {
             (
@@ -121,7 +129,12 @@ pub async fn ensure(ctx: &BuildCtx<'_>, rt: &PlannedRuntime) -> AppResult<(Runti
     found(&dir).ok_or_else(|| AppError::internal("The runtime vanished after it was installed."))
 }
 
-async fn install(ctx: &BuildCtx<'_>, rt: &PlannedRuntime, partial: &Path, downloads: &Path) -> AppResult<()> {
+async fn install(
+    ctx: &BuildCtx<'_>,
+    rt: &PlannedRuntime,
+    partial: &Path,
+    downloads: &Path,
+) -> AppResult<()> {
     let offer = rt.offer.as_ref().expect("checked by ensure");
     let file = offer
         .artifact
@@ -144,7 +157,10 @@ async fn install(ctx: &BuildCtx<'_>, rt: &PlannedRuntime, partial: &Path, downlo
 
     let mut hosts: Vec<String> = Vec::new();
     for url in std::iter::once(&offer.artifact.url).chain(&offer.artifact.mirrors) {
-        if let Some(host) = url::Url::parse(url).ok().and_then(|u| u.host_str().map(str::to_string)) {
+        if let Some(host) = url::Url::parse(url)
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_string))
+        {
             hosts.push(host);
         }
     }
@@ -178,7 +194,11 @@ async fn install(ctx: &BuildCtx<'_>, rt: &PlannedRuntime, partial: &Path, downlo
 /// `..`.
 fn rel_path(s: &str) -> Option<PathBuf> {
     let parts: Vec<&str> = s.split('/').collect();
-    if s.is_empty() || parts.iter().any(|p| p.is_empty() || *p == "." || *p == ".." || p.contains('\\')) {
+    if s.is_empty()
+        || parts
+            .iter()
+            .any(|p| p.is_empty() || *p == "." || *p == ".." || p.contains('\\'))
+    {
         return None;
     }
     Some(parts.iter().collect())

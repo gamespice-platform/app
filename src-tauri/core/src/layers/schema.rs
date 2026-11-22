@@ -16,7 +16,8 @@ use regex::Regex;
 use serde_json::Value;
 
 /// The manifest schema, as shipped in the repository.
-pub const MANIFEST_SCHEMA: &str = include_str!("../../../../schemas/loader-manifest.v1.schema.json");
+pub const MANIFEST_SCHEMA: &str =
+    include_str!("../../../../schemas/loader-manifest.v1.schema.json");
 
 /// One schema error: where in the document, and what.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,16 +30,39 @@ pub struct SchemaError {
 /// schema test holds the shipped schema to these.
 #[cfg(test)]
 const KEYWORDS: &[&str] = &[
-    "$ref", "type", "const", "enum", "pattern", "minLength", "maxLength", "minimum", "maximum", "items",
-    "minItems", "maxItems", "uniqueItems", "required", "properties", "additionalProperties", "propertyNames",
-    "maxProperties", "unevaluatedProperties", "allOf", "anyOf", "oneOf", "not", "if", "then",
+    "$ref",
+    "type",
+    "const",
+    "enum",
+    "pattern",
+    "minLength",
+    "maxLength",
+    "minimum",
+    "maximum",
+    "items",
+    "minItems",
+    "maxItems",
+    "uniqueItems",
+    "required",
+    "properties",
+    "additionalProperties",
+    "propertyNames",
+    "maxProperties",
+    "unevaluatedProperties",
+    "allOf",
+    "anyOf",
+    "oneOf",
+    "not",
+    "if",
+    "then",
 ];
 #[cfg(test)]
 const ANNOTATIONS: &[&str] = &["$schema", "$id", "$defs", "title", "description"];
 
 fn manifest_schema() -> &'static Value {
     static SCHEMA: OnceLock<Value> = OnceLock::new();
-    SCHEMA.get_or_init(|| serde_json::from_str(MANIFEST_SCHEMA).expect("the manifest schema is JSON"))
+    SCHEMA
+        .get_or_init(|| serde_json::from_str(MANIFEST_SCHEMA).expect("the manifest schema is JSON"))
 }
 
 /// Validates `doc` as an install manifest. Empty means valid.
@@ -58,8 +82,14 @@ pub fn validate(schema: &Value, doc: &Value) -> Vec<SchemaError> {
 
 fn regex(pattern: &str) -> Option<Regex> {
     static CACHE: OnceLock<Mutex<HashMap<String, Option<Regex>>>> = OnceLock::new();
-    let mut cache = CACHE.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
-    cache.entry(pattern.to_string()).or_insert_with(|| Regex::new(pattern).ok()).clone()
+    let mut cache = CACHE
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    cache
+        .entry(pattern.to_string())
+        .or_insert_with(|| Regex::new(pattern).ok())
+        .clone()
 }
 
 fn pointer_token(k: &str) -> String {
@@ -69,9 +99,13 @@ fn pointer_token(k: &str) -> String {
 fn json_eq(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Number(x), Value::Number(y)) => x.as_f64() == y.as_f64(),
-        (Value::Array(x), Value::Array(y)) => x.len() == y.len() && x.iter().zip(y).all(|(a, b)| json_eq(a, b)),
+        (Value::Array(x), Value::Array(y)) => {
+            x.len() == y.len() && x.iter().zip(y).all(|(a, b)| json_eq(a, b))
+        }
         (Value::Object(x), Value::Object(y)) => {
-            x.len() == y.len() && x.iter().all(|(k, a)| y.get(k).is_some_and(|b| json_eq(a, b)))
+            x.len() == y.len()
+                && x.iter()
+                    .all(|(k, a)| y.get(k).is_some_and(|b| json_eq(a, b)))
         }
         _ => a == b,
     }
@@ -79,7 +113,12 @@ fn json_eq(a: &Value, b: &Value) -> bool {
 
 fn is_integer(v: &Value) -> bool {
     match v {
-        Value::Number(n) => n.is_i64() || n.is_u64() || n.as_f64().is_some_and(|f| f.is_finite() && f.fract() == 0.0),
+        Value::Number(n) => {
+            n.is_i64()
+                || n.is_u64()
+                || n.as_f64()
+                    .is_some_and(|f| f.is_finite() && f.fract() == 0.0)
+        }
         _ => false,
     }
 }
@@ -103,15 +142,26 @@ struct Validator<'a> {
 
 impl<'a> Validator<'a> {
     fn resolve(&self, reference: &str) -> Option<&'a Value> {
-        reference.strip_prefix('#').and_then(|p| self.root.pointer(p))
+        reference
+            .strip_prefix('#')
+            .and_then(|p| self.root.pointer(p))
     }
 
     /// Validates `v` against `s`, appending errors, and returns the names of
     /// the properties `s` evaluated (for `unevaluatedProperties`).
-    fn check(&self, s: &'a Value, v: &Value, at: &str, out: &mut Vec<SchemaError>) -> HashSet<String> {
+    fn check(
+        &self,
+        s: &'a Value,
+        v: &Value,
+        at: &str,
+        out: &mut Vec<SchemaError>,
+    ) -> HashSet<String> {
         let mut evaluated = HashSet::new();
         let err = |out: &mut Vec<SchemaError>, message: String| {
-            out.push(SchemaError { at: at.to_string(), message })
+            out.push(SchemaError {
+                at: at.to_string(),
+                message,
+            })
         };
         let s = match s {
             Value::Bool(true) => return evaluated,
@@ -142,7 +192,13 @@ impl<'a> Validator<'a> {
         }
         if let Some(Value::Array(options)) = s.get("enum") {
             if !options.iter().any(|o| json_eq(o, v)) {
-                err(out, format!("must be equal to one of the allowed values ({})", Value::Array(options.clone())));
+                err(
+                    out,
+                    format!(
+                        "must be equal to one of the allowed values ({})",
+                        Value::Array(options.clone())
+                    ),
+                );
             }
         }
 
@@ -242,7 +298,10 @@ impl<'a> Validator<'a> {
                         continue;
                     }
                     if additional == &Value::Bool(false) {
-                        err(out, format!("must NOT have additional properties (\"{k}\")"));
+                        err(
+                            out,
+                            format!("must NOT have additional properties (\"{k}\")"),
+                        );
                     } else {
                         self.check(additional, x, &format!("{at}/{}", pointer_token(k)), out);
                     }
@@ -289,7 +348,10 @@ impl<'a> Validator<'a> {
                     Some(errors) => out.extend(errors),
                     None => err(out, "must match exactly one schema in oneOf".into()),
                 },
-                _ => err(out, format!("must match exactly one schema in oneOf (passingSchemas {passing:?})")),
+                _ => err(
+                    out,
+                    format!("must match exactly one schema in oneOf (passingSchemas {passing:?})"),
+                ),
             }
         }
         if let Some(not) = s.get("not") {
@@ -313,7 +375,10 @@ impl<'a> Validator<'a> {
         if s.get("unevaluatedProperties") == Some(&Value::Bool(false)) {
             if let Value::Object(map) = v {
                 for k in map.keys().filter(|k| !evaluated.contains(*k)) {
-                    err(out, format!("must NOT have unevaluated properties (\"{k}\")"));
+                    err(
+                        out,
+                        format!("must NOT have unevaluated properties (\"{k}\")"),
+                    );
                 }
                 evaluated.extend(map.keys().cloned());
             }
@@ -323,11 +388,22 @@ impl<'a> Validator<'a> {
 
     /// The errors of the `oneOf` branch whose `action` constant is the
     /// document's `action`, when there is exactly one such branch.
-    fn named_branch(&self, failures: &[(&'a Value, Vec<SchemaError>)], v: &Value) -> Option<Vec<SchemaError>> {
+    fn named_branch(
+        &self,
+        failures: &[(&'a Value, Vec<SchemaError>)],
+        v: &Value,
+    ) -> Option<Vec<SchemaError>> {
         let action = v.get("action")?.as_str()?;
         let mut named = failures.iter().filter(|(sub, _)| {
-            let branch = sub.get("$ref").and_then(Value::as_str).and_then(|r| self.resolve(r)).unwrap_or(sub);
-            branch.pointer("/properties/action/const").and_then(Value::as_str) == Some(action)
+            let branch = sub
+                .get("$ref")
+                .and_then(Value::as_str)
+                .and_then(|r| self.resolve(r))
+                .unwrap_or(sub);
+            branch
+                .pointer("/properties/action/const")
+                .and_then(Value::as_str)
+                == Some(action)
         });
         let (_, errors) = named.next()?;
         named.next().is_none().then(|| errors.clone())
@@ -365,7 +441,10 @@ mod tests {
     fn every_keyword_is_known() {
         let mut unknown = Vec::new();
         walk_keywords(manifest_schema(), &mut unknown);
-        assert!(unknown.is_empty(), "keywords the interpreter does not implement: {unknown:?}");
+        assert!(
+            unknown.is_empty(),
+            "keywords the interpreter does not implement: {unknown:?}"
+        );
     }
 
     #[test]

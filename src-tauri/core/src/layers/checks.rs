@@ -61,7 +61,15 @@ pub fn scan(root: &Path, limits: Limits) -> AppResult<Vec<LayerFile>> {
     let mut lower: HashMap<String, String> = HashMap::new();
     let mut total: u64 = 0;
 
-    walk(root, root, String::new(), limits, &mut out, &mut lower, &mut total)?;
+    walk(
+        root,
+        root,
+        String::new(),
+        limits,
+        &mut out,
+        &mut lower,
+        &mut total,
+    )?;
 
     out.sort_by(|a, b| a.path.cmp(&b.path));
 
@@ -299,7 +307,10 @@ mod tests {
         for bad in ["nul.txt", "CON", "trailing.", "space "] {
             let tmp = layer();
             std::fs::write(tmp.path().join("files").join(bad), b"x").unwrap();
-            assert!(scan(&tmp.path().join("files"), Limits::UNLIMITED).is_err(), "{bad}");
+            assert!(
+                scan(&tmp.path().join("files"), Limits::UNLIMITED).is_err(),
+                "{bad}"
+            );
         }
 
         let tmp = layer();
@@ -314,8 +325,29 @@ mod tests {
         let tmp = layer();
         std::fs::write(tmp.path().join("files/big"), vec![0u8; 100]).unwrap();
         let root = tmp.path().join("files");
-        assert!(scan(&root, Limits { max_bytes: 50, max_files: 0 }).is_err());
-        assert!(scan(&root, Limits { max_bytes: 0, max_files: 1 }).is_err());
-        assert!(scan(&root, Limits { max_bytes: 1000, max_files: 2 }).is_ok());
+        assert!(scan(
+            &root,
+            Limits {
+                max_bytes: 50,
+                max_files: 0
+            }
+        )
+        .is_err());
+        assert!(scan(
+            &root,
+            Limits {
+                max_bytes: 0,
+                max_files: 1
+            }
+        )
+        .is_err());
+        assert!(scan(
+            &root,
+            Limits {
+                max_bytes: 1000,
+                max_files: 2
+            }
+        )
+        .is_ok());
     }
 }
