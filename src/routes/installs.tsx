@@ -24,6 +24,7 @@ import { SignInPrompt } from '~/components/states'
 import { LaunchDialog } from '~/components/launch-dialog'
 import type { LaunchPreviewT } from '~/lib/ipc/schemas'
 import { useFolderPicker } from '~/components/folder-picker'
+import CatalogFields, { type VersionFields } from '~/components/catalog/catalog-fields'
 
 /**
  * **Installs** — the sandboxes a game is played in.
@@ -157,7 +158,9 @@ function InstallCard({
                         {[
                             `${install.items.length} item${install.items.length === 1 ? '' : 's'}`,
                             install.gameVersion,
-                            install.loader,
+                            [install.loader, install.loaderVersion]
+                                .filter(Boolean)
+                                .join(' '),
                         ]
                             .filter(Boolean)
                             .join(' · ')}
@@ -300,12 +303,15 @@ function NewInstallDialog({
 }) {
     const [name, setName] = useState('')
     const [appId, setAppId] = useState<number | null>(null)
-    const [gameVersion, setGameVersion] = useState('')
-    const [loader, setLoader] = useState('')
+    const [fields, setFields] = useState<VersionFields>({
+        gameVersion: null,
+        loader: null,
+        loaderVersion: null,
+    })
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [apps, setApps] = useState<
-        { id: number; name: string; icon: string | null }[]
+        { id: number; slug: string; name: string; icon: string | null }[]
     >([])
 
     useEffect(() => {
@@ -327,6 +333,7 @@ function NewInstallDialog({
                         .filter((a) => a.url && slugs.has(a.url.toLowerCase()))
                         .map((a) => ({
                             id: a.id,
+                            slug: (a.url ?? '').toLowerCase(),
                             name: appLabel(a),
                             icon: a.icon,
                         }))
@@ -341,6 +348,8 @@ function NewInstallDialog({
         }
     }, [])
 
+    const chosen = apps.find((a) => a.id === appId) ?? null
+
     const create = async () => {
         if (!appId || name.trim().length === 0) return
 
@@ -351,8 +360,9 @@ function NewInstallDialog({
             await api.installCreate({
                 appId,
                 name: name.trim(),
-                gameVersion: gameVersion.trim() || undefined,
-                loader: loader.trim() || undefined,
+                gameVersion: fields.gameVersion?.trim() || undefined,
+                loader: fields.loader?.trim() || undefined,
+                loaderVersion: fields.loaderVersion ?? undefined,
             })
 
             onCreated()
@@ -388,7 +398,15 @@ function NewInstallDialog({
                         fullWidth
                         placeholder="Choose a game…"
                         value={appId ? String(appId) : ''}
-                        onChange={(next) => setAppId(next ? Number(next) : null)}
+                        onChange={(next) => {
+                            setAppId(next ? Number(next) : null)
+                            // Versions and loaders belong to one game.
+                            setFields({
+                                gameVersion: null,
+                                loader: null,
+                                loaderVersion: null,
+                            })
+                        }}
                         options={apps.map((a) => ({
                             value: String(a.id),
                             label: a.name,
@@ -414,29 +432,19 @@ function NewInstallDialog({
                     />
                 </label>
 
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                    <label className="block text-xs">
-                        Game version
-                        <input
-                            value={gameVersion}
-                            maxLength={64}
-                            onChange={(e) => setGameVersion(e.target.value)}
-                            placeholder="1.20.1"
-                            className="mt-1 w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-xs"
+                {chosen && (
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <CatalogFields
+                            key={chosen.id}
+                            appId={chosen.id}
+                            appSlug={chosen.slug || null}
+                            value={fields}
+                            onPatch={(next) =>
+                                setFields((prev) => ({ ...prev, ...next }))
+                            }
                         />
-                    </label>
-
-                    <label className="block text-xs">
-                        Mod loader
-                        <input
-                            value={loader}
-                            maxLength={64}
-                            onChange={(e) => setLoader(e.target.value)}
-                            placeholder="fabric"
-                            className="mt-1 w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-xs"
-                        />
-                    </label>
-                </div>
+                    </div>
+                )}
 
                 <p className="mt-2 text-[11px] text-muted">
                     The version and loader are hints a launch rule may use. You can

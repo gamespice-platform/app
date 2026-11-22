@@ -81,6 +81,7 @@ import {
     type FsRootT,
     CatalogViewSchema,
     LoaderVersionsViewSchema,
+    InstallPlanPreviewSchema,
     type CatalogChannelT,
 } from './schemas'
 
@@ -421,6 +422,7 @@ export const ipc = {
             strategy?: 'direct' | 'hardlink' | 'symlink' | 'usvfs'
             gameVersion?: string | null
             loader?: string | null
+            loaderVersion?: string | null
             gameDir?: string | null
             options?: Record<string, unknown>
             cloudSync?: boolean
@@ -549,6 +551,14 @@ export const ipc = {
             loader,
             ...opts,
         }),
+
+    /** What a deploy would install below the mods, and whether it needs consent. */
+    installPlanPreview: (id: number) =>
+        call('install_plan_preview', InstallPlanPreviewSchema, { id }),
+
+    /** Agree to the plan the user was shown; refused when it changed since. */
+    installPlanConsent: (id: number, planHash: string) =>
+        call('install_plan_consent', z.void(), { id, planHash }),
 
     sandboxDeploy: (id: number, dryRun = false) =>
         call('sandbox_deploy', DeployReportSchema, { id, dryRun }),

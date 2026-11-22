@@ -30,6 +30,14 @@ const GAME_CACHE_LIMITS = [
     { value: '32768', label: '32 GB' },
 ]
 
+/** `versionListCount`: how many game versions a picker lists; `0` is all the server has. */
+const VERSION_COUNTS = [
+    { value: '10', label: 'Last 10' },
+    { value: '30', label: 'Last 30' },
+    { value: '100', label: 'Last 100' },
+    { value: '0', label: 'All' },
+]
+
 function formatBytes(bytes: number): string {
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
@@ -100,6 +108,32 @@ function GameCacheSection() {
                             void setApp({ gameCacheLimitMb: Number(next) })
                         }
                         options={GAME_CACHE_LIMITS}
+                    />
+                }
+            />
+            <Row
+                label="Game versions to list"
+                hint="How many recent versions the game version picker shows. Any other version can still be typed under Custom."
+                control={
+                    <Select
+                        label="Game versions to list"
+                        value={String(app.versionListCount)}
+                        onChange={(next) =>
+                            void setApp({ versionListCount: Number(next) })
+                        }
+                        options={
+                            VERSION_COUNTS.some(
+                                (o) => o.value === String(app.versionListCount)
+                            )
+                                ? VERSION_COUNTS
+                                : [
+                                      ...VERSION_COUNTS,
+                                      {
+                                          value: String(app.versionListCount),
+                                          label: `Last ${app.versionListCount}`,
+                                      },
+                                  ]
+                        }
                     />
                 }
             />

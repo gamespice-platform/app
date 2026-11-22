@@ -89,6 +89,88 @@ let settings: Record<string, unknown> | null = null
 const games = new Map<number, Record<string, unknown>>()
 const REVIEW_BUILD = '1.20261113.1637'
 g.__reviewGames = games
+g.__reviewSandboxes = sandboxes
+
+// ------------------------------------------------------------ Game versions and loaders
+// `minecraft` has a catalog; every other game has none (free-text fields).
+// A script sets `__reviewCatalogMode = 'stale'` for the offline banner and
+// `__reviewDeployFail = true` for an installer that exits non-zero.
+const ISO = '2026-11-01T00:00:00Z'
+const VERSIONS = ['1.21.4', '1.21.3', '1.21.1', '1.20.6', '1.20.1', '1.19.2', '1.18.2']
+const catalogVersions = () => [
+    { versionId: '25w14a', label: null, channel: 'PREVIEW', channelLabel: 'Snapshot', sortKey: 900, releasedAt: ISO, deprecated: null, managed: true },
+    ...VERSIONS.map((v, i) => ({ versionId: v, label: null, channel: 'STABLE', channelLabel: null, sortKey: 800 - i, releasedAt: ISO, deprecated: null, managed: true })),
+]
+const LOADERS = [
+    { key: 'forge', name: 'Forge', description: 'The oldest loader; most big mods.', sides: 'BOTH', onlineNote: null, position: 1, customVersions: true, managed: true },
+    { key: 'fabric', name: 'Fabric', description: 'Light and quick to update.', sides: 'BOTH', onlineNote: null, position: 2, customVersions: true, managed: true },
+    { key: 'neoforge', name: 'NeoForge', description: 'The Forge fork most 1.20.2+ mods target.', sides: 'BOTH', onlineNote: null, position: 3, customVersions: true, managed: true },
+    { key: 'quilt', name: 'Quilt', description: 'Fabric-compatible.', sides: 'BOTH', onlineNote: null, position: 4, customVersions: true, managed: true },
+]
+const BUILDS: Record<string, Record<string, string[]>> = {
+    forge: { '1.21.4': ['54.1.0', '54.0.26', '54.0.12'], '1.21.1': ['52.0.40', '52.0.31'], '1.20.1': ['47.3.0', '47.2.0'] },
+    fabric: { '*': ['0.16.9', '0.16.7', '0.15.11'] },
+    neoforge: { '1.21.4': ['21.4.75', '21.4.50'], '1.21.1': ['21.1.90'] },
+    quilt: { '*': ['0.27.1', '0.26.4'] },
+}
+const provenance = () => g.__reviewCatalogMode === 'stale'
+    ? { source: 'cache', stale: true, fetchedAt: Date.parse('2026-11-18T09:30:00Z') }
+    : { source: 'remote', stale: false, fetchedAt: Date.now() }
+function loaderBuilds(loader: string, gameVersion: string | null) {
+    const table = BUILDS[loader] ?? {}
+    const list = table['*'] ?? (gameVersion ? table[gameVersion] : Object.values(table).flat()) ?? []
+    return list.map((version, i) => ({ version, channel: 'STABLE', sortKey: 100 - i, recommended: i === 0, custom: false, deprecated: null }))
+}
+
+const listeners = new Map<string, number[]>()
+function emit(event: string, payload: unknown) {
+    const internals = g.__TAURI_INTERNALS__ as { runCallback(id: number, data: unknown): void }
+    for (const id of listeners.get(event) ?? []) internals.runCallback(id, { event, id, payload })
+}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** The install plan `install_plan_preview` would resolve for a sandbox, from the real Forge manifest's steps. */
+function planFor(s: Record<string, unknown>) {
+    const gameVersion = s.gameVersion as string | null
+    const loader = s.loader as string | null
+    const loaderVersion = (s.loaderVersion as string | null) ?? null
+    if (s.appSlug !== 'minecraft' || !gameVersion) return null
+    const server = s.environment === 'server'
+    const side = server ? 'server' : 'client'
+    const layers: Record<string, unknown>[] = [{
+        manifestKey: `minecraft/version@${gameVersion}`, revision: 1, title: `Minecraft ${gameVersion}`, layerHash: 'a1'.repeat(32), exec: false,
+        steps: [{ action: 'download', artifact: server ? 'server' : 'client', to: { root: 'layer', path: server ? 'files/server.jar' : `files/versions/${gameVersion}/${gameVersion}.jar` } }],
+        values: { gameVersion }, downloadHosts: ['piston-data.mojang.com'],
+    }]
+    if (loader === 'forge' && loaderVersion) {
+        const installer = { action: 'runInstaller', program: '{runtime.java}', args: ['-jar', '{artifact.installer}', server ? '--installServer' : '--installClient', '{layerFiles}'], cwd: '{layerWork}', network: true, timeoutSecs: server ? 1800 : 900 }
+        layers.push({
+            manifestKey: `minecraft/loader/forge@${gameVersion}-${loaderVersion}`, revision: 1, title: `Forge ${loaderVersion}`, layerHash: 'b2'.repeat(32), exec: true,
+            steps: server
+                ? [{ action: 'download', artifact: 'installer', to: { root: 'downloads', path: 'forge-{gameVersion}-{loaderVersion}-installer.jar' } }, installer]
+                : [
+                    { action: 'download', artifact: 'installer', to: { root: 'downloads', path: 'forge-{gameVersion}-{loaderVersion}-installer.jar' } },
+                    { action: 'writeText', ifMissing: true, content: '{"profiles":{}}', path: { root: 'layer', path: 'files/launcher_profiles.json' } },
+                    installer,
+                    { action: 'remove', path: { root: 'layer', path: 'files/launcher_profiles.json' } },
+                ],
+            values: { gameVersion, loaderVersion, launchVersionId: `${gameVersion}-forge-${loaderVersion}` },
+            downloadHosts: ['maven.minecraftforge.net'],
+        })
+    }
+    const exec = layers.some((l) => l.exec)
+    const consents = [
+        ...(exec ? [{ key: 'exec:minecraft/loader/forge', text: 'Runs the Forge installer with Java.', url: null }] : []),
+        ...(server ? [{ key: 'eula', text: 'I accept the Minecraft End User License Agreement.', url: 'https://aka.ms/MinecraftEULA' }] : []),
+    ]
+    return {
+        planHash: `c0ffee${gameVersion}${loader ?? ''}${loaderVersion ?? ''}${side}`.replace(/[^0-9a-z]/g, '').padEnd(64, '0'),
+        appSlug: 'minecraft', trust: 'official', side, platform: 'linux-x64', layers,
+        runtimes: exec ? [{ kind: 'java', major: 21, for: 'install', offer: null }] : [],
+        consents, exec,
+    }
+}
+const consented = new Set<string>()
 
 mockWindows('main')
 g.__TAURI_OS_PLUGIN_INTERNALS__ = { platform: 'linux', os_type: 'linux', family: 'unix', version: '6', arch: 'x86_64', exe_extension: '', eol: '\n', hostname: 'review' }
@@ -236,8 +318,54 @@ mockIPC(async (cmd, args) => {
             const session = fake(schema) as Record<string, unknown>
             return Object.assign(session, { id: 1, kind: fake((schema as { shape: { kind: unknown } }).shape.kind), label: `server ${a.serverId}`, startedMs: Date.now() })
         }
-        case 'plugin:event|listen': return 1
-        case 'plugin:event|unlisten': case 'plugin:event|emit': return null
+        case 'catalog_get': {
+            const slug = String(a.appSlug ?? '')
+            const known = slug === 'minecraft'
+            return { ...provenance(), app: { id: Number(a.appId), slug }, loaders: known ? LOADERS : [], versions: { items: known ? catalogVersions() : [], nextCursor: null }, generatedAt: ISO }
+        }
+        case 'catalog_loader_versions': {
+            const gv = (a.gameVersion as string | null | undefined) ?? null
+            return { ...provenance(), loader: String(a.loader), gameVersion: gv, items: loaderBuilds(String(a.loader), gv), nextCursor: null }
+        }
+        case 'install_plan_preview': {
+            const s = sandboxes.get(Number(a.id))
+            const plan = s ? planFor(s) : null
+            return { plan, needsConsent: !!plan && plan.consents.length > 0 && !consented.has(plan.planHash) }
+        }
+        case 'install_plan_consent': consented.add(String(a.planHash)); return null
+        case 'sandbox_deploy': {
+            const s = sandboxes.get(Number(a.id))
+            const plan = s ? planFor(s) : null
+            if (plan && plan.consents.length > 0 && !consented.has(plan.planHash)) throw { code: 'needs_consent', message: 'This install needs your consent first.' }
+            for (const layer of plan?.layers ?? []) {
+                const steps = layer.steps as Record<string, unknown>[]
+                for (let index = 0; index < steps.length; index++) {
+                    const base = { sandboxId: Number(a.id), planHash: plan?.planHash, layer: layer.manifestKey, index, total: steps.length }
+                    emit('deploy://plan-step', { ...base, status: 'running' })
+                    await sleep(120)
+                    if (g.__reviewDeployFail && steps[index].action === 'runInstaller') {
+                        const logTail = 'Extracting main jar...\nDownloading libraries\nException in thread "main" java.io.IOException: Server returned HTTP response code: 503\nThere was an error during installation'
+                        emit('deploy://plan-step', { ...base, status: 'failed', logTail })
+                        throw { code: 'invalid', message: 'The Forge installer exited with code 1.' }
+                    }
+                    emit('deploy://plan-step', { ...base, status: 'done' })
+                }
+            }
+            if (s) s.needsDeploy = false
+            return { ...(fake(schema) as object), requested: 'hardlink', used: 'hardlink', placed: 12 }
+        }
+        case 'plugin:event|listen': {
+            const list = listeners.get(String(a.event)) ?? []
+            list.push(Number(a.handler))
+            listeners.set(String(a.event), list)
+            return Number(a.handler)
+        }
+        case 'plugin:event|unlisten': {
+            const list = listeners.get(String(a.event)) ?? []
+            listeners.set(String(a.event), list.filter((h) => h !== Number(a.eventId)))
+            return null
+        }
+        case 'plugin:event|emit': return null
         default:
             return fake(schema)
     }

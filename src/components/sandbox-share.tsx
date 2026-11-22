@@ -224,7 +224,12 @@ export function ImportSandbox({
                                     {preview.appName ?? `Game ${preview.appId}`}
                                 </p>
                                 <p className="text-[11px] text-muted">
-                                    {preview.loader ?? 'no loader'} ·{' '}
+                                    {preview.loader
+                                        ? [preview.loader, preview.loaderVersion]
+                                              .filter(Boolean)
+                                              .join(' ')
+                                        : 'no loader'}{' '}
+                                    ·{' '}
                                     {preview.gameVersion ?? 'any version'} ·{' '}
                                     {preview.environment}
                                 </p>

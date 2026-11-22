@@ -476,6 +476,7 @@ export const api = {
         description?: string
         gameVersion?: string
         loader?: string
+        loaderVersion?: string
         isDefault?: boolean
         launch?: {
             args?: string[]
@@ -490,6 +491,7 @@ export const api = {
         description?: string | null
         gameVersion?: string | null
         loader?: string | null
+        loaderVersion?: string | null
         isDefault?: boolean
         launch?: {
             args?: string[]

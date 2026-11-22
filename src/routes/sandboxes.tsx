@@ -19,7 +19,7 @@ import {
 
 import { api } from '~/lib/api/client'
 import { ipc } from '~/lib/ipc/commands'
-import { messageOf } from '~/lib/ipc'
+import { isIpcError, messageOf } from '~/lib/ipc'
 import { sandboxGameOptions, sandboxSlugs, type SandboxGame } from '~/lib/library/sandbox-games'
 import { GameIcon } from '~/components/game-icon'
 import { ItemThumb } from '~/components/item-thumb'
@@ -33,6 +33,7 @@ import type {
     OutdatedT,
     DeployReportT,
     ExportReportT,
+    InstallPlanT,
     OptionSpecT,
     SandboxRowT,
     SandboxSpecT,
@@ -41,6 +42,11 @@ import type {
 import { SignInPrompt } from '~/components/states'
 import { LaunchDialog } from '~/components/launch-dialog'
 import Select from '~/components/select'
+import TextField from '~/components/text-field'
+import CatalogFields from '~/components/catalog/catalog-fields'
+import InstallPlanPanel from '~/components/catalog/install-plan-panel'
+import InstallConsentDialog from '~/components/catalog/install-consent-dialog'
+import DeployProgress from '~/components/catalog/deploy-progress'
 import FolderPicker from '~/components/folder-picker'
 import { Toggle } from '~/components/form'
 import ConfigEditor from '~/components/config-editor'
@@ -262,6 +268,9 @@ export default function SandboxesRoute() {
                                 <p className="mt-0.5 truncate text-[0.7rem] text-muted">
                                     {sandbox.appName ?? 'Unknown game'}
                                     {sandbox.loader ? ` · ${sandbox.loader}` : ''}
+                                    {sandbox.loader && sandbox.loaderVersion
+                                        ? ` ${sandbox.loaderVersion}`
+                                        : ''}
                                     {sandbox.gameVersion
                                         ? ` ${sandbox.gameVersion}`
                                         : ''}
@@ -333,6 +342,9 @@ function SandboxDetail({
     const [report, setReport] = useState<DeployReportT | null>(null)
     const [exported, setExported] = useState<ExportReportT | null>(null)
     const [picking, setPicking] = useState(false)
+    /** The plan awaiting consent, then the plan being installed. */
+    const [consentPlan, setConsentPlan] = useState<InstallPlanT | null>(null)
+    const [installing, setInstalling] = useState<InstallPlanT | null>(null)
 
     /*
      * `null` means the dialog is closed. It opens BEFORE the plan resolves, so
@@ -420,6 +432,37 @@ function SandboxDetail({
         }
     }
 
+    /**
+     * Deploy, by way of the install plan when there is one: consent first
+     * when it runs an installer or needs a licence, then the step-by-step
+     * progress. A plan that cannot be worked out (offline, no catalog)
+     * deploys the plain way, and Rust still refuses a plan with no consent.
+     */
+    const startDeploy = () =>
+        run('deploy', async () => {
+            const preview = await ipc
+                .installPlanPreview(sandbox.id)
+                .catch(() => null)
+            const plan = preview?.plan ?? null
+
+            if (plan && preview?.needsConsent) {
+                setConsentPlan(plan)
+                return
+            }
+            if (plan && plan.layers.length > 0) {
+                setInstalling(plan)
+                return
+            }
+            try {
+                setReport(await ipc.sandboxDeploy(sandbox.id))
+            } catch (err) {
+                if (!(isIpcError(err) && err.code === 'needs_consent')) throw err
+                const again = await ipc.installPlanPreview(sandbox.id)
+                if (!again.plan) throw err
+                setConsentPlan(again.plan)
+            }
+        })
+
     /** Items in this sandbox's game that the user is subscribed to. */
     const candidates = useMemo(
         () =>
@@ -496,6 +539,31 @@ function SandboxDetail({
                 />
             )}
 
+            {consentPlan && (
+                <InstallConsentDialog
+                    plan={consentPlan}
+                    onCancel={() => setConsentPlan(null)}
+                    onConsent={async () => {
+                        await ipc.installPlanConsent(sandbox.id, consentPlan.planHash)
+                        setConsentPlan(null)
+                        setInstalling(consentPlan)
+                    }}
+                />
+            )}
+
+            {installing && (
+                <DeployProgress
+                    sandboxId={sandbox.id}
+                    plan={installing}
+                    deploy={() => ipc.sandboxDeploy(sandbox.id)}
+                    onClose={(done) => {
+                        setInstalling(null)
+                        if (done) setReport(done)
+                        void onChanged()
+                    }}
+                />
+            )}
+
             {picking && (
                 <FolderPicker
                     title={`Where is ${sandbox.appName ?? 'the game'} installed?`}
@@ -532,11 +600,7 @@ function SandboxDetail({
                 <button
                     type="button"
                     disabled={busy !== null || !sandbox.targetDir}
-                    onClick={() =>
-                        void run('deploy', async () => {
-                            setReport(await ipc.sandboxDeploy(sandbox.id))
-                        })
-                    }
+                    onClick={() => void startDeploy()}
                     className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-foreground disabled:opacity-50"
                 >
                     <FiCheck className="size-3.5" />
@@ -1186,24 +1250,27 @@ function SandboxSettings({
                     />
                 </Labelled>
 
-                <Labelled label="Game version">
-                    <TextField
-                        value={sandbox.gameVersion ?? ''}
-                        placeholder="Any"
-                        onCommit={(value) =>
-                            void patch({ gameVersion: value || null })
-                        }
-                    />
-                </Labelled>
-
-                <Labelled label="Loader">
-                    <TextField
-                        value={sandbox.loader ?? ''}
-                        placeholder="None"
-                        onCommit={(value) => void patch({ loader: value || null })}
-                    />
-                </Labelled>
+                <CatalogFields
+                    appId={sandbox.appId}
+                    appSlug={sandbox.appSlug}
+                    value={{
+                        gameVersion: sandbox.gameVersion,
+                        loader: sandbox.loader,
+                        loaderVersion: sandbox.loaderVersion ?? null,
+                    }}
+                    onPatch={(next) => patch(next)}
+                />
             </div>
+
+            <InstallPlanPanel
+                sandboxId={sandbox.id}
+                watch={[
+                    sandbox.environment,
+                    sandbox.gameVersion,
+                    sandbox.loader,
+                    sandbox.loaderVersion,
+                ].join('|')}
+            />
 
             {options.length > 0 && (
                 <div className="flex flex-col gap-2 border-t border-border pt-3">
@@ -1742,54 +1809,6 @@ function Labelled({
             {children}
             {hint && <p className="mt-1 text-[0.7rem] text-muted">{hint}</p>}
         </div>
-    )
-}
-
-/**
- * A text input that commits on blur and on Enter, not on every keystroke.
- *
- * Each commit is an IPC round trip and a database write; committing per
- * character would be one per letter typed into a version field.
- */
-function TextField({
-    value,
-    onCommit,
-    placeholder,
-    numeric,
-    min,
-    max,
-}: {
-    value: string
-    onCommit: (next: string) => void
-    placeholder?: string
-    numeric?: boolean
-    min?: number
-    max?: number
-}) {
-    const [draft, setDraft] = useState(value)
-    const [valueSeen, setValueSeen] = useState(value)
-
-    // A new value from outside replaces whatever was being typed.
-    if (valueSeen !== value) {
-        setValueSeen(value)
-        setDraft(value)
-    }
-
-    return (
-        <input
-            value={draft}
-            type={numeric ? 'number' : 'text'}
-            min={min}
-            max={max}
-            placeholder={placeholder}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={() => draft !== value && onCommit(draft)}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur()
-                if (e.key === 'Escape') setDraft(value)
-            }}
-            className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
-        />
     )
 }
 

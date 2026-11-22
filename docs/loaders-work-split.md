@@ -290,6 +290,32 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
     - a game with no catalog showing the free-text fields;
   - screenshots in light and dark;
   - `npm run typecheck` and `npm test` pass.
+- **What was built:**
+  - `src/lib/catalog/picker.ts` holds the picker logic, apart from React. It is tested in `picker.test.ts`. It covers:
+    - the option rows: "Any version" or "None (vanilla)" first, then the catalog's rows, then a current value the catalog does not list;
+    - `checkCustomVersion`, the "Custom versions" pattern, which Rust checks again;
+    - carrying a loader version over a game version change, landing on the recommended build or else the newest;
+    - the offline and stale line;
+    - expanding a plan step's `{placeholders}`;
+    - the trust line, the exec host and the split between checkbox consents and statements.
+  - `src/lib/catalog/text.ts` holds the `catalog.*` strings through `ct()`. The app has no locale files yet, so English is the only table.
+  - `src/components/catalog/`:
+    - `version-picker`, `loader-picker` and `loader-version-picker` are built on `select.tsx`. That component gained a search box and a "Custom…" row as additive props, and now resets its query when opened.
+    - `catalog-fields` loads `catalog_get` for the sandbox's own game slug, so nothing here is specific to Minecraft. It asks `catalog_loader_versions` for builds and shows the offline, stale and fallback banner. A game with no catalog rows keeps the free-text fields (`text-field.tsx`).
+    - `install-plan-panel` is "What installing this does" from `install_plan_preview`. It shows every step in run order with the full argv.
+    - `install-consent-dialog` shows the trust line with the plan hash, the exec statement naming the download host, every step, and a checkbox per licence. It calls `install_plan_consent`.
+    - `deploy-progress` listens to `deploy://plan-step` and opens the log of a failed step.
+  - Wiring:
+    - In `routes/sandboxes.tsx`, the pickers replace the two text fields and the plan disclosure is added. Deploy now goes through consent when the plan needs it (`needs_consent`), then through the progress view.
+    - `routes/installs.tsx` uses the same fields in the create flow and resets them when the game changes.
+    - The install list and the share preview show `loaderVersion`.
+    - Settings → App gains `versionListCount` (default 30; 0 lists all).
+  - Free-text values from before the catalog are not rewritten. A4's migration 12 already split them. A value the catalog does not know shows as a custom or unknown row and is kept until the user picks another.
+  - `e2e/review/catalog.mjs` runs against the mocked bridge (`e2e/review/mock.ts`, catalog fixtures). It covers all seven acceptance flows (25 checks) and writes `docs/review/catalog-*.png` in dark and `-light`.
+  - Left open:
+    - Rust does not emit `deploy://plan-step` yet. Until it does, the view marks every step done on success, and on failure marks the first unfinished step.
+    - Settings → Storage "Clear unused layers" and Settings → Advanced "Install manifest from file" have no command to call yet.
+    - The pack panel cannot show a loader version because `local/modpack.rs` does not parse one.
 - **Step labels:** `step-label.tsx` is the one table of human labels per step action. W3's manifest panel needs the same text. It reads a JSON copy, `schemas/step-labels.en.json`, owned by A1 and synced by `catalog:schema:sync`, so neither side hand-writes the other's labels.
 
 ### A6: end to end, docs, changelog, readme (tmc-app, plus the website wire doc review)

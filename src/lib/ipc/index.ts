@@ -21,6 +21,8 @@ export const IpcErrorSchema = z.object({
         'api',
         'invalid',
         'jail',
+        /** The install plan asks for consent: show `install_plan_preview`. */
+        'needs_consent',
         'internal',
     ]),
     message: z.string(),

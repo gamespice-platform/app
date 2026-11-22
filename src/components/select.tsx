@@ -73,6 +73,24 @@ type Props<T extends string> = {
     className?: string
     /** Match the width of the button rather than sizing to content. */
     fullWidth?: boolean
+    /**
+     * A search box at the top of the open list that narrows the rows by label
+     * or value. Placeholder text for the box; omit for no box.
+     */
+    search?: string
+    /**
+     * A "Custom…" row at the bottom: choosing it turns the control into a text
+     * field, `check` validates inline (an error message, or `null`), and Enter
+     * hands the trimmed text to `onCustom`. With a search box, the row offers
+     * the typed query directly.
+     */
+    custom?: {
+        label: string
+        /** The row's text when a query is typed, `{value}` for the query. */
+        queryLabel?: string
+        check: (text: string) => string | null
+        onCustom: (text: string) => void
+    }
 }
 
 export default function Select<T extends string>({
@@ -84,14 +102,21 @@ export default function Select<T extends string>({
     disabled,
     className = '',
     fullWidth,
+    search,
+    custom,
 }: Props<T>) {
     const [open, setOpen] = useState(false)
+    const [query, setQuery] = useState('')
+    // The "Custom…" text field: `null` when the control is a dropdown.
+    const [editing, setEditing] = useState<string | null>(null)
     const [active, setActive] = useState(0)
     const [above, setAbove] = useState(false)
 
     const rootRef = useRef<HTMLDivElement>(null)
     const buttonRef = useRef<HTMLButtonElement>(null)
     const listRef = useRef<HTMLDivElement>(null)
+    const searchRef = useRef<HTMLInputElement>(null)
+    const editRef = useRef<HTMLInputElement>(null)
 
     /*
      * Type-ahead state. A ref rather than state: it changes on every keystroke
@@ -102,20 +127,39 @@ export default function Select<T extends string>({
 
     const id = useId()
 
-    const selectable = useMemo(
-        () => options.filter((option) => !option.disabled),
-        [options]
-    )
-
     const selected = options.find((option) => option.value === value)
+
+    /*
+     * The rows on show: every option, or those matching the search box. The
+     * Custom row is not an option (its value is not a `T`); it sits at index
+     * `rows.length` when there is one.
+     */
+    const rows = useMemo(() => {
+        const needle = query.trim().toLowerCase()
+
+        if (!search || !needle) return options
+
+        return options.filter(
+            (option) =>
+                option.label.toLowerCase().includes(needle) ||
+                option.value.toLowerCase().includes(needle)
+        )
+    }, [options, query, search])
+
+    const count = rows.length + (custom ? 1 : 0)
+
+    const selectable = useMemo(
+        () => rows.filter((option) => !option.disabled),
+        [rows]
+    )
 
     const indexOfValue = useCallback(
         () =>
             Math.max(
                 0,
-                options.findIndex((option) => option.value === value)
+                rows.findIndex((option) => option.value === value)
             ),
-        [options, value]
+        [rows, value]
     )
 
     // ------------------------------------------------------------ Dismissal
@@ -150,6 +194,24 @@ export default function Select<T extends string>({
         setAbove(below < 260 && rect.top > below)
     }, [open])
 
+    // The search box takes the keyboard while the list is open.
+    useEffect(() => {
+        if (open) searchRef.current?.focus()
+    }, [open])
+
+    /** Opening starts with an empty search, so every row shows again. */
+    const openList = () => {
+        setQuery('')
+        setActive(indexOfValue())
+        setOpen(true)
+    }
+
+    const isEditing = editing !== null
+
+    useEffect(() => {
+        if (isEditing) editRef.current?.focus()
+    }, [isEditing])
+
     // Keep the highlighted row in view while arrowing through a long list.
     useEffect(() => {
         if (!open) return
@@ -167,16 +229,28 @@ export default function Select<T extends string>({
         buttonRef.current?.focus()
     }
 
+    const startCustom = () => {
+        setEditing(query.trim() || (selected ? '' : value))
+        setOpen(false)
+    }
+
+    const commitAt = (index: number) => {
+        const option = rows[index]
+
+        if (option) commit(option)
+        else if (custom && index === rows.length) startCustom()
+    }
+
     const move = (delta: number) => {
-        if (!selectable.length) return
+        if (!selectable.length && !custom) return
 
         setActive((current) => {
             let next = current
 
-            for (let step = 0; step < options.length; step += 1) {
-                next = (next + delta + options.length) % options.length
+            for (let step = 0; step < count; step += 1) {
+                next = (next + delta + count) % count
 
-                if (!options[next]?.disabled) return next
+                if (!rows[next]?.disabled) return next
             }
 
             return current
@@ -190,8 +264,7 @@ export default function Select<T extends string>({
                 event.preventDefault()
 
                 if (!open) {
-                    setActive(indexOfValue())
-                    setOpen(true)
+                    openList()
 
                     return
                 }
@@ -205,24 +278,26 @@ export default function Select<T extends string>({
                 if (!open) return
 
                 event.preventDefault()
-                setActive(event.key === 'Home' ? 0 : options.length - 1)
+                setActive(event.key === 'Home' ? 0 : count - 1)
 
                 return
             }
             case 'Enter':
             case ' ': {
+                // A space typed into the search box is text, not a commit.
+                if (event.key === ' ' && event.target === searchRef.current) {
+                    return
+                }
+
                 event.preventDefault()
 
                 if (!open) {
-                    setActive(indexOfValue())
-                    setOpen(true)
+                    openList()
 
                     return
                 }
 
-                const option = options[active]
-
-                if (option) commit(option)
+                commitAt(active)
 
                 return
             }
@@ -231,6 +306,7 @@ export default function Select<T extends string>({
 
                 event.preventDefault()
                 setOpen(false)
+                buttonRef.current?.focus()
 
                 return
             }
@@ -253,6 +329,9 @@ export default function Select<T extends string>({
          */
         if (event.key.length !== 1 || event.ctrlKey || event.metaKey) return
 
+        // With a search box the letters are the search.
+        if (event.target === searchRef.current) return
+
         const now = Date.now()
 
         typed.current.text =
@@ -268,9 +347,9 @@ export default function Select<T extends string>({
 
         // Search from the row AFTER the current one, wrapping, so repeating a
         // letter steps through matches instead of sticking on the first.
-        for (let step = 1; step <= options.length; step += 1) {
-            const index = (from + step) % options.length
-            const option = options[index]
+        for (let step = 1; step <= rows.length; step += 1) {
+            const index = (from + step) % rows.length
+            const option = rows[index]
 
             if (
                 option &&
@@ -285,6 +364,56 @@ export default function Select<T extends string>({
             }
         }
     }
+
+    if (custom && editing !== null) {
+        const error = editing.trim() ? custom.check(editing) : null
+        const done = () => {
+            const text = editing.trim()
+
+            if (text && !custom.check(text)) custom.onCustom(text)
+            setEditing(null)
+        }
+
+        return (
+            <div
+                className={`${fullWidth ? 'w-full' : 'inline-block'} ${className}`}
+            >
+                <input
+                    ref={editRef}
+                    type="text"
+                    aria-label={label}
+                    aria-invalid={error !== null}
+                    aria-describedby={error ? `${id}-error` : undefined}
+                    value={editing}
+                    spellCheck={false}
+                    autoComplete="off"
+                    onChange={(event) => setEditing(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                            event.preventDefault()
+                            if (!error) done()
+                        } else if (event.key === 'Escape') {
+                            event.preventDefault()
+                            setEditing(null)
+                        }
+                    }}
+                    onBlur={() => (error ? setEditing(null) : done())}
+                    className={`w-full rounded-lg border bg-surface px-2 py-1.5 text-sm focus:outline-none ${
+                        error
+                            ? 'border-danger/50'
+                            : 'border-border focus:border-accent'
+                    }`}
+                />
+                {error && (
+                    <p id={`${id}-error`} className="mt-1 text-xs text-danger">
+                        {error}
+                    </p>
+                )}
+            </div>
+        )
+    }
+
+    const customIndex = rows.length
 
     return (
         <div
@@ -304,8 +433,8 @@ export default function Select<T extends string>({
                 onClick={() => {
                     if (disabled) return
 
-                    setActive(indexOfValue())
-                    setOpen((was) => !was)
+                    if (open) setOpen(false)
+                    else openList()
                 }}
                 onKeyDown={onKeyDown}
                 className={`flex ${
@@ -344,14 +473,34 @@ export default function Select<T extends string>({
                         above ? 'bottom-full mb-1' : 'top-full mt-1'
                     }`}
                 >
-                    {options.length === 0 && (
+                    {search && (
+                        <input
+                            ref={searchRef}
+                            type="search"
+                            aria-label={search}
+                            aria-controls={`${id}-list`}
+                            aria-activedescendant={`${id}-opt-${active}`}
+                            placeholder={search}
+                            value={query}
+                            spellCheck={false}
+                            autoComplete="off"
+                            onChange={(event) => {
+                                setQuery(event.target.value)
+                                setActive(0)
+                            }}
+                            onKeyDown={onKeyDown}
+                            className="mb-1 w-full rounded-md border border-border bg-surface-2 px-2 py-1 text-sm focus:border-accent focus:outline-none"
+                        />
+                    )}
+
+                    {rows.length === 0 && !custom && (
                         <p className="px-2 py-3 text-center text-xs text-muted">
                             Nothing to choose from
                         </p>
                     )}
 
-                    {options.map((option, index) => {
-                        const previous = options[index - 1]?.group
+                    {rows.map((option, index) => {
+                        const previous = rows[index - 1]?.group
                         const heading =
                             option.group && option.group !== previous
                                 ? option.group
@@ -420,6 +569,27 @@ export default function Select<T extends string>({
                             </div>
                         )
                     })}
+
+                    {custom && (
+                        <div
+                            id={`${id}-opt-${customIndex}`}
+                            data-index={customIndex}
+                            role="option"
+                            aria-selected={false}
+                            onPointerDown={(event) => {
+                                event.preventDefault()
+                                startCustom()
+                            }}
+                            onPointerEnter={() => setActive(customIndex)}
+                            className={`flex cursor-pointer items-center gap-2 rounded-md border-t border-border px-2 py-1.5 text-sm text-accent ${
+                                customIndex === active ? 'bg-surface-tertiary' : ''
+                            }`}
+                        >
+                            {query.trim() && custom.queryLabel
+                                ? custom.queryLabel.replace('{value}', query.trim())
+                                : custom.label}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

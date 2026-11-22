@@ -731,6 +731,8 @@ export const SandboxRowSchema = z.object({
     strategy: DeployStrategySchema,
     gameVersion: z.string().nullable(),
     loader: z.string().nullable(),
+    /** The loader's own version (`54.1.0`); absent on rows from older builds. */
+    loaderVersion: z.string().nullish(),
     preset: z.string().nullable(),
     isDefault: z.boolean(),
     cloudSync: z.boolean(),
@@ -854,6 +856,8 @@ export const SharedSandboxSchema = z.object({
     strategy: DeployStrategySchema,
     gameVersion: z.string().nullable(),
     loader: z.string().nullable(),
+    /** Absent from a code made by an older app. */
+    loaderVersion: z.string().nullish(),
     preset: z.string().nullable(),
     options: z.record(z.string(), z.unknown()),
     launchArgs: z.array(z.string()),
@@ -1658,3 +1662,84 @@ export type LoaderVersionsViewT = z.infer<typeof LoaderVersionsViewSchema>
 
 export const CatalogChannelVals = ['STABLE', 'PREVIEW', 'EXPERIMENTAL', 'LEGACY'] as const
 export type CatalogChannelT = (typeof CatalogChannelVals)[number]
+
+/**
+ * One layer of an install plan (`tmc_core::layers::plan::PlannedLayer`).
+ * `steps` are the manifest's own step objects for this side and platform,
+ * shown verbatim; `values` fill their `{placeholders}`.
+ */
+export const PlannedLayerSchema = z.object({
+    manifestKey: z.string(),
+    revision: z.number(),
+    title: z.string(),
+    layerHash: z.string(),
+    exec: z.boolean(),
+    steps: z.array(z.record(z.string(), z.unknown())),
+    values: z.record(z.string(), z.string()),
+    downloadHosts: z.array(z.string()),
+})
+
+export type PlannedLayerT = z.infer<typeof PlannedLayerSchema>
+
+export const PlanConsentSchema = z.object({
+    /** `exec:<manifest>`, `runtime:<kind>-<major>`, or the manifest's own id (`eula`). */
+    key: z.string(),
+    text: z.string(),
+    url: z.string().nullish(),
+})
+
+export type PlanConsentT = z.infer<typeof PlanConsentSchema>
+
+export const PlanRuntimeSchema = z.object({
+    kind: z.string(),
+    major: z.number(),
+    for: z.enum(['install', 'launch']),
+    offer: z
+        .object({
+            vendorLabel: z.string().nullish(),
+            artifact: z.object({ url: z.string(), sha256: z.string() }).loose(),
+        })
+        .loose()
+        .nullable(),
+})
+
+/** `tmc_core::layers::plan::InstallPlan`: what a deploy installs below the mods. */
+export const InstallPlanSchema = z.object({
+    planHash: z.string(),
+    appSlug: z.string(),
+    /** `compiled`: shipped in this build; `official`: signed by TMC; `local`: a file, unsigned. */
+    trust: z.enum(['compiled', 'official', 'local']),
+    side: z.string(),
+    platform: z.string(),
+    layers: z.array(PlannedLayerSchema),
+    runtimes: z.array(PlanRuntimeSchema),
+    consents: z.array(PlanConsentSchema),
+    exec: z.boolean(),
+})
+
+export type InstallPlanT = z.infer<typeof InstallPlanSchema>
+
+/** `install_plan_preview`. */
+export const InstallPlanPreviewSchema = z.object({
+    /** Null when the game, version or loader has no managed install. */
+    plan: InstallPlanSchema.nullable(),
+    needsConsent: z.boolean(),
+})
+
+export type InstallPlanPreviewT = z.infer<typeof InstallPlanPreviewSchema>
+
+/** `deploy://plan-step`: one step of a deploy's install plan changed state. */
+export const PlanStepEventSchema = z.object({
+    sandboxId: z.number(),
+    planHash: z.string(),
+    /** The layer's manifest key. */
+    layer: z.string(),
+    index: z.number(),
+    total: z.number(),
+    status: z.enum(['running', 'done', 'skipped', 'failed']),
+    bytes: z.number().nullish(),
+    totalBytes: z.number().nullish(),
+    logTail: z.string().nullish(),
+})
+
+export type PlanStepEventT = z.infer<typeof PlanStepEventSchema>
