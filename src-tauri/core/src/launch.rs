@@ -222,6 +222,68 @@ pub struct LaunchContext {
     /// A published virtual tree to carry into the game, when the sandbox being
     /// launched deployed that way.
     pub vfs: Option<VfsHandoff>,
+    /// Platform directories `execSearch` candidates expand against.
+    pub exec_roots: crate::detect::DetectRoots,
+    /// The directories of `PATH`, for a bare-name `execSearch` candidate.
+    pub path_dirs: Vec<PathBuf>,
+}
+
+/// The directories on this process's `PATH`.
+pub fn system_path_dirs() -> Vec<PathBuf> {
+    std::env::var_os("PATH")
+        .map(|p| {
+            std::env::split_paths(&p)
+                .filter(|d| d.is_absolute())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn platform_key() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "linux"
+    }
+}
+
+/// Search the rule's `execSearch` list for this platform. `Ok(None)` when the
+/// rule has no list; `Err` carries the candidates tried, for the message.
+fn search_exec(spec: &LaunchSpec, ctx: &LaunchContext) -> Option<Result<PathBuf, Vec<String>>> {
+    let list = spec.exec_search.get(platform_key())?;
+
+    if list.is_empty() {
+        return None;
+    }
+
+    let mut tried = Vec::new();
+
+    for candidate in list {
+        let found: Vec<PathBuf> = if candidate.contains(['/', '\\', '<', '~']) {
+            crate::detect::folders::expand(candidate, &ctx.exec_roots)
+        } else {
+            ctx.path_dirs
+                .iter()
+                .map(|dir| dir.join(candidate))
+                .collect()
+        };
+
+        for path in found {
+            if path.is_file() {
+                return Some(Ok(path));
+            }
+
+            tried.push(path.display().to_string());
+        }
+
+        if candidate.contains('<') && !candidate.contains('>') {
+            tried.push(candidate.clone());
+        }
+    }
+
+    Some(Err(tried))
 }
 
 /// Where a virtually-deployed sandbox published its tree.
@@ -313,15 +375,21 @@ fn has_unresolved(value: &str) -> bool {
 /// One game is one directory but three binaries, and a launch file that had to
 /// pick one at authoring time would only ever work on the author's OS.
 fn exec_for_platform(spec: &LaunchSpec) -> Option<&String> {
-    let key = if cfg!(target_os = "windows") {
-        "windows"
-    } else if cfg!(target_os = "macos") {
-        "macos"
-    } else {
-        "linux"
-    };
+    spec.exec_platform
+        .get(platform_key())
+        .or(spec.exec.as_ref())
+}
 
-    spec.exec_platform.get(key).or(spec.exec.as_ref())
+fn exec_not_found(tried: Vec<String>) -> AppError {
+    AppError::invalid(format!(
+        "The game's launcher was not found. Looked in: {}. Install the launcher (or repair its \
+         install), then try again.",
+        if tried.is_empty() {
+            "(nothing: no matching location exists on this machine)".to_owned()
+        } else {
+            tried.join(", ")
+        }
+    ))
 }
 
 /// Build the plan.
@@ -360,7 +428,27 @@ pub fn plan(
     }
 
     // ------------------------------------------------------------- Target
+    let searched = if spec.uri.is_none() {
+        search_exec(spec, ctx)
+    } else {
+        None
+    };
+
     let (program, uri) = match (&spec.uri, exec_for_platform(spec)) {
+        (None, _) if matches!(searched, Some(Ok(_))) => {
+            // Vetted by construction: the path came from the rule's own
+            // candidate list, which parsing already restricted.
+            let Some(Ok(found)) = searched else {
+                unreachable!()
+            };
+
+            (Some(found), None)
+        }
+        (None, None) if searched.is_some() => {
+            return Err(exec_not_found(
+                searched.and_then(Result::err).unwrap_or_default(),
+            ));
+        }
         (Some(uri), _) => {
             let filled = fill(uri, &table);
 
@@ -406,6 +494,10 @@ pub fn plan(
             )?;
 
             if !resolved.is_file() {
+                if let Some(Err(tried)) = searched {
+                    return Err(exec_not_found(tried));
+                }
+
                 return Err(AppError::invalid(format!(
                     "The game's launcher is not where the rule expects it: {}",
                     resolved.display()
@@ -801,6 +893,150 @@ mod tests {
                 "{escape} should be refused"
             );
         }
+    }
+
+    fn search_rule(list: &[&str]) -> AppPluginFile {
+        let key = platform_key();
+        let items = list
+            .iter()
+            .map(|c| format!("{c:?}"))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        rule_from(&format!(
+            r#"{{ "manifestVersion": 1, "launch": {{ "execSearch": {{ "{key}": [{items}] }} }} }}"#
+        ))
+    }
+
+    #[test]
+    fn exec_search_finds_a_launcher_outside_the_game_directory() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let game = tmp.path().join("instance");
+        let pf = tmp.path().join("Program Files (x86)");
+        std::fs::create_dir_all(&game).expect("mkdir");
+        std::fs::create_dir_all(pf.join("Launcher")).expect("mkdir");
+        std::fs::write(pf.join("Launcher/run.exe"), b"x").expect("write");
+
+        let ctx = LaunchContext {
+            exec_roots: crate::detect::DetectRoots {
+                program_files: vec![pf.clone()],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let rule = search_rule(&["<programFiles>/Launcher/run.exe"]);
+        let plan = plan(&rule, &jail_over(&game), &LaunchOptions::default(), &ctx).expect("plan");
+
+        assert_eq!(
+            plan.program,
+            Some(pf.join("Launcher/run.exe").display().to_string())
+        );
+    }
+
+    #[test]
+    fn exec_search_looks_up_a_bare_name_on_path_and_keeps_order() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let game = tmp.path().join("g");
+        let bin = tmp.path().join("bin");
+        std::fs::create_dir_all(&game).expect("mkdir");
+        std::fs::create_dir_all(&bin).expect("mkdir");
+        std::fs::write(bin.join("tool"), b"x").expect("write");
+
+        let ctx = LaunchContext {
+            path_dirs: vec![bin.clone()],
+            ..Default::default()
+        };
+
+        let rule = search_rule(&["missing-first", "tool"]);
+        let plan = plan(&rule, &jail_over(&game), &LaunchOptions::default(), &ctx).expect("plan");
+
+        assert_eq!(plan.program, Some(bin.join("tool").display().to_string()));
+    }
+
+    #[test]
+    fn exec_search_failure_names_what_was_searched() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let ctx = LaunchContext {
+            path_dirs: vec![tmp.path().to_path_buf()],
+            ..Default::default()
+        };
+
+        let rule = search_rule(&["nothing-here"]);
+        let err = plan(
+            &rule,
+            &jail_over(tmp.path()),
+            &LaunchOptions::default(),
+            &ctx,
+        )
+        .expect_err("must fail");
+
+        assert!(err.to_string().contains("nothing-here"), "{err}");
+        assert!(err.to_string().contains("not found"), "{err}");
+    }
+
+    #[test]
+    fn exec_search_does_not_widen_the_jail_for_exec() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let game = tmp.path().join("game");
+        std::fs::create_dir_all(&game).expect("mkdir");
+
+        let key = platform_key();
+        let rule = rule_from(&format!(
+            r#"{{ "manifestVersion": 1, "launch": {{ "exec": "../evil.sh", "execSearch": {{ "{key}": ["nothing-here"] }} }} }}"#
+        ));
+
+        assert!(plan(
+            &rule,
+            &jail_over(&game),
+            &LaunchOptions::default(),
+            &LaunchContext::default()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn exec_search_candidates_with_dotdot_or_relative_paths_are_refused_at_parse() {
+        for bad in ["<programFiles>/../x.exe", "sub/run.sh", "../x", "a\\..\\b"] {
+            let body = format!(
+                r#"{{ "manifestVersion": 1, "kind": "launch", "launch": {{ "execSearch": {{ "linux": [{bad:?}] }} }} }}"#
+            );
+
+            let tmp = tempfile::tempdir().expect("tempdir");
+            let dir = tmp.path().join("app/minecraft");
+
+            std::fs::create_dir_all(&dir).expect("mkdir");
+            std::fs::write(dir.join("launch.json"), body).expect("write");
+
+            let plugins = AppPlugins::load(tmp.path());
+
+            assert!(
+                plugins.errors().iter().any(|(f, _)| f.contains("launch")),
+                "{bad} should be refused: {:?}",
+                plugins.errors()
+            );
+        }
+    }
+
+    #[test]
+    fn the_shipped_minecraft_launcher_is_found_outside_the_instance() {
+        let plugins = AppPlugins::shipped();
+        let rule = plugins
+            .launch_for("minecraft", None)
+            .expect("minecraft launch rule");
+        let spec = rule.launch.as_ref().expect("launch");
+
+        for platform in ["windows", "macos", "linux"] {
+            assert!(
+                spec.exec_search
+                    .get(platform)
+                    .is_some_and(|l| !l.is_empty()),
+                "{platform} has no execSearch"
+            );
+        }
+
+        assert!(spec.exec.is_none(), "must not resolve inside the instance");
+        assert!(spec.args.iter().any(|a| a == "{installDir}"));
     }
 
     #[test]

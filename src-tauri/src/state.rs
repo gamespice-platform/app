@@ -62,6 +62,9 @@ pub struct AppState {
     pub latency: LatencyStore,
     pub version: String,
 
+    /// Platform directories for a launch rule's `execSearch`, resolved once.
+    pub exec_roots: tmc_core::detect::DetectRoots,
+
     /// The device's library: which subscriptions are here, what is on disk,
     /// every sandbox, the deployment ledger and the download queue.
     pub library: Arc<LibraryDb>,
@@ -340,6 +343,7 @@ impl AppState {
             plugins,
             latency: LatencyStore::new(),
             version,
+            exec_roots: Self::compute_detect_roots(app),
             downloads,
             games,
             rcon,
@@ -534,6 +538,7 @@ impl AppState {
             settings,
             http: self.api.raw(),
             audit: &self.audit,
+            exec_roots: &self.exec_roots,
             downloads: Some(&self.downloads),
             staging_root: &dirs.staging,
             backup_root: &dirs.backups,
@@ -566,6 +571,10 @@ impl AppState {
     /// rule every other path in this app follows, and the reason `tmc_core::
     /// detect` takes them as an argument instead of finding them itself.
     pub fn detect_roots(&self, app: &AppHandle) -> tmc_core::detect::DetectRoots {
+        Self::compute_detect_roots(app)
+    }
+
+    fn compute_detect_roots(app: &AppHandle) -> tmc_core::detect::DetectRoots {
         use tauri::Manager;
 
         let resolver = app.path();

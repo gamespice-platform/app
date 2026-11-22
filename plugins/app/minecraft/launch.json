@@ -1,16 +1,29 @@
 {
     "manifestVersion": 1,
-    "label": "Minecraft (bundled launcher)",
-    "description": "Starts the launcher that ships inside the game folder, pointed at this sandbox's own directory with --workDir. That flag is what makes a sandbox an instance: the launcher writes mods, config, saves and options.txt underneath it, so two sandboxes never share any of them.",
+    "label": "Minecraft (official launcher)",
+    "description": "Starts the Minecraft Launcher, which is installed on its own (Program Files, the Microsoft Store, /Applications or your PATH) and NOT inside the game folder, pointed at this sandbox's own directory with --workDir. That flag is what makes a sandbox an instance: the launcher writes mods, config, saves and options.txt underneath it, so two sandboxes never share any of them.",
 
     "permissions": {},
 
     "launch": {
-        "exec": "minecraft-launcher",
-        "execPlatform": {
-            "windows": "MinecraftLauncher.exe",
-            "macos": "Minecraft.app/Contents/MacOS/launcher",
-            "linux": "minecraft-launcher"
+        "execSearch": {
+            "windows": [
+                "<programFiles>/Minecraft Launcher/MinecraftLauncher.exe",
+                "<programFiles>/Minecraft Launcher/game/MinecraftLauncher.exe",
+                "<localAppData>/Microsoft/WindowsApps/MinecraftLauncher.exe",
+                "<localAppData>/Programs/Minecraft Launcher/MinecraftLauncher.exe",
+                "MinecraftLauncher.exe"
+            ],
+            "macos": [
+                "/Applications/Minecraft.app/Contents/MacOS/launcher",
+                "~/Applications/Minecraft.app/Contents/MacOS/launcher"
+            ],
+            "linux": [
+                "minecraft-launcher",
+                "/opt/minecraft-launcher/minecraft-launcher",
+                "/var/lib/flatpak/exports/bin/com.mojang.Minecraft",
+                "~/.local/share/flatpak/exports/bin/com.mojang.Minecraft"
+            ]
         },
 
         "args": ["--workDir", "{installDir}", "--version", "{gameVersion}"],

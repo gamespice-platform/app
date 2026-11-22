@@ -55,9 +55,13 @@ fn row(sandbox: Sandbox, state: &AppState) -> AppResult<SandboxRow> {
     Ok(SandboxRow {
         needs_deploy: sandbox.needs_deploy(&ledger),
         deployed_files: ledger.len(),
-        target_dir: tmc_core::library::deploy::target_dir(&sandbox, &settings)
-            .ok()
-            .map(|p| p.to_string_lossy().into_owned()),
+        target_dir: tmc_core::library::deploy::target_dir(
+            &sandbox,
+            &settings,
+            tmc_core::library::deploy::is_isolated(&state.app_plugins(), &sandbox),
+        )
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned()),
         sandbox,
     })
 }
@@ -201,6 +205,22 @@ pub async fn sandbox_create(
         }
 
         new.options = spec.clamp_options(&new.options);
+    }
+
+    /*
+     * An isolated-instance game (`isolatedInstance` in its sandbox.json) gets a
+     * fresh folder of its own when none was chosen. Never the app-wide game
+     * folder: that is the user's real install, and the whole point of a
+     * sandbox is that it is not.
+     */
+    if new.game_dir.is_none() && spec.is_some_and(|s| s.deploy.isolated_instance) {
+        let dir = tmc_core::library::deploy::create_instance_dir(
+            &state.paths.instances_dir(),
+            new.app_slug.as_deref().unwrap_or("game"),
+            &new.name,
+        )?;
+
+        new.game_dir = Some(dir.display().to_string());
     }
 
     let id = state.library.sandbox_create(&new)?;

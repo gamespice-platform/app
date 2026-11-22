@@ -683,7 +683,11 @@ pub fn import_unmanaged(
         .ok_or_else(|| AppError::invalid("That sandbox does not exist."))?;
 
     let settings = state.settings.get();
-    let game_dir = tmc_core::library::deploy::target_dir(&sandbox, &settings)?;
+    let game_dir = tmc_core::library::deploy::target_dir(
+        &sandbox,
+        &settings,
+        tmc_core::library::deploy::is_isolated(&state.app_plugins(), &sandbox),
+    )?;
 
     let plugins = state.app_plugins();
 

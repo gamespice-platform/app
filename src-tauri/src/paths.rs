@@ -76,6 +76,13 @@ impl AppPaths {
         self.data.join("staging")
     }
 
+    /// Where isolated-instance sandboxes get their own game folders:
+    /// `<data>/instances/<game>/<sandbox name>`. In DATA for the same reason as
+    /// staging: it holds worlds and configs somebody cares about.
+    pub fn instances_dir(&self) -> PathBuf {
+        self.data.join("instances")
+    }
+
     /// Where a deploy puts the game files it displaced, so a purge can put them
     /// back.
     ///

@@ -6,6 +6,7 @@
     "sandbox": {
         "deploy": {
             "defaultStrategy": "direct",
+            "isolatedInstance": true,
             "supportedStrategies": ["direct", "hardlink", "symlink"],
 
             "modTargets": [
@@ -20,7 +21,7 @@
                 "Each sandbox is a self-contained INSTANCE, the way CurseForge, Prism and MultiMC do it: give it its own game folder and it gets its own mods, config, saves, resourcepacks and options.txt. Nothing is shared with your vanilla .minecraft, so a modpack cannot corrupt a world you care about and two packs on different Minecraft versions cannot fight over one config folder.",
                 "Copying is the default for the same reason those launchers copy. A Minecraft instance is a directory the launcher is pointed at with --workDir, and everything inside it is expected to be a real file: loaders resolve paths, some mods rewrite their own jar on first run, and Windows refuses to create a symbolic link at all unless Developer Mode is on. Mod jars are small; correctness is worth the megabytes.",
                 "Switch to hard links if you keep several packs that share many of the same mods and the staging folder is on the same drive as the instance. They cost nothing on disk and behave like real files. Symbolic links are the last option: they work, but a mod that rewrites its own jar writes back into staging, where the next sandbox to use that mod will find it.",
-                "Point the sandbox at a NEW empty folder rather than at your existing .minecraft. That is what makes it an instance rather than a redecoration of the install you already have.",
+                "A new sandbox is given a fresh folder of its own under the app's data (instances/minecraft/<name>) and is never pointed at your existing .minecraft. Use Change only to put the instance somewhere else, and choose a NEW empty folder: that is what makes it an instance rather than a redecoration of the install you already have.",
                 "A client sandbox and a server sandbox need different builds of the same mod. Set the environment on the sandbox and the browser will only offer you mods that run on that side."
             ]
         },

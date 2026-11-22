@@ -204,7 +204,7 @@ pub fn from_hints(roots: &DetectRoots, plugins: &AppPlugins) -> Vec<DetectedGame
 /// else is taken literally, and a hint that is not absolute after expansion is
 /// dropped rather than resolved against the working directory — which is not a
 /// meaningful location for a GUI app.
-fn expand(hint: &str, roots: &DetectRoots) -> Vec<PathBuf> {
+pub fn expand(hint: &str, roots: &DetectRoots) -> Vec<PathBuf> {
     if hint.len() > 512 || hint.contains('\0') {
         return Vec::new();
     }

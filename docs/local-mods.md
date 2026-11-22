@@ -80,3 +80,5 @@ MO2 is **not** shipped, and the reason is worth keeping: its instances are named
 
 - **An archive that already holds `mods/` is a slice of the game folder.** Nesting it under the game's mod target again produces `mods/mods/foo.jar`, which deploys, reports no error and does nothing. `store::suggest_rel_path` tests the payload's top level against the game's declared `modTargets` before it nests anything.
 - **`store::relayout` cannot rename in place.** Moving a payload from the game's root into `mods` is a rename of a directory into itself, which every platform refuses — and root-to-subdirectory is the FIRST case a user hits, because it is what an unrecognised archive gets. It goes via a sibling holding directory, and puts the files back if the second rename fails.
+
+**Isolated-instance games.** A Minecraft sandbox gets its own folder under the app data `instances/` directory when created, so adopt and import read that folder, never the real `.minecraft`. A sandbox of such a game with no folder (made before this) fails loudly until Change gives it one.

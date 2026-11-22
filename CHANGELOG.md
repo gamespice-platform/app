@@ -18,6 +18,8 @@ The GameSpice App's releases, newest first. A version here is the one in `packag
 - New: a `download` step can list `mirrors`; each passes the same https and host checks, a pinned SHA-256 is required, and it fails over only on a network error or a mismatch.
 - Fixed: `rusqlite` 0.40 to 0.41 (bundled SQLite, `libsqlite3-sys` 0.38 to 0.39), which clears RUSTSEC-2026-0459; the advisory ignore is gone from `audit.toml`.
 - New: `CREDITS.md` names the projects the rules were drafted from.
+- Fixed: a Minecraft sandbox no longer deploys into the real `.minecraft`. A new sandbox gets its own folder under the app data `instances/` directory (`isolatedInstance` in `sandbox.json`), and an isolated game with no folder of its own now fails with a message instead of using the app-wide one. A sandbox made earlier with no folder needs Change once.
+- New: a launch rule's `execSearch` lists per-platform places to find a launcher outside the game folder (`<programFiles>`, `<localAppData>`, `<appData>`, `~`, or a bare `PATH` name). Minecraft uses it for the official launcher on Windows, macOS and Linux; a miss lists what was searched.
 
 ## 0.5.16
 

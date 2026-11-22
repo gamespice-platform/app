@@ -274,6 +274,9 @@ pub struct AppPluginPermissions {
 ///   * `exec` is a path RELATIVE to the game directory. There is no variant for
 ///     an absolute path, and the same [`crate::plugins::jail`] rules that
 ///     stop an installer escaping the jail are applied to it.
+///   * `execSearch` is the one way to name a launcher outside the game
+///     directory: an ordered per-platform list the RULE declares (never user
+///     input; `..` and other relative forms are refused at parse).
 ///   * `uri` is the alternative for games that launch through a client
 ///     (`steam://rungameid/271590`). It is handed to the OS opener, never to a
 ///     shell, and is checked against a scheme allow-list.
@@ -294,6 +297,22 @@ pub struct LaunchSpec {
     /// is one directory but three binaries.
     #[serde(default)]
     pub exec_platform: BTreeMap<String, String>,
+
+    /// Where to find an executable that lives OUTSIDE the game folder, keyed by
+    /// platform (`windows`, `macos`, `linux`).
+    ///
+    /// For launchers installed system-wide (Minecraft's lives in `Program
+    /// Files`, not in `.minecraft`). An ordered list of candidates: either an
+    /// absolute path, a path starting `~/`, `<programFiles>/` (both Program
+    /// Files and Program Files (x86), on every drive), `<appData>/`,
+    /// `<localAppData>/` or `<drives>/`, or a BARE name looked up on `PATH`.
+    /// The first that exists as a file wins. This is the only way a rule names a
+    /// path outside the jail, and it is a closed list written by the rule —
+    /// never a user-typed or `..` path; a candidate with `..` is refused when
+    /// the rule is parsed. When none exists, `exec`/`execPlatform` (inside the
+    /// jail) is tried, and otherwise the launch fails naming what was searched.
+    #[serde(default)]
+    pub exec_search: BTreeMap<String, Vec<String>>,
 
     /// A URI handed to the OS (`steam://…`). Mutually exclusive with `exec`.
     #[serde(default)]
@@ -436,6 +455,13 @@ pub struct DeploySpec {
     /// default (hard links).
     #[serde(default)]
     pub default_strategy: Option<String>,
+
+    /// Every sandbox of this game is an isolated INSTANCE (Minecraft, Prism-style
+    /// launchers). Creating one without its own folder makes a fresh folder under
+    /// the app's data (`instances/<game>/<name>`), and a sandbox can never fall
+    /// back to the app-wide game folder, which is the user's real install.
+    #[serde(default)]
+    pub isolated_instance: bool,
 
     /// Empty means "any the machine supports".
     #[serde(default)]
@@ -1038,6 +1064,41 @@ fn default_kind() -> AppPluginKind {
     AppPluginKind::ManageMod
 }
 
+/// Is this `execSearch` candidate one a rule may name? Absolute, a known prefix,
+/// or a bare file name for `PATH`; no `..`, no control characters, no other
+/// relative path (which would mean "relative to wherever we happen to run").
+fn check_exec_candidate(candidate: &str) -> Result<(), &'static str> {
+    if candidate.is_empty() || candidate.len() > 512 || candidate.chars().any(char::is_control) {
+        return Err("is empty, too long or has a control character");
+    }
+
+    if candidate.split(['/', '\\']).any(|part| part == "..") {
+        return Err("must not contain '..'");
+    }
+
+    let prefixed = [
+        "~/",
+        "<drives>/",
+        "<programFiles>/",
+        "<appData>/",
+        "<localAppData>/",
+    ]
+    .iter()
+    .any(|p| candidate.starts_with(p));
+
+    let bare = !candidate.contains(['/', '\\', '<', '~']);
+
+    let absolute = std::path::Path::new(candidate).is_absolute()
+        || candidate.starts_with('/')
+        || candidate.as_bytes().get(1) == Some(&b':');
+
+    if prefixed || bare || absolute {
+        Ok(())
+    } else {
+        Err("must be absolute, start with ~/ <programFiles>/ <appData>/ <localAppData>/ <drives>/, or be a bare name")
+    }
+}
+
 impl AppPluginFile {
     fn validate(&self) -> AppResult<()> {
         if self.manifest_version != 1 {
@@ -1053,7 +1114,23 @@ impl AppPluginFile {
                     return Err(AppError::invalid("A launch file must declare `launch`."));
                 };
 
-                let has_exec = launch.exec.is_some() || !launch.exec_platform.is_empty();
+                let has_exec = launch.exec.is_some()
+                    || !launch.exec_platform.is_empty()
+                    || launch.exec_search.values().any(|v| !v.is_empty());
+
+                for (platform, list) in &launch.exec_search {
+                    if list.len() > 16 {
+                        return Err(AppError::invalid("`execSearch` has too many candidates."));
+                    }
+
+                    for candidate in list {
+                        if let Err(why) = check_exec_candidate(candidate) {
+                            return Err(AppError::invalid(format!(
+                                "`execSearch.{platform}` candidate '{candidate}': {why}"
+                            )));
+                        }
+                    }
+                }
 
                 if has_exec == launch.uri.is_some() {
                     return Err(AppError::invalid(

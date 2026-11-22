@@ -111,6 +111,7 @@ struct World {
     db: LibraryDb,
     plugins: AppPlugins,
     roots: JailRoots,
+    exec_roots: tmc_core::detect::DetectRoots,
     settings: AppSettings,
     audit: Arc<Audit>,
     http: reqwest::Client,
@@ -184,6 +185,7 @@ fn world() -> World {
         db: LibraryDb::open(base.join("library.db")).expect("db"),
         plugins,
         roots: JailRoots { data, cache },
+        exec_roots: tmc_core::detect::DetectRoots::default(),
         settings,
         audit: Arc::new(Audit::new(base.join("audit.jsonl"))),
         http: tmc_core::http::client(),
@@ -203,6 +205,7 @@ impl World {
             settings: &self.settings,
             http: &self.http,
             audit: &self.audit,
+            exec_roots: &self.exec_roots,
             downloads: None,
             staging_root: &self.staging,
             backup_root: &self.backups,
@@ -530,7 +533,7 @@ async fn a_subscription_becomes_a_deployed_game_folder_and_back_again() {
 
         assert!(
             program.starts_with(
-                &target_dir(&sandbox, &world.settings)
+                &target_dir(&sandbox, &world.settings, false)
                     .unwrap()
                     .display()
                     .to_string()

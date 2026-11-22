@@ -95,11 +95,14 @@ fn context(state: &AppState, sandbox_id: i64) -> AppResult<Context> {
      */
     let mut settings = state.settings.get();
 
-    let dir = tmc_core::library::deploy::target_dir(&sandbox, &settings).map_err(|_| {
-        AppError::invalid(
+    let isolated = tmc_core::library::deploy::is_isolated(&state.app_plugins(), &sandbox);
+
+    let dir =
+        tmc_core::library::deploy::target_dir(&sandbox, &settings, isolated).map_err(|_| {
+            AppError::invalid(
             "No game folder is set for this sandbox, so there is nothing to read settings from.",
         )
-    })?;
+        })?;
 
     settings.game_dirs.insert(
         sandbox.app_id.to_string(),

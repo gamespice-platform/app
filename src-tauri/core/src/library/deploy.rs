@@ -58,6 +58,8 @@ pub struct SandboxCtx<'a> {
     pub settings: &'a AppSettings,
     pub http: &'a reqwest::Client,
     pub audit: &'a Audit,
+    /// Platform directories for `execSearch` (`<programFiles>` and friends).
+    pub exec_roots: &'a crate::detect::DetectRoots,
     /// The download queue, so staging a mod is visible and pausable.
     pub downloads: Option<&'a crate::download::DownloadManager>,
     /// Where every sandbox's staging folders live: `<staging>/<id>/<mod key>`.
@@ -100,27 +102,118 @@ impl StageOutcome {
     }
 }
 
+/// Does this sandbox's game declare `isolatedInstance` in its `sandbox.json`?
+///
+/// Such a game's sandboxes are instances: each one owns a folder and none may
+/// ever fall back to the app-wide game folder (the user's real install).
+pub fn is_isolated(plugins: &AppPlugins, sandbox: &Sandbox) -> bool {
+    sandbox
+        .app_slug
+        .as_deref()
+        .and_then(|slug| plugins.sandbox_spec(slug))
+        .is_some_and(|spec| spec.deploy.isolated_instance)
+}
+
+/// Make a fresh, empty instance folder: `<root>/<app slug>/<sandbox name>[-n]`.
+///
+/// The name is reduced to `[A-Za-z0-9 ._-]` first, so a sandbox called
+/// `..\..\Windows` cannot walk out of `root`. An existing folder is never
+/// reused (it may hold another sandbox's saves): a counter is appended.
+pub fn create_instance_dir(root: &Path, slug: &str, name: &str) -> AppResult<PathBuf> {
+    fn clean(raw: &str) -> String {
+        let kept: String = raw
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || matches!(c, ' ' | '.' | '_' | '-') {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect();
+
+        let kept = kept.trim_matches(|c: char| c == '.' || c == ' ' || c == '-');
+
+        if kept.is_empty() {
+            "instance".to_owned()
+        } else {
+            kept.chars().take(64).collect()
+        }
+    }
+
+    let parent = root.join(clean(slug));
+    let base = clean(name);
+
+    std::fs::create_dir_all(&parent).map_err(|e| {
+        AppError::invalid(format!(
+            "Could not create the instances folder {}: {e}",
+            parent.display()
+        ))
+    })?;
+
+    for n in 0..1000 {
+        let leaf = if n == 0 {
+            base.clone()
+        } else {
+            format!("{base}-{}", n + 1)
+        };
+
+        let dir = parent.join(leaf);
+
+        // `create_dir` (not `_all`) fails when the folder exists, which is the
+        // atomic "never reuse one" check.
+        match std::fs::create_dir(&dir) {
+            Ok(()) => return Ok(dir),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => {
+                return Err(AppError::invalid(format!(
+                    "Could not create the instance folder {}: {e}",
+                    dir.display()
+                )))
+            }
+        }
+    }
+
+    Err(AppError::invalid(
+        "Too many instance folders with that name. Rename the sandbox.",
+    ))
+}
+
 /// Where a sandbox deploys to on this machine.
 ///
 /// Its own folder when it has one — which is how CurseForge-style isolated
 /// instances are expressed — and otherwise the app's configured directory for
 /// the game, which is the "main install" every user starts with.
 ///
+/// `isolated` is the game's `isolatedInstance` flag. Such a game NEVER falls
+/// back to the app-wide folder: that is the user's real install (for Minecraft,
+/// their `.minecraft`), and a sandbox is supposed to be separate from it.
+///
 /// A missing directory is an ERROR rather than something to create: creating it
 /// means a typo in the settings produces an empty folder that the deploy then
 /// "succeeds" into, leaving the user with a game that has no mods and an app
 /// that says it worked.
-pub fn target_dir(sandbox: &Sandbox, settings: &AppSettings) -> AppResult<PathBuf> {
-    let raw = sandbox
-        .game_dir
-        .clone()
-        .or_else(|| settings.game_dirs.get(&sandbox.app_id.to_string()).cloned())
-        .ok_or_else(|| {
+pub fn target_dir(sandbox: &Sandbox, settings: &AppSettings, isolated: bool) -> AppResult<PathBuf> {
+    let raw = if isolated {
+        sandbox.game_dir.clone().ok_or_else(|| {
             AppError::invalid(
-                "This sandbox has no game folder yet. Set one in Library → My apps, or give the \
-                 sandbox its own folder.",
+                "This sandbox has no instance folder of its own. This game's sandboxes are \
+                 isolated instances and never use the game's main folder: choose an empty \
+                 folder for it with Change.",
             )
-        })?;
+        })?
+    } else {
+        sandbox
+            .game_dir
+            .clone()
+            .or_else(|| settings.game_dirs.get(&sandbox.app_id.to_string()).cloned())
+            .ok_or_else(|| {
+                AppError::invalid(
+                    "This sandbox has no game folder yet. Set one on the game's card in Library, \
+                     or give the sandbox its own folder.",
+                )
+            })?
+    };
 
     let path = PathBuf::from(raw);
 
@@ -404,7 +497,7 @@ pub fn deploy_sandbox(
     ctx: &SandboxCtx<'_>,
     dry_run: bool,
 ) -> AppResult<DeployReport> {
-    let target = target_dir(sandbox, ctx.settings)?;
+    let target = target_dir(sandbox, ctx.settings, is_isolated(ctx.plugins, sandbox))?;
 
     /*
      * The game's own rules, when it has a `sandbox.json`. A game declaring
@@ -498,7 +591,7 @@ pub fn launch_plan(
     sandbox: &Sandbox,
     ctx: &SandboxCtx<'_>,
 ) -> AppResult<LaunchPlan> {
-    let target = target_dir(sandbox, ctx.settings)?;
+    let target = target_dir(sandbox, ctx.settings, is_isolated(ctx.plugins, sandbox))?;
 
     let slug = sandbox.app_slug.as_deref().ok_or_else(|| {
         AppError::invalid("This sandbox's game has no slug, so no launch rule can be found for it.")
@@ -566,6 +659,8 @@ pub fn launch_plan(
         install_dir: Some(target.clone()),
         game_dir: Some(target),
         vfs,
+        exec_roots: ctx.exec_roots.clone(),
+        path_dirs: crate::launch::system_path_dirs(),
     };
 
     let mut plan = crate::launch::plan(rule, &jail, &options, &launch_ctx)?;
@@ -617,7 +712,7 @@ pub fn purge_sandbox(
     sandbox: &Sandbox,
     ctx: &SandboxCtx<'_>,
 ) -> AppResult<PurgeReport> {
-    let target = target_dir(sandbox, ctx.settings)?;
+    let target = target_dir(sandbox, ctx.settings, is_isolated(ctx.plugins, sandbox))?;
     let previous = db.sandbox_ledger(sandbox.id)?;
 
     let report = deploy::purge(&target, &previous);
@@ -675,7 +770,7 @@ pub fn verify_sandbox(
     sandbox: &Sandbox,
     ctx: &SandboxCtx<'_>,
 ) -> AppResult<deploy::VerifyReport> {
-    let target = target_dir(sandbox, ctx.settings)?;
+    let target = target_dir(sandbox, ctx.settings, is_isolated(ctx.plugins, sandbox))?;
     let ledger = db.sandbox_ledger(sandbox.id)?;
 
     Ok(deploy::verify(&target, &ledger))
@@ -689,7 +784,7 @@ pub fn strategies_for(
     sandbox: &Sandbox,
     ctx: &SandboxCtx<'_>,
 ) -> AppResult<Vec<deploy::StrategyReport>> {
-    let target = target_dir(sandbox, ctx.settings)?;
+    let target = target_dir(sandbox, ctx.settings, is_isolated(ctx.plugins, sandbox))?;
     let staging = deploy::stage_root(ctx.staging_root, sandbox.id);
 
     std::fs::create_dir_all(&staging)?;
@@ -771,9 +866,54 @@ mod tests {
         let id = db.sandbox_create(&new_sandbox()).expect("create");
         let sandbox = db.sandbox_get(id).expect("get").expect("present");
 
-        let err = target_dir(&sandbox, &AppSettings::default()).expect_err("must refuse");
+        let err = target_dir(&sandbox, &AppSettings::default(), false).expect_err("must refuse");
 
         assert!(err.to_string().contains("no game folder"));
+    }
+
+    #[test]
+    fn an_isolated_game_never_falls_back_to_the_app_wide_folder() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let real = tmp.path().join(".minecraft");
+
+        std::fs::create_dir_all(&real).expect("mkdir");
+
+        let db = LibraryDb::open_memory().expect("db");
+        let id = db.sandbox_create(&new_sandbox()).expect("create");
+        let sandbox = db.sandbox_get(id).expect("get").expect("present");
+
+        let err = target_dir(&sandbox, &settings_with(1, &real), true).expect_err("must refuse");
+
+        assert!(err.to_string().contains("instance folder"), "{err}");
+    }
+
+    #[test]
+    fn the_shipped_minecraft_sandboxes_are_isolated() {
+        let plugins = AppPlugins::shipped();
+        let db = LibraryDb::open_memory().expect("db");
+        let id = db.sandbox_create(&new_sandbox()).expect("create");
+        let mut sandbox = db.sandbox_get(id).expect("get").expect("present");
+
+        sandbox.app_slug = Some("minecraft".into());
+        assert!(is_isolated(&plugins, &sandbox));
+
+        sandbox.app_slug = Some("gtav".into());
+        assert!(!is_isolated(&plugins, &sandbox));
+    }
+
+    #[test]
+    fn instance_folders_are_fresh_sanitised_and_inside_the_root() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+
+        let a = create_instance_dir(tmp.path(), "minecraft", "Test").expect("a");
+        let b = create_instance_dir(tmp.path(), "minecraft", "Test").expect("b");
+        let c = create_instance_dir(tmp.path(), "minecraft", "..\\..\\Windows/x").expect("c");
+
+        assert_eq!(a, tmp.path().join("minecraft/Test"));
+        assert_eq!(b, tmp.path().join("minecraft/Test-2"));
+        assert!(a.is_dir() && b.is_dir());
+        assert!(c.starts_with(tmp.path().join("minecraft")));
+        assert_eq!(c.parent(), Some(tmp.path().join("minecraft").as_path()));
     }
 
     #[test]
@@ -794,7 +934,7 @@ mod tests {
         let id = db.sandbox_create(&new).expect("create");
         let sandbox = db.sandbox_get(id).expect("get").expect("present");
 
-        let resolved = target_dir(&sandbox, &settings_with(1, &shared)).expect("resolved");
+        let resolved = target_dir(&sandbox, &settings_with(1, &shared), false).expect("resolved");
 
         assert_eq!(resolved, own);
     }
@@ -807,7 +947,7 @@ mod tests {
 
         let settings = settings_with(1, Path::new("/definitely/not/here"));
 
-        assert!(target_dir(&sandbox, &settings).is_err());
+        assert!(target_dir(&sandbox, &settings, false).is_err());
     }
 
     /// A mod in the list but not yet downloaded is not deployable, and must not
@@ -847,6 +987,7 @@ mod tests {
             settings: &settings,
             http: &http,
             audit: &audit,
+            exec_roots: &crate::detect::DetectRoots::default(),
             downloads: None,
             staging_root: &tmp.path().join("staging"),
             backup_root: &tmp.path().join("backups"),
