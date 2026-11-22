@@ -21,6 +21,7 @@ Shot from the running app in its dark theme, with a demo account on the dev site
 - **Server Browser**: A full server browser like the one on the website, but with **real-time latency** and **server status** along with latency charts & graphs. You can also filter by game version, mod list, and more.
 - **RCON**: Remote console access to your servers, with a full command history and logging. You can also send commands to multiple servers at once, and even schedule commands to be sent at a later time.
 - **Connect**: One-click connect to servers that support it, with the ability to save your login credentials for future use.
+- **Console**: The `tmc` command-line tool as a terminal inside the app (desktop). Release builds include `tmc`, so it works with nothing else installed; `TMC_CLI_PATH` points it at another build. See [docs/console.md](docs/console.md).
 ### Gaming Platform
 - **Integrated Game Launcher**: Launch external games from the app, or launch integrated games right within the built-in Game Player, in a window of its own or full screen.
 - **Install TMC's own games**: Games we publish are downloaded and installed by the app for whatever machine you are on, kept up to date automatically, and started as real programs rather than in a browser. You can turn automatic updates off per game, and remove one at any time.

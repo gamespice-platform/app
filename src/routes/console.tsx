@@ -120,9 +120,10 @@ export default function ConsoleRoute() {
     if (probe.state === 'missing') {
         return (
             <Notice title="The TMC command-line tool is not installed">
-                The console runs the <code className="selectable">tmc</code> program
-                installed on this computer; it is not part of the app. Install it
-                with Python 3.11 or newer (
+                This build of the app does not include the{' '}
+                <code className="selectable">tmc</code> program (release builds
+                do), and none was found on this computer. Install it with Python
+                3.11 or newer (
                 <code className="selectable">pip install tmc-cli</code>), make sure{' '}
                 <code className="selectable">tmc --version</code> works in a
                 terminal, then reopen this screen.
@@ -270,7 +271,11 @@ function Terminal({ info }: { info: ConsoleProbeT }) {
                     <h1 className="text-lg font-bold">Console</h1>
                     <p className="selectable text-xs text-muted">
                         {info.version ?? 'tmc'}
-                        {info.path ? ` - ${info.path}` : ''}
+                        {info.source === 'bundled'
+                            ? ' - built in'
+                            : info.path
+                              ? ` - ${info.path}`
+                              : ''}
                         {info.signedIn
                             ? ' - signed in as you'
                             : ' - using your tmc profiles'}

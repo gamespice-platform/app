@@ -88,6 +88,8 @@ GitHub → this repository → Settings → Secrets and variables → Actions.
 | `TMC_UPDATER_PUBKEY` | Variable, optional | a different public key | a fork signing its own releases |
 | `TMC_UPDATER_ENDPOINT` | Variable, optional | a different default manifest URL | overriding the bucket or GitHub default |
 
+`TMC_CLI_TOKEN` (optional while tmc-cli is public): a read-only token for the tmc-cli repository, used by the `tmc-cli` jobs; falls back to `GITHUB_TOKEN`, which cannot read another private repository. The bundled CLI revision is `packaging/tmc-cli.json`; bump it in a commit before tagging. The sidecar is part of each bundle, so it is in the updater payload and under its signature.
+
 ### Android and iOS secrets
 
 All optional; without them the release still ships, and the job summary says what was skipped.

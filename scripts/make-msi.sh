@@ -61,6 +61,17 @@ mkdir -p "$(dirname "$out")"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# The bundled `tmc.exe` (TMC_SIDECAR), when the build has one: a second file in
+# the install directory, which is where the app looks for it. wixl has no
+# conditionals, so the component is cut out of the template when there is none.
+tmpl="$root/packaging/windows/tmc.wxs"
+if [ -n "${TMC_SIDECAR:-}" ] && [ -f "$TMC_SIDECAR" ]; then
+    sidecar="$(cd "$(dirname "$TMC_SIDECAR")" && pwd)/$(basename "$TMC_SIDECAR")"
+    sed -e "s|@SIDECAR@|$sidecar|g" -e '/@SIDECAR_BEGIN@/d' -e '/@SIDECAR_END@/d' "$tmpl" > "$work/tmpl.wxs"
+else
+    sed -e '/@SIDECAR_BEGIN@/,/@SIDECAR_END@/d' "$tmpl" > "$work/tmpl.wxs"
+fi
+
 sed -e "s|@PRODUCT@|$product|g" \
     -e "s|@VERSION@|$msi_version|g" \
     -e "s|@PUBLISHER@|$publisher|g" \
@@ -69,7 +80,7 @@ sed -e "s|@PRODUCT@|$product|g" \
     -e "s|@EXENAME@|$exename|g" \
     -e "s|@EXEPATH@|$exe|g" \
     -e "s|@ICON@|$icon|g" \
-    "$root/packaging/windows/tmc.wxs" > "$work/tmc.wxs"
+    "$work/tmpl.wxs" > "$work/tmc.wxs"
 
 wixl --arch x64 --output "$out" "$work/tmc.wxs"
 

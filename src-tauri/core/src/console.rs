@@ -6,8 +6,9 @@
 //! "No command takes a program or a path from the webview" still holds: the
 //! webview sends ONE STRING, and everything below is decided in Rust.
 //!
-//!   * **The program is never the webview's.** It is `tmc`, looked up on `PATH`
-//!     by [`find_program`]. A typed leading `tmc` is stripped by
+//!   * **The program is never the webview's.** It is the `tmc` shipped beside
+//!     the app (see [`resolve`] for the order), else `tmc` on `PATH`, found by
+//!     [`find_program`]. A typed leading `tmc` is stripped by
 //!     [`split_argv`]; any other first word is simply an argument to `tmc`.
 //!   * **No shell.** The line becomes an argv vector and goes to
 //!     `Command::args`; `;`, `|`, `&&`, backticks and `$(…)` are inert bytes to
@@ -405,22 +406,109 @@ pub fn fallback_dirs(home: Option<&Path>, windows: bool) -> Vec<PathBuf> {
     dirs
 }
 
-/// `tmc` on this process's `PATH`, then in [`fallback_dirs`].
-pub fn locate() -> Option<PathBuf> {
-    let pathext = std::env::var_os("PATHEXT");
+/// Environment variable naming a `tmc` to use instead of the bundled one. It is
+/// the USER's environment, never the webview's; it must be an absolute path to
+/// a runnable file, and a value that is not is ignored (so a typo falls back to
+/// the bundled CLI rather than to nothing).
+pub const OVERRIDE_ENV: &str = "TMC_CLI_PATH";
 
-    if let Some(found) = find_program(
-        PROGRAM,
-        std::env::var_os("PATH").as_deref(),
-        pathext.as_deref(),
-        cfg!(windows),
-    ) {
-        return Some(found);
+/// Where the `tmc` that will run came from, for the header and the audit log.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Source {
+    /// [`OVERRIDE_ENV`].
+    Override,
+    /// The sidecar installed beside the app's executable.
+    Bundled,
+    /// `PATH` or [`fallback_dirs`]: a `pip install` the user made.
+    Path,
+}
+
+impl Source {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Override => "override",
+            Self::Bundled => "bundled",
+            Self::Path => "path",
+        }
+    }
+}
+
+/// The sidecar's file name next to the app's executable. Tauri strips the
+/// target-triple suffix when it bundles `binaries/tmc-<triple>`.
+pub fn bundled_name(windows: bool) -> &'static str {
+    if windows {
+        "tmc.exe"
+    } else {
+        "tmc"
+    }
+}
+
+/// Every input of the lookup, so the order can be tested without touching the
+/// process environment.
+pub struct Lookup<'a> {
+    pub override_path: Option<&'a OsStr>,
+    /// The directory holding the app's own executable.
+    pub exe_dir: Option<&'a Path>,
+    pub path_var: Option<&'a OsStr>,
+    pub pathext: Option<&'a OsStr>,
+    pub home: Option<&'a Path>,
+    pub windows: bool,
+}
+
+/// Which `tmc` to run, in this order:
+///
+///   1. [`OVERRIDE_ENV`], when the user set it to a runnable absolute path;
+///   2. the bundled sidecar next to the app executable;
+///   3. `tmc` on `PATH`, then in [`fallback_dirs`].
+///
+/// The bundled one comes BEFORE `PATH` on purpose: the CLI tracks the app's API
+/// (`TMC_APP_TOKEN`, the `/api/app/v1` routes), so the copy built for this app
+/// version is the one guaranteed to match it. A `pip`-installed `tmc` that is
+/// older or newer is what the override is for. A dev build or a bare
+/// `cargo run` has no sidecar and so falls through to `PATH`, as before.
+pub fn resolve(l: &Lookup<'_>) -> Option<(PathBuf, Source)> {
+    if let Some(p) = l.override_path {
+        let p = PathBuf::from(p);
+
+        if p.is_absolute() && is_runnable(&p) {
+            return Some((p, Source::Override));
+        }
     }
 
-    let joined = std::env::join_paths(fallback_dirs(home_dir().as_deref(), cfg!(windows))).ok()?;
+    if let Some(dir) = l.exe_dir {
+        let p = dir.join(bundled_name(l.windows));
 
-    find_program(PROGRAM, Some(&joined), pathext.as_deref(), cfg!(windows))
+        if is_runnable(&p) {
+            return Some((p, Source::Bundled));
+        }
+    }
+
+    if let Some(found) = find_program(PROGRAM, l.path_var, l.pathext, l.windows) {
+        return Some((found, Source::Path));
+    }
+
+    let joined = std::env::join_paths(fallback_dirs(l.home, l.windows)).ok()?;
+
+    find_program(PROGRAM, Some(&joined), l.pathext, l.windows).map(|p| (p, Source::Path))
+}
+
+/// [`resolve`] against this process's environment.
+pub fn locate_with_source() -> Option<(PathBuf, Source)> {
+    let exe = std::env::current_exe().ok();
+    let home = home_dir();
+
+    resolve(&Lookup {
+        override_path: std::env::var_os(OVERRIDE_ENV).as_deref(),
+        exe_dir: exe.as_deref().and_then(Path::parent),
+        path_var: std::env::var_os("PATH").as_deref(),
+        pathext: std::env::var_os("PATHEXT").as_deref(),
+        home: home.as_deref(),
+        windows: cfg!(windows),
+    })
+}
+
+pub fn locate() -> Option<PathBuf> {
+    locate_with_source().map(|(p, _)| p)
 }
 
 // ---- Signing the CLI in with the app's own session ---------------------------
@@ -497,10 +585,74 @@ fn home_dir() -> Option<PathBuf> {
         .filter(|p| p.is_absolute() && p.is_dir())
 }
 
+/// Variables an AppImage's `AppRun` points INTO its own mount, and which a
+/// child would then load from: the bundled GTK/webkit libraries and data
+/// directories are not what a frozen Python (or a user's `tmc` and whatever
+/// that starts) was built against.
+const APPIMAGE_PATH_VARS: [&str; 6] = [
+    "LD_LIBRARY_PATH",
+    "PATH",
+    "XDG_DATA_DIRS",
+    "PYTHONPATH",
+    "GIO_EXTRA_MODULES",
+    "GST_PLUGIN_PATH",
+];
+
+/// Variables that make a Python interpreter look somewhere other than where it
+/// was built, whoever set them. A frozen `tmc` ignores them; a pip `tmc` would
+/// import from the wrong tree.
+const PYTHON_LEAKS: [&str; 2] = ["PYTHONHOME", "PYTHONPATH"];
+
+type EnvChange = (&'static str, Option<std::ffi::OsString>);
+
+/// `(name, Some(new value) | None to remove)` for the variables the child must
+/// not inherit as they are. Empty outside an AppImage, except for the Python
+/// ones. `get` reads the environment; passing it in keeps this testable.
+pub fn sanitised_env(get: impl Fn(&str) -> Option<std::ffi::OsString>) -> Vec<EnvChange> {
+    let mut out: Vec<EnvChange> = Vec::new();
+    let appdir = get("APPDIR")
+        .filter(|_| get("APPIMAGE").is_some())
+        .map(PathBuf::from);
+
+    for var in APPIMAGE_PATH_VARS {
+        let (Some(appdir), Some(value)) = (appdir.as_ref(), get(var)) else {
+            continue;
+        };
+
+        let kept: Vec<PathBuf> = std::env::split_paths(&value)
+            .filter(|p| !p.starts_with(appdir))
+            .collect();
+
+        if kept.len() == std::env::split_paths(&value).count() {
+            continue;
+        }
+
+        match std::env::join_paths(kept) {
+            Ok(v) if !v.is_empty() => out.push((var, Some(v))),
+            _ => out.push((var, None)),
+        }
+    }
+
+    for var in PYTHON_LEAKS {
+        if get(var).is_some() && !out.iter().any(|(k, _)| *k == var) {
+            out.push((var, None));
+        }
+    }
+
+    out
+}
+
 fn command(program: &Path, args: &[String], extra_env: &[(String, String)]) -> Command {
     let mut cmd = Command::new(program);
 
     cmd.args(args);
+
+    for (k, v) in sanitised_env(|k| std::env::var_os(k)) {
+        match v {
+            Some(v) => cmd.env(k, v),
+            None => cmd.env_remove(k),
+        };
+    }
 
     for (k, v) in FIXED_ENV {
         cmd.env(k, v);
@@ -1171,6 +1323,146 @@ mod tests {
         assert_eq!(find_program("tmc", None, None, cfg!(windows)), None);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn runnable(path: &Path) {
+        std::fs::write(path, b"x").unwrap();
+        make_executable(path);
+    }
+
+    fn make_executable(path: &Path) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        #[cfg(not(unix))]
+        let _ = path;
+    }
+
+    #[test]
+    fn resolution_order_is_override_bundled_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let name = bundled_name(cfg!(windows));
+        let (app, pathdir, own) = (
+            dir.path().join("app"),
+            dir.path().join("path"),
+            dir.path().join("own"),
+        );
+
+        for d in [&app, &pathdir, &own] {
+            std::fs::create_dir_all(d).unwrap();
+            runnable(&d.join(name));
+        }
+
+        let pathvar = std::env::join_paths([&pathdir]).unwrap();
+        let mut l = Lookup {
+            override_path: None,
+            exe_dir: Some(&app),
+            path_var: Some(&pathvar),
+            pathext: None,
+            home: None,
+            windows: cfg!(windows),
+        };
+
+        // The bundled copy beats a `tmc` on PATH.
+        assert_eq!(resolve(&l), Some((app.join(name), Source::Bundled)));
+
+        // An override beats the bundled copy; a relative or missing one is ignored.
+        let ov = own.join(name);
+
+        l.override_path = Some(ov.as_os_str());
+        assert_eq!(resolve(&l), Some((ov.clone(), Source::Override)));
+
+        l.override_path = Some(OsStr::new("tmc"));
+        assert_eq!(resolve(&l).unwrap().1, Source::Bundled);
+
+        let missing = dir.path().join("missing");
+
+        l.override_path = Some(missing.as_os_str());
+        assert_eq!(resolve(&l).unwrap().1, Source::Bundled);
+
+        // No sidecar (a dev build): PATH.
+        let nowhere = own.join("nowhere");
+
+        l.override_path = None;
+        l.exe_dir = Some(&nowhere);
+        assert_eq!(resolve(&l), Some((pathdir.join(name), Source::Path)));
+    }
+
+    /// Runs the sidecar the build script produced, through the same resolution
+    /// and spawn code the Console uses. `TMC_BUNDLED_BIN` is set by
+    /// `scripts/build-tmc-cli.sh --test`; without it there is nothing to run
+    /// and the test says so rather than passing silently.
+    #[test]
+    fn bundled_cli_runs_through_the_console_path() {
+        let Some(bin) = std::env::var_os("TMC_BUNDLED_BIN") else {
+            eprintln!("TMC_BUNDLED_BIN not set: skipping (run scripts/build-tmc-cli.sh --test)");
+            return;
+        };
+
+        // Install it the way Tauri does: `tmc` beside the app executable.
+        let dir = tempfile::tempdir().unwrap();
+        let installed = dir.path().join(bundled_name(cfg!(windows)));
+
+        std::fs::copy(&bin, &installed).unwrap();
+        make_executable(&installed);
+
+        let (found, source) = resolve(&Lookup {
+            override_path: None,
+            exe_dir: Some(dir.path()),
+            path_var: None,
+            pathext: None,
+            home: None,
+            windows: cfg!(windows),
+        })
+        .expect("the bundled tmc must resolve");
+
+        assert_eq!(source, Source::Bundled);
+
+        let version = version_of(&found).expect("tmc --version must run");
+
+        assert!(
+            version.chars().any(|c| c.is_ascii_digit()),
+            "unexpected --version output: {version:?}"
+        );
+
+        let out = command(&found, &["--help".to_string()], &[])
+            .stdin(Stdio::null())
+            .output()
+            .unwrap();
+
+        assert!(out.status.success(), "tmc --help failed");
+        assert!(!out.stdout.is_empty());
+    }
+
+    #[test]
+    fn appimage_mount_is_stripped_from_the_child_environment() {
+        let env = |k: &str| -> Option<std::ffi::OsString> {
+            match k {
+                "APPIMAGE" => Some("/x/App.AppImage".into()),
+                "APPDIR" => Some("/tmp/.mount_app".into()),
+                "LD_LIBRARY_PATH" => Some("/tmp/.mount_app/usr/lib:/opt/lib".into()),
+                "PATH" => Some("/tmp/.mount_app/usr/bin".into()),
+                "PYTHONHOME" => Some("/tmp/.mount_app/usr".into()),
+                "XDG_DATA_DIRS" => Some("/usr/share".into()),
+                _ => None,
+            }
+        };
+
+        let out = sanitised_env(env);
+        let get = |k: &str| out.iter().find(|(n, _)| *n == k).map(|(_, v)| v.clone());
+
+        assert_eq!(get("LD_LIBRARY_PATH"), Some(Some("/opt/lib".into())));
+        assert_eq!(get("PATH"), Some(None));
+        assert_eq!(get("PYTHONHOME"), Some(None));
+        assert_eq!(get("XDG_DATA_DIRS"), None);
+
+        // Outside an AppImage only the Python variables go.
+        let plain = sanitised_env(|k| (k == "PYTHONHOME").then(|| "/x".into()));
+
+        assert_eq!(plain, vec![("PYTHONHOME", None)]);
     }
 
     #[test]

@@ -35,7 +35,52 @@ env:
     RUST_TOOLCHAIN: '1.98'
 
 jobs:
+    # THE `tmc` COMMAND-LINE TOOL, FROZEN, ONCE PER TARGET.
+    #
+    # The Console runs a `tmc` shipped inside the app so it works with no pip
+    # step and no Python on the machine. PyInstaller cannot cross-compile, so
+    # each target builds on its own kind of runner; `build` below downloads the
+    # results. The CLI revision is `packaging/tmc-cli.json`, so a tag rebuilds
+    # exactly what the commit says. TMC_CLI_TOKEN (a read-only PAT for the
+    # tmc-cli repository) is needed while that repository is private.
+    tmc-cli:
+        strategy:
+            fail-fast: true
+            matrix:
+                include:
+                    - { os: ubuntu-22.04, triple: x86_64-unknown-linux-gnu }
+                    - { os: windows-latest, triple: x86_64-pc-windows-msvc }
+                    # The universal app needs both slices; `build` joins them.
+                    - { os: macos-latest, triple: aarch64-apple-darwin }
+                    - { os: macos-15-intel, triple: x86_64-apple-darwin }
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.inputs.tag || github.ref }}
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - name: Build tmc
+              shell: bash
+              env:
+                  TMC_CLI_TOKEN: ${{ secrets.TMC_CLI_TOKEN || secrets.GITHUB_TOKEN }}
+              run: bash scripts/build-tmc-cli.sh --triple "${{ matrix.triple }}"
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: tmc-cli-${{ matrix.triple }}
+                  path: src-tauri/binaries/*
+                  if-no-files-found: error
+
     build:
+        needs: tmc-cli
         strategy:
             fail-fast: false
             matrix:
@@ -91,6 +136,25 @@ jobs:
             - uses: Swatinem/rust-cache@v2
               with:
                   workspaces: src-tauri
+
+            # The sidecar `externalBin` expects, named for the build target.
+            # An artifact loses its executable bit, and the universal macOS
+            # build wants one fat file named for `universal-apple-darwin`.
+            - uses: actions/download-artifact@v4
+              with:
+                  pattern: tmc-cli-*
+                  path: src-tauri/binaries
+                  merge-multiple: true
+
+            - name: Prepare the bundled tmc
+              shell: bash
+              working-directory: src-tauri/binaries
+              run: |
+                  chmod +x tmc-* || true
+                  if [ "${{ matrix.name }}" = "macos" ]; then
+                      lipo -create -output tmc-universal-apple-darwin tmc-aarch64-apple-darwin tmc-x86_64-apple-darwin
+                  fi
+                  ls -la
 
             - name: Linux build dependencies
               if: matrix.name == 'linux'
@@ -195,6 +259,13 @@ jobs:
                   else
                       echo "::warning::No TAURI_SIGNING_PRIVATE_KEY secret, so this release is unsigned and download-only: installed apps will show the banner and open the download page rather than installing. See docs/RELEASING.md."
                   fi
+
+                  # The bundled `tmc` (a sidecar). It is passed here, not set in
+                  # tauri.conf.json, because tauri-build refuses to compile when a
+                  # declared externalBin is missing, which would break `cargo
+                  # check` and `tauri dev` for everyone. Missing here is an error
+                  # on purpose: a release without it has a dead Console.
+                  extra+=(--config src-tauri/tauri.bundle-tmc.conf.json)
 
                   npx tauri build ${{ matrix.args }} "${extra[@]}"
 

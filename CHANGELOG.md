@@ -32,6 +32,7 @@ The GameSpice App's releases, newest first. A version here is the one in `packag
 ## Unreleased
 
 - New: Library > Apps lists your games with a Manage button for each: install folder and Find my games moved there from Settings > Games, which is now Settings > Downloads (the download cache location only). The old address redirects.
+- New: release builds include the `tmc` command-line tool, so the Console works without a pip install. A bundled `tmc` wins over one on PATH; set `TMC_CLI_PATH` to use another. The installer grows by about 9 MB.
 
 ## 0.5.5
 

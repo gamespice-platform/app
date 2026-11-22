@@ -30,6 +30,10 @@ So:
 
 `scripts/release-targets.mjs` is the one filename → platform table, shared by the static manifest (`updater-manifest.mjs`) and the site publish (`publish-release.mjs`), and pinned by a vitest. macOS ships the `.app.tar.gz`, not the `.dmg`; Windows prefers the `-setup.exe` over the `.msi`, which does not bootstrap WebView2; the manifest carries `{os}-{arch}-{bundle}` keys too, so an MSI install updates from the MSI.
 
+## The bundled tmc
+
+The `tmc` the Console runs is inside the bundle, so an update replaces it with the app (see [console.md](console.md)). Nothing is downloaded separately.
+
 ## Installs from before the rename
 
 The updater public key is unchanged, so old installs verify new bundles; what they need is to *find* them. The workflow writes the manifests under the old `downloads/tmc-app/` prefix too, and `scripts/bridge-release.sh` publishes a `latest.json`-only release on `modcommunity/tmc-app` for installs that poll that repository. [RELEASING.md](RELEASING.md#the-repository-moved) has the table of who reaches the new release how.

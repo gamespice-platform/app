@@ -18,9 +18,12 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/.." && pwd)"
 
 bundles="appimage,deb"
+with_tmc=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --bundles) bundles="${2:?--bundles needs a list}"; shift ;;
+        # Skip the bundled `tmc` (the Console then needs a pip install).
+        --no-tmc-cli) with_tmc=0 ;;
         -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
@@ -53,7 +56,18 @@ case ",$bundles," in
         ;;
 esac
 
-npx --no-install tauri build --bundles "$bundles"
+# The Console's `tmc` ships inside the app as a sidecar. Reuse a build that is
+# already there; TMC_CLI_SRC=<checkout> builds a local tmc-cli instead of
+# fetching the ref pinned in packaging/tmc-cli.json.
+extra=()
+if [ "$with_tmc" -eq 1 ]; then
+    host="$(rustc -vV 2>/dev/null | sed -n 's/^host: //p')"
+    [ -n "$host" ] || host="x86_64-unknown-linux-gnu"
+    [ -f "$root/src-tauri/binaries/tmc-$host" ] || bash "$here/build-tmc-cli.sh"
+    extra+=(--config "$root/src-tauri/tauri.bundle-tmc.conf.json")
+fi
+
+npx --no-install tauri build --bundles "$bundles" "${extra[@]}"
 
 outdir="$root/src-tauri/target/release"
 echo

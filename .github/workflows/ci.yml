@@ -87,6 +87,32 @@ jobs:
               working-directory: src-tauri
               run: cargo fmt --all -- --check
 
+    # The bundled `tmc`: build it from the pinned ref and start it through the
+    # Console's own lookup. Catches a bad pin, a PyInstaller regression, or a
+    # CLI change that no longer freezes, before a tag does.
+    tmc-cli:
+        name: bundled tmc (build, --version through the Console)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-python@v5
+              with:
+                  python-version: '3.12'
+
+            - uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: src-tauri
+
+            - name: Build and test
+              env:
+                  TMC_CLI_TOKEN: ${{ secrets.TMC_CLI_TOKEN || secrets.GITHUB_TOKEN }}
+              run: bash scripts/build-tmc-cli.sh --test
+
     shell:
         name: gamespice-app (clippy, tests)
         runs-on: ubuntu-latest

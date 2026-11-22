@@ -43,3 +43,6 @@ src-tauri/gen/apple
 scripts/shots/node_modules
 scripts/shots/.vite
 scripts/shots/out
+
+# Sidecar built by scripts/build-tmc-cli.sh
+src-tauri/binaries/

@@ -39,6 +39,7 @@ The index. `CLAUDE.md` in the repository root is the always-loaded summary; this
 | [updater.md](updater.md) | how the app updates itself, and why the signature is the whole security model |
 | [downloads.md](downloads.md) | the download queue: resume, checksums, its own HTTP client, bandwidth |
 | [detection.md](detection.md) | finding installed games from launcher manifests, and the bounded folder walk |
+| [console.md](console.md) | the Console, which `tmc` it runs (override, bundled, PATH), how the sidecar is built, signed and updated |
 | [rcon.md](rcon.md) | the two RCON dialects, the one deliberate SSRF gap, how passwords are kept |
 | [deep-links.md](deep-links.md) | `gs://`: a link may SHOW, never DO |
 | [prior-art.md](prior-art.md) | which mod managers this learned from, and how they are credited |

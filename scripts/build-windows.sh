@@ -61,6 +61,19 @@ fi
 bundle_args=(--bundles nsis)
 [ "$installers" -eq 0 ] && bundle_args=(--no-bundle)
 
+# THE BUNDLED `tmc` CANNOT BE BUILT HERE. PyInstaller does not cross-compile, so
+# the Windows sidecar comes from a Windows runner (the release workflow's
+# `tmc-cli` job) or a Windows machine, as
+# src-tauri/binaries/tmc-$target.exe. Present: it is bundled. Absent: the
+# installers are built without it and the Console falls back to a `tmc` on PATH.
+sidecar="$root/src-tauri/binaries/tmc-$target.exe"
+if [ -f "$sidecar" ]; then
+    bundle_args+=(--config "$root/src-tauri/tauri.bundle-tmc.conf.json")
+else
+    echo "note: $sidecar is missing, so this build has no bundled tmc (the Console needs a pip install)." >&2
+    sidecar=""
+fi
+
 # `--runner cargo-xwin` replaces `cargo` for the compile step only; the bundler
 # still runs from this machine, which is why NSIS works and WiX does not.
 XWIN_ACCEPT_LICENSE="${XWIN_ACCEPT_LICENSE:-1}" \
@@ -79,7 +92,7 @@ mkdir -p "$outdir/bundle/portable"
 cp "$exe" "$outdir/bundle/portable/$product.exe"
 
 if [ "$installers" -eq 1 ]; then
-    "$here/make-msi.sh" "$exe" >/dev/null
+    TMC_SIDECAR="$sidecar" "$here/make-msi.sh" "$exe" >/dev/null
 fi
 
 echo

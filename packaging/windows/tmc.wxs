@@ -71,6 +71,15 @@
                   KeyPath="yes" />
           </Component>
 
+          <!-- @SIDECAR_BEGIN@ -->
+          <Component Id="BundledTmc" Guid="7C1E4B92-3D58-4A60-9B7F-2E6A0D81C5F3" Win64="yes">
+            <File Id="TmcCliExe"
+                  Name="tmc.exe"
+                  Source="@SIDECAR@"
+                  KeyPath="yes" />
+          </Component>
+          <!-- @SIDECAR_END@ -->
+
           <Component Id="DeepLinkScheme" Guid="3A03C91C-9034-4246-873D-CB727683729C" Win64="yes">
             <RegistryValue Root="HKLM" Key="Software\Classes\tmc"
                            Value="URL:@PRODUCT@ Protocol" Type="string" KeyPath="yes" />
@@ -118,6 +127,9 @@
 
     <Feature Id="Complete" Title="@PRODUCT@" Level="1">
       <ComponentRef Id="MainExecutable" />
+      <!-- @SIDECAR_BEGIN@ -->
+      <ComponentRef Id="BundledTmc" />
+      <!-- @SIDECAR_END@ -->
       <ComponentRef Id="DeepLinkScheme" />
       <ComponentRef Id="DeepLinkSchemeGs" />
       <ComponentRef Id="StartMenuShortcut" />

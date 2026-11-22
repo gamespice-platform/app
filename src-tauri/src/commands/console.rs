@@ -6,7 +6,8 @@
 //! or a path from the webview. Here the webview sends a command LINE, so it is
 //! worth stating what it still cannot do:
 //!
-//!   * **Choose the program.** It is `tmc`, found on `PATH` by Rust. The line
+//!   * **Choose the program.** It is the `tmc` installed beside the app (or the
+//!     user's `TMC_CLI_PATH`, or `tmc` on `PATH`), chosen by Rust. The line
 //!     becomes arguments to it and to nothing else.
 //!   * **Reach a shell.** There is none; see [`tmc_core::console`].
 //!   * **Choose the working directory or environment.** Both are Rust's.
@@ -39,6 +40,9 @@ pub struct ConsoleProbe {
     pub found: bool,
     /// Where `tmc` was found, for the header.
     pub path: Option<String>,
+    /// `bundled` (shipped with the app), `override` (`TMC_CLI_PATH`) or `path`
+    /// (the user's own install).
+    pub source: Option<&'static str>,
     /// `tmc --version`'s first line.
     pub version: Option<String>,
     /// The app is signed in, so a run is signed in as the same user
@@ -76,10 +80,11 @@ pub async fn console_probe(state: State<'_, AppState>) -> AppResult<ConsoleProbe
     let signed_in = state.auth.has_refresh();
 
     tauri::async_runtime::spawn_blocking(move || {
-        let Some(path) = console::locate() else {
+        let Some((path, source)) = console::locate_with_source() else {
             return ConsoleProbe {
                 found: false,
                 path: None,
+                source: None,
                 version: None,
                 signed_in,
             };
@@ -89,6 +94,7 @@ pub async fn console_probe(state: State<'_, AppState>) -> AppResult<ConsoleProbe
             found: true,
             version: console::version_of(&path),
             path: Some(path.display().to_string()),
+            source: Some(source.as_str()),
             signed_in,
         }
     })
@@ -114,7 +120,7 @@ pub async fn console_run(
 
     let Some(program) = console::locate() else {
         return Err(AppError::invalid(
-            "The tmc command-line tool was not found. Install it with pip, then reopen this screen.",
+            "The tmc command-line tool was not found. This build of the app does not include it; install it with pip (pip install tmc-cli), then reopen this screen.",
         ));
     };
 

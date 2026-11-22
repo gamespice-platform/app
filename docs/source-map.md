@@ -83,7 +83,7 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `commands/downloads.rs` | The queue. No command here takes a URL or a destination — `download_release` takes ids |
 | `commands/detect.rs` | Scan, and separately apply. A scan configures nothing |
 | `commands/rcon.rs` | Consoles. No command returns a password |
-| `commands/console.rs` | The Console screen: runs the installed `tmc` CLI (desktop only), streams `tmc://console` events; signs it in with the app's session via `TMC_APP_TOKEN` (`core/console.rs::app_session_env` withholds it when the line carries a host flag). `tmc` is found on `PATH` then `~/.local/bin`, Homebrew, `/usr/local/bin`, pip-user Scripts; it is not bundled |
+| `commands/console.rs` | The Console screen: runs the installed `tmc` CLI (desktop only), streams `tmc://console` events; signs it in with the app's session via `TMC_APP_TOKEN` (`core/console.rs::app_session_env` withholds it when the line carries a host flag). `tmc` is found on `PATH` then `~/.local/bin`, Homebrew, `/usr/local/bin`, pip-user Scripts; release builds bundle one beside the app, which wins over PATH unless `TMC_CLI_PATH` is set (see [console.md](console.md)) |
 | `commands/library.rs` | Sync, install, uninstall, launch |
 | `commands/play.rs` | The two ways a game starts that the SERVER resolves. Names IDS, never a loader URL or a connect link |
 | `commands/games.rs` | Installing, updating and starting a TMC build. Names an APP ID — never a URL, never a path |

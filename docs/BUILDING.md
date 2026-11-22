@@ -12,6 +12,10 @@ Five targets, one codebase — but not one machine. This is what can be produced
 
 The interesting row is the first one: **the whole Windows build comes out of the Linux box**, installers included, so a developer without a Windows machine — or without access to `@modcommunity/shared` on the one they have — can still hand somebody an exe.
 
+## The bundled tmc
+
+Release builds ship the `tmc` CLI as a sidecar for the Console. `npm run build:linux` builds it for this machine; the other platforms get it from the release workflow. See [console.md](console.md). The Windows cross-build needs `src-tauri/binaries/tmc-x86_64-pc-windows-msvc.exe` built on Windows, or it ships without.
+
 ## Windows, from Linux
 
 ```bash

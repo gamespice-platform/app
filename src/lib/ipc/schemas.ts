@@ -1490,6 +1490,8 @@ export type GameUpdateReportT = z.infer<typeof GameUpdateReportSchema>
 export const ConsoleProbeSchema = z.object({
     found: z.boolean(),
     path: z.string().nullish(),
+    /** `bundled` (shipped with the app), `override` (TMC_CLI_PATH) or `path` (the user's own install). */
+    source: z.enum(['bundled', 'override', 'path']).nullish(),
     version: z.string().nullish(),
     /** The app is signed in, so `tmc` runs as the same user. */
     signedIn: z.boolean().default(false),
