@@ -179,6 +179,13 @@ pub enum Step {
         /// Drop this many leading path components from each entry.
         #[serde(default)]
         strip: u8,
+        /// After `strip`, drop one more leading folder when every file in the
+        /// archive shares the same one (`mod-1.2/...`), so a wrapper folder an
+        /// author did or did not add lands in the same place. Archives whose
+        /// files already sit at the top, or under several folders, are left
+        /// as they are; a macOS `__MACOSX/` sibling is dropped.
+        #[serde(default)]
+        strip_single_root: bool,
         /// Only extract entries whose path starts with one of these prefixes.
         #[serde(default)]
         include: Vec<String>,

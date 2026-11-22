@@ -436,7 +436,7 @@ fn unpack(build: &NativeBuild, archive: &Path, dest: &Path) -> AppResult<()> {
      * directory here would make that declaration wrong — and the publisher
      * is the one who can see what is in their own archive.
      */
-    plugins::steps::extract_archive(archive, dest, 0, &[])?;
+    plugins::steps::extract_archive(archive, dest, &Default::default())?;
 
     Ok(())
 }

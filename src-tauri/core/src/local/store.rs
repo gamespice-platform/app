@@ -448,7 +448,8 @@ pub fn measure(store: &Path, id: i64) -> (usize, u64) {
 fn assemble(source: &Path, dest: &Path, payload: Payload) -> AppResult<(usize, u64)> {
     match payload {
         Payload::Unpack => {
-            let written = crate::plugins::steps::extract_archive(source, dest, 0, &[])?;
+            let written =
+                crate::plugins::steps::extract_archive(source, dest, &Default::default())?;
 
             let mut bytes = 0u64;
             walk(dest, 0, &mut |_, meta| {

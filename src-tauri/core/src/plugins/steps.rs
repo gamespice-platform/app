@@ -225,12 +225,21 @@ impl Executor<'_> {
                 from,
                 to,
                 strip,
+                strip_single_root,
                 include,
             } => {
                 let source = self.resolve(from, ctx, false)?;
                 let dest = self.resolve(to, ctx, true)?;
 
-                let written = extract_archive(&source, &dest, *strip, include)?;
+                let written = extract_archive(
+                    &source,
+                    &dest,
+                    &ExtractOpts {
+                        strip: *strip,
+                        strip_single_root: *strip_single_root,
+                        include,
+                    },
+                )?;
 
                 audit!(
                     self.audit,
@@ -546,11 +555,21 @@ impl Executor<'_> {
 // would eventually differ, and the one that differed would be the one nobody
 // was reading.
 
+/// What to keep of an archive's paths. `Default` keeps everything as named.
+#[derive(Default, Clone, Copy)]
+pub(crate) struct ExtractOpts<'a> {
+    /// Leading components to drop from every entry.
+    pub strip: u8,
+    /// After `strip`, drop one more component if every file in the archive
+    /// shares one top-level folder. `__MACOSX/` is ignored and never written.
+    pub strip_single_root: bool,
+    pub include: &'a [String],
+}
+
 pub(crate) fn extract_archive(
     source: &Path,
     dest: &Path,
-    strip: u8,
-    include: &[String],
+    opts: &ExtractOpts,
 ) -> AppResult<Vec<PathBuf>> {
     let name = source
         .file_name()
@@ -559,16 +578,19 @@ pub(crate) fn extract_archive(
         .to_ascii_lowercase();
 
     if name.ends_with(".zip") {
-        extract_zip(source, dest, strip, include)
+        extract_zip_within(source, dest, opts, MAX_EXTRACT_BYTES)
     } else if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
-        let file = std::fs::File::open(source)?;
-        let decoder = flate2::read::GzDecoder::new(file);
+        let open = || -> AppResult<_> {
+            Ok(tar::Archive::new(flate2::read::GzDecoder::new(
+                std::fs::File::open(source)?,
+            )))
+        };
 
-        extract_tar(tar::Archive::new(decoder), dest, strip, include)
+        extract_tar(open, dest, opts)
     } else if name.ends_with(".tar") {
-        let file = std::fs::File::open(source)?;
+        let open = || -> AppResult<_> { Ok(tar::Archive::new(std::fs::File::open(source)?)) };
 
-        extract_tar(tar::Archive::new(file), dest, strip, include)
+        extract_tar(open, dest, opts)
     } else {
         Err(AppError::invalid(
             "Only .zip, .tar, .tar.gz and .tgz archives can be extracted.",
@@ -577,20 +599,10 @@ pub(crate) fn extract_archive(
 }
 
 /// The files written, in archive order — the caller journals them.
-fn extract_zip(
-    source: &Path,
-    dest: &Path,
-    strip: u8,
-    include: &[String],
-) -> AppResult<Vec<PathBuf>> {
-    extract_zip_within(source, dest, strip, include, MAX_EXTRACT_BYTES)
-}
-
 fn extract_zip_within(
     source: &Path,
     dest: &Path,
-    strip: u8,
-    include: &[String],
+    opts: &ExtractOpts,
     max_bytes: u64,
 ) -> AppResult<Vec<PathBuf>> {
     let file = std::fs::File::open(source)?;
@@ -600,6 +612,33 @@ fn extract_zip_within(
 
     if archive.len() > MAX_EXTRACT_ENTRIES {
         return Err(AppError::jail("Archive has too many entries."));
+    }
+
+    /*
+     * One pass over the names alone (no decompression) decides whether there
+     * is a single wrapper folder. The unsafe-path refusal is the same one the
+     * extraction loop makes, so a hostile name fails here before any write.
+     */
+    let mut extra = 0usize;
+
+    if opts.strip_single_root {
+        let mut names: Vec<Vec<String>> = Vec::new();
+
+        for i in 0..archive.len() {
+            let entry = archive
+                .by_index_raw(i)
+                .map_err(|e| AppError::invalid(format!("Bad zip entry: {e}")))?;
+
+            let Some(raw) = entry.enclosed_name() else {
+                return Err(AppError::jail("Archive contains an unsafe path."));
+            };
+
+            if !entry.is_dir() {
+                names.push(components(&raw));
+            }
+        }
+
+        extra = single_root_extra(&names, opts.strip);
     }
 
     let mut total: u64 = 0;
@@ -625,7 +664,12 @@ fn extract_zip_within(
             continue;
         }
 
-        let Some(relative) = strip_and_filter(&raw, strip, include) else {
+        if opts.strip_single_root && is_mac_junk(&raw) {
+            continue;
+        }
+
+        let Some(relative) = strip_and_filter(&raw, opts.strip as usize + extra, opts.include)
+        else {
             continue;
         };
 
@@ -670,12 +714,35 @@ fn extract_zip_within(
     Ok(written)
 }
 
+/// `open` yields a fresh reader each call: a tar stream cannot seek, so the
+/// single-root scan and the extraction are two separate reads.
 fn extract_tar<R: Read>(
-    mut archive: tar::Archive<R>,
+    open: impl Fn() -> AppResult<tar::Archive<R>>,
     dest: &Path,
-    strip: u8,
-    include: &[String],
+    opts: &ExtractOpts,
 ) -> AppResult<Vec<PathBuf>> {
+    let mut extra = 0usize;
+
+    if opts.strip_single_root {
+        let mut names: Vec<Vec<String>> = Vec::new();
+        let mut scan = open()?;
+
+        for entry in scan.entries()? {
+            let entry = entry?;
+
+            if entry.header().entry_type().is_file() {
+                names.push(components(&entry.path()?));
+            }
+
+            if names.len() > MAX_EXTRACT_ENTRIES {
+                return Err(AppError::jail("Archive has too many entries."));
+            }
+        }
+
+        extra = single_root_extra(&names, opts.strip);
+    }
+
+    let mut archive = open()?;
     let mut total: u64 = 0;
     let mut written: Vec<PathBuf> = Vec::new();
 
@@ -700,7 +767,12 @@ fn extract_tar<R: Read>(
 
         let raw = entry.path()?.into_owned();
 
-        let Some(relative) = strip_and_filter(&raw, strip, include) else {
+        if opts.strip_single_root && is_mac_junk(&raw) {
+            continue;
+        }
+
+        let Some(relative) = strip_and_filter(&raw, opts.strip as usize + extra, opts.include)
+        else {
             continue;
         };
 
@@ -733,21 +805,62 @@ fn extract_tar<R: Read>(
     Ok(written)
 }
 
-/// Apply `strip` and the include filter; `None` means "skip this entry".
-fn strip_and_filter(raw: &Path, strip: u8, include: &[String]) -> Option<String> {
-    let parts: Vec<String> = raw
-        .components()
+fn components(raw: &Path) -> Vec<String> {
+    raw.components()
         .filter_map(|c| match c {
             std::path::Component::Normal(p) => Some(p.to_string_lossy().into_owned()),
             _ => None,
         })
-        .collect();
+        .collect()
+}
 
-    if parts.len() <= strip as usize {
+/// The `__MACOSX/` resource-fork sibling Finder adds to a zip.
+fn is_mac_junk(raw: &Path) -> bool {
+    components(raw).first().is_some_and(|c| c == "__MACOSX")
+}
+
+/// 1 when, after `strip`, every file lives under one shared top-level folder
+/// (and none sits directly at the top), else 0. An archive with no files, or
+/// whose files already sit at the root, is left alone.
+fn single_root_extra(files: &[Vec<String>], strip: u8) -> usize {
+    let strip = strip as usize;
+    let mut root: Option<&str> = None;
+
+    for parts in files {
+        if parts.first().is_some_and(|c| c == "__MACOSX") {
+            continue;
+        }
+
+        // A file that `strip` consumes entirely is not extracted anyway.
+        if parts.len() <= strip {
+            continue;
+        }
+
+        let rest = &parts[strip..];
+
+        if rest.len() < 2 {
+            return 0;
+        }
+
+        match root {
+            None => root = Some(rest[0].as_str()),
+            Some(r) if r == rest[0] => {}
+            Some(_) => return 0,
+        }
+    }
+
+    usize::from(root.is_some())
+}
+
+/// Apply `strip` and the include filter; `None` means "skip this entry".
+fn strip_and_filter(raw: &Path, strip: usize, include: &[String]) -> Option<String> {
+    let parts = components(raw);
+
+    if parts.len() <= strip {
         return None;
     }
 
-    let relative = parts[strip as usize..].join("/");
+    let relative = parts[strip..].join("/");
 
     if relative.is_empty() {
         return None;
@@ -980,7 +1093,7 @@ mod tests {
         let dest = tmp.path().join("out");
         std::fs::create_dir_all(&dest).expect("mkdir");
 
-        let result = extract_zip_within(&archive, &dest, 0, &[], 1024);
+        let result = extract_zip_within(&archive, &dest, &ExtractOpts::default(), 1024);
 
         // Refused either by our own byte cap ("allowed size") or, since zip 9, by
         // the reader itself noticing the header and the data disagree. Either
@@ -990,6 +1103,146 @@ mod tests {
             std::fs::metadata(dest.join("big.bin")).map_or(0, |m| m.len()) <= 1024,
             "more than the cap reached the disk"
         );
+    }
+
+    fn zip_of(path: &Path, names: &[&str]) {
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(path).expect("create"));
+        let opts: zip::write::FileOptions<'_, '_, ()> = zip::write::FileOptions::default();
+
+        for name in names {
+            zip.start_file(*name, opts).expect("entry");
+            std::io::Write::write_all(&mut zip, b"data").expect("body");
+        }
+        zip.finish().expect("finish");
+    }
+
+    fn extract_names(names: &[&str], opts: &ExtractOpts) -> Vec<String> {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let archive = tmp.path().join("m.zip");
+        zip_of(&archive, names);
+        let dest = tmp.path().join("out");
+        std::fs::create_dir_all(&dest).expect("mkdir");
+
+        let mut got: Vec<String> = extract_archive(&archive, &dest, opts)
+            .expect("extract")
+            .iter()
+            .map(|p| {
+                p.strip_prefix(&dest)
+                    .expect("inside")
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            })
+            .collect();
+        got.sort();
+        got
+    }
+
+    const SINGLE: ExtractOpts<'static> = ExtractOpts {
+        strip: 0,
+        strip_single_root: true,
+        include: &[],
+    };
+
+    #[test]
+    fn a_single_wrapper_folder_is_stripped_and_mac_junk_dropped() {
+        let got = extract_names(
+            &[
+                "mod-1.2/descriptor.mod",
+                "mod-1.2/common/a.txt",
+                "__MACOSX/mod-1.2/._a",
+            ],
+            &SINGLE,
+        );
+
+        assert_eq!(got, ["common/a.txt", "descriptor.mod"]);
+    }
+
+    #[test]
+    fn no_wrapper_or_several_roots_are_left_alone() {
+        // Files at the top: nothing to unwrap.
+        assert_eq!(
+            extract_names(&["descriptor.mod", "common/a.txt"], &SINGLE),
+            ["common/a.txt", "descriptor.mod"]
+        );
+        // Two top-level folders: not a wrapper.
+        assert_eq!(
+            extract_names(&["a/x.txt", "b/y.txt"], &SINGLE),
+            ["a/x.txt", "b/y.txt"]
+        );
+        // One folder plus a loose file: not a wrapper.
+        assert_eq!(
+            extract_names(&["a/x.txt", "readme.txt"], &SINGLE),
+            ["a/x.txt", "readme.txt"]
+        );
+        // Without the option, a single folder is kept.
+        assert_eq!(
+            extract_names(&["a/x.txt"], &ExtractOpts::default()),
+            ["a/x.txt"]
+        );
+    }
+
+    #[test]
+    fn single_root_adds_to_numeric_strip() {
+        let opts = ExtractOpts { strip: 1, ..SINGLE };
+
+        assert_eq!(
+            extract_names(&["outer/inner/x.txt", "outer/inner/y/z.txt"], &opts),
+            ["x.txt", "y/z.txt"]
+        );
+    }
+
+    #[test]
+    fn single_root_keeps_the_zip_slip_refusal() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let archive = tmp.path().join("evil.zip");
+        zip_of(&archive, &["w/ok.txt", "w/../../escape.txt"]);
+        let dest = tmp.path().join("out");
+        std::fs::create_dir_all(&dest).expect("mkdir");
+
+        extract_archive(&archive, &dest, &SINGLE).expect_err("unsafe path accepted");
+        assert!(!tmp.path().join("escape.txt").exists());
+    }
+
+    #[test]
+    fn single_root_keeps_the_byte_cap() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let archive = tmp.path().join("big.zip");
+        zip_of(&archive, &["w/a.txt", "w/b.txt"]);
+        let dest = tmp.path().join("out");
+        std::fs::create_dir_all(&dest).expect("mkdir");
+
+        // Each entry is 4 bytes; a cap of 6 lets one through and refuses the second.
+        extract_zip_within(&archive, &dest, &SINGLE, 6).expect_err("cap ignored");
+    }
+
+    #[test]
+    fn a_tar_gz_wrapper_folder_is_stripped() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let archive = tmp.path().join("m.tar.gz");
+        {
+            let gz = flate2::write::GzEncoder::new(
+                std::fs::File::create(&archive).expect("create"),
+                flate2::Compression::default(),
+            );
+            let mut tar = tar::Builder::new(gz);
+
+            for name in ["pkg/a.txt", "pkg/sub/b.txt"] {
+                let mut h = tar::Header::new_gnu();
+                h.set_size(4);
+                h.set_mode(0o644);
+                h.set_cksum();
+                tar.append_data(&mut h, name, &b"data"[..]).expect("append");
+            }
+            tar.into_inner().expect("tar").finish().expect("gz");
+        }
+        let dest = tmp.path().join("out");
+        std::fs::create_dir_all(&dest).expect("mkdir");
+
+        extract_archive(&archive, &dest, &SINGLE).expect("extract");
+
+        assert!(dest.join("a.txt").is_file());
+        assert!(dest.join("sub/b.txt").is_file());
+        assert!(!dest.join("pkg").exists());
     }
 
     #[test]
@@ -1013,7 +1266,8 @@ mod tests {
         std::fs::create_dir_all(&dest).expect("mkdir");
 
         // Exactly at the cap is allowed.
-        let written = extract_zip_within(&archive, &dest, 0, &[], 1024).expect("extract");
+        let written =
+            extract_zip_within(&archive, &dest, &ExtractOpts::default(), 1024).expect("extract");
 
         assert_eq!(written.len(), 2);
         assert_eq!(std::fs::read(dest.join("b.txt")).expect("read").len(), 512);
@@ -1071,6 +1325,7 @@ mod tests {
                         path: "scripts".into(),
                     },
                     strip: 0,
+                    strip_single_root: false,
                     include: vec![],
                 }],
                 &RunContext(HashMap::new()),

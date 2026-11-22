@@ -17,6 +17,8 @@ That is a real limitation and it is the point: the alternative is third-party co
 
 `download`, `extract`, `copy`, `move`, `mkdir`, `remove`, `writeText`, `patchJson`. **Adding a step that runs a program, resolves an absolute path, or reads an environment variable breaks the model** — do not.
 
+`extract` takes `strip` (drop that many leading components), `include` (path prefixes to keep) and `stripSingleRoot`. The last drops one more component only when every file in the archive sits under one shared top-level folder, so `mod-1.2/descriptor.mod` and a bare `descriptor.mod` both land at the same place; a mix of loose files and folders, or several folders, is left as it is, and a `__MACOSX/` sibling is never written. It adds to `strip`, the decision reads names only (no decompression) before the first write, and the zip-slip check, tar link refusal and byte/entry caps apply unchanged. The Paradox rules (`stellaris`, `crusader-kings-2/3`, `europa-universalis-4`, `hearts-of-iron-4`, `victoria-3`, `imperator-rome`) use it. The idea of unfolding a wrapper folder comes from Mod Organizer 2's data checker.
+
 Every path is a `PathRef { root, path }` where `root` is one of `gameDir`, `pluginData`, `downloads`. The type cannot express an absolute path.
 
 **`path` is relative to the ROOT, not to any grant.** A plugin granted `{gameDir, "mods", write}` writes to `{ root: gameDir, path: "mods/foo.jar" }`. Grants are *filters* over the resolved path, so several narrow grants under one root compose as a union and stay narrow — the alternative, anchoring each grant at its own subdirectory, cannot say which grant a `PathRef` meant and used to merge them into the widest one.
