@@ -19,6 +19,9 @@ The official **The Modding Community** app: Rust + Tauri 2 + React 19, shipping 
 | [docs/live-queries.md](docs/live-queries.md) | anything under `net/`, query ports, protocols, latency display |
 | [docs/plugins.md](docs/plugins.md) | the plugin format, the jail, signatures, `plugins/app/` rules |
 | [docs/sandboxes.md](docs/sandboxes.md) | the library database, sync, sandboxes, deployment strategies, USVFS, the ledger, share codes |
+| [docs/loaders-and-versions.md](docs/loaders-and-versions.md) | game version or loader pickers, the catalog client, layers, deploy patches, `install_state` |
+| [docs/loader-manifests.md](docs/loader-manifests.md) | `manifests/`, `schemas/`, install-only steps, `runInstaller`, exec signing |
+| [docs/loaders-work-split.md](docs/loaders-work-split.md) | building any unit of the game version and loader feature |
 | [docs/local-mods.md](docs/local-mods.md) | imports, adoption, reading another mod manager, `tmc.json` |
 | [docs/config-editor.md](docs/config-editor.md) | the game-settings editor and `config.json` |
 | [docs/playing.md](docs/playing.md) | launching anything, the web player, TMC-published game builds, launch arguments, play sessions |
