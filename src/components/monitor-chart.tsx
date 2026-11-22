@@ -66,6 +66,7 @@ export default function TimeChart({
     integer = false,
     tooltip,
     step = false,
+    heat,
 }: {
     samples: MonitorSample[]
     value: (s: MonitorSample) => number | null
@@ -82,6 +83,13 @@ export default function TimeChart({
     integer?: boolean
     tooltip: (s: MonitorSample) => string[]
     step?: boolean
+    /**
+     * Colour the line by HEIGHT, not by sample: the stroke is one vertical
+     * gradient fixed to the value axis, so a spike is green at its foot and
+     * turns yellow, orange and red only as it climbs past each threshold.
+     * Stops are `[value, colour]`, ascending.
+     */
+    heat?: ReadonlyArray<readonly [number, string]>
 }) {
     const [ref, { w, h }] = useSize<HTMLDivElement>()
     const gid = useId().replace(/:/g, '')
@@ -217,6 +225,26 @@ export default function TimeChart({
                             <stop offset="0%" stopColor={color} stopOpacity="0.38" />
                             <stop offset="100%" stopColor={color} stopOpacity="0.02" />
                         </linearGradient>
+                        {heat && (
+                            <linearGradient
+                                id={`heat-${gid}`}
+                                gradientUnits="userSpaceOnUse"
+                                x1="0"
+                                y1={MARGIN.top}
+                                x2="0"
+                                y2={base}
+                            >
+                                {[...heat]
+                                    .sort((a, b) => b[0] - a[0])
+                                    .map(([v, c]) => (
+                                        <stop
+                                            key={v}
+                                            offset={Math.min(1, Math.max(0, 1 - v / top))}
+                                            stopColor={c}
+                                        />
+                                    ))}
+                            </linearGradient>
+                        )}
                     </defs>
 
                     {/* Grid and y labels */}
@@ -285,7 +313,7 @@ export default function TimeChart({
                                     <path
                                         d={p.line}
                                         fill="none"
-                                        stroke={color}
+                                        stroke={heat ? `url(#heat-${gid})` : color}
                                         strokeWidth={1.75}
                                         strokeLinejoin="round"
                                         strokeLinecap="round"

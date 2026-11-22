@@ -549,6 +549,15 @@ function Fact({ label, value }: { label: string; value: string }) {
     )
 }
 
+/** Latency line colour by height: green to yellow to orange to red. */
+const LATENCY_HEAT = [
+    [0, 'var(--lat-good)'],
+    [90, 'var(--lat-good)'],
+    [150, 'var(--lat-fair)'],
+    [200, 'var(--lat-poor)'],
+    [300, 'var(--lat-bad)'],
+] as const
+
 /**
  * The main window owns navigation and the play dialog, so the monitor hands
  * both off to it rather than duplicating them. A hash link opens the page in
@@ -761,7 +770,8 @@ function GraphArea({
                             t0={t0}
                             t1={t1}
                             color={tone.stroke}
-                                            hoverAt={hoverAt}
+                            heat={LATENCY_HEAT}
+                            hoverAt={hoverAt}
                             onHover={onHover}
                             floor={50}
                             unit="ms"
