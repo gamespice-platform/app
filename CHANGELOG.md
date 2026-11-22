@@ -1,5 +1,13 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.14
+
+- Changed: Library is now the single catalogue of every game and app: GameSpice games stand out with players, peak, servers and a play graph, plus small Quick play and Play solo buttons; Managed, Unmanaged and GameSpice tabs; install and uninstall; create a sandbox or open a workshop from the card. The Apps entry and the Play page are gone (their addresses redirect to Library).
+- New: Library > Mods lists installed and imported mods for each game with sort, filter, enable/disable, update, uninstall, open folder and workshop page.
+- Fixed: New sandbox now lists every game the app can manage, including Minecraft.
+- Fixed: a Subscribed row that cannot be installed shows "Not installable" with Unsubscribe and Open page.
+- Fixed: the Android build compiles again (autostart commands are desktop only).
+
 ## 0.5.13
 
 - Fixed: the server table now has a horizontal scrollbar pinned to the bottom of the window when it is wider than the window (Windows had none).
