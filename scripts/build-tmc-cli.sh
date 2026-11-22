@@ -80,8 +80,10 @@ work="$root/src-tauri/target/tmc-cli-build"
 mkdir -p "$work" "$out"
 
 if [ -z "$src" ]; then
-    repo="$(node -p "require('$root/packaging/tmc-cli.json').repo")"
-    ref="$(node -p "require('$root/packaging/tmc-cli.json').ref")"
+    # Relative to $root: on Windows Git Bash $root is a POSIX path (/d/a/...)
+    # that a native node.exe cannot resolve.
+    repo="$(cd "$root" && node -p "require('./packaging/tmc-cli.json').repo")"
+    ref="$(cd "$root" && node -p "require('./packaging/tmc-cli.json').ref")"
     url="${TMC_CLI_REPO_URL:-https://github.com/$repo.git}"
     # CI: tmc-cli may be private. The token rides in the URL only for this one
     # fetch; nothing below prints it.

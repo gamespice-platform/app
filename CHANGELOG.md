@@ -1,5 +1,11 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.15
+
+### Fixed
+
+- Release builds: the bundled `tmc` build failed on Windows (Node could not read `packaging/tmc-cli.json` through a Git Bash path), so 0.5.13 and 0.5.14 never published installers. Nothing changes in the app itself.
+
 ## 0.5.14
 
 - Changed: Library is now the single catalogue of every game and app: GameSpice games stand out with players, peak, servers and a play graph, plus small Quick play and Play solo buttons; Managed, Unmanaged and GameSpice tabs; install and uninstall; create a sandbox or open a workshop from the card. The Apps entry and the Play page are gone (their addresses redirect to Library).
