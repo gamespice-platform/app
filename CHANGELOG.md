@@ -1,5 +1,14 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.13
+
+- Fixed: the server table now has a horizontal scrollbar pinned to the bottom of the window when it is wider than the window (Windows had none).
+- New: Servers > Favourites shows your TMC account favourites when signed in and local favourites when signed out; favouriting syncs to your account. Account favourites need the matching website update to be live; until then the list stays empty.
+- New: the Console runs the `tmc` command-line tool in a terminal screen, signed in as the app user.
+- New: Library > My apps lists your games with a Manage button for each: install folder and Find my games moved there from Settings > Games, which is now Settings > Downloads (the download cache location only). The old address redirects.
+- New: release builds include the `tmc` command-line tool, so the Console works without a pip install. A bundled `tmc` wins over one on PATH; set `TMC_CLI_PATH` to use another. The installer grows by about 9 MB.
+
+
 ## 0.5.12
 
 - Changed: the game cards on the Play page now carry the numbers the website's Games cards show: players now, the 24 hour peak and servers up as tiles, with a players-per-hour chart under them. The chart appears once the site sends the hourly history in the play page; until then the card says so instead of guessing.
@@ -29,11 +38,6 @@ The GameSpice App's releases, newest first. A version here is the one in `packag
 
 - Changed: pressing Play on a game you have not installed now opens the chooser with "Install and play" ready (with a progress percentage), instead of silently opening the web build. With native installed, left click still launches native; right click always opens the chooser.
 - Fixed: on Linux AppImage, native games inherited the AppImage's library paths, which could leave the game window gray. Games now start with a clean environment.
-## Unreleased
-
-- New: Library > Apps lists your games with a Manage button for each: install folder and Find my games moved there from Settings > Games, which is now Settings > Downloads (the download cache location only). The old address redirects.
-- New: release builds include the `tmc` command-line tool, so the Console works without a pip install. A bundled `tmc` wins over one on PATH; set `TMC_CLI_PATH` to use another. The installer grows by about 9 MB.
-
 ## 0.5.5
 
 - Fixed: the server table cut off its right-hand columns in a narrow window; it now scrolls sideways.
