@@ -66,6 +66,11 @@ die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 # One machine-readable line per detected fact; the test harness asserts these.
 plan() { printf 'plan: %s=%s\n' "$1" "$2"; }
 have() { command -v "$1" >/dev/null 2>&1; }
+# $1 as one single-quoted sh word: safe for any path, including spaces, $ and quotes.
+shquote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+# $1 as a quoted argument of a desktop-entry Exec key (spec: double quotes,
+# with \, ", ` and $ escaped; then each \ doubled again as a string value).
+desktop_quote() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/%/%%/g' -e 's/[\\"`$]/\\&/g' -e 's/\\/\\\\/g')"; }
 
 # ------------------------------------------------------------------ detection
 
@@ -151,8 +156,11 @@ detect_pm() {
 detect_env() {
     wsl=no
     if [ -n "${WSL_DISTRO_NAME:-}" ] || { [ -r "$R/proc/version" ] && grep -qi microsoft "$R/proc/version" 2>/dev/null; }; then wsl=yes; fi
+    # $container is the variable systemd-nspawn, podman and LXC set; read it
+    # before this function reuses the name for its own answer.
+    container_env="${container:-}"
     container=no
-    if [ -e "$R/.dockerenv" ] || [ -e "$R/run/.containerenv" ] || [ -n "${container:-}" ] ||
+    if [ -e "$R/.dockerenv" ] || [ -e "$R/run/.containerenv" ] || [ -n "$container_env" ] ||
         { [ -r "$R/proc/1/cgroup" ] && grep -qE 'docker|lxc|kubepods|containerd' "$R/proc/1/cgroup" 2>/dev/null; }; then
         container=yes
     fi
@@ -322,7 +330,7 @@ prereqs() {
     if confirm "Run  $(show_priv "$PREREQ_CMD")  now?"; then
         if run_priv "$PREREQ_CMD"; then
             detect_fuse
-            if [ "$dl" = none ]; then detect_env; fi
+            if [ "$dl" = none ]; then detect_env; set_protocols; fi
         else
             warn "that command failed; carrying on without it."
         fi
@@ -347,13 +355,31 @@ netfail() {
   To install without the network: download the AppImage on another machine and run  GS_APPIMAGE=./GameSpice-App_<version>_$ASSET_ARCH.AppImage sh install.sh"
 }
 
+# Which URL schemes a download may use, and may be redirected to. HTTPS only,
+# so a redirect cannot downgrade to plain HTTP. A mirror named in GS_BASE_URL
+# may use its own scheme (file:// for tests and offline mirrors, http:// with
+# a warning): the person running the script chose it.
+set_protocols() {
+    PROTO='=https'
+    case "$BASE_URL" in
+        file://*) PROTO='=https,file' ;;
+        http://*) PROTO='=https,http'; warn "GS_BASE_URL is plain HTTP: the download and its checksums.txt can be altered in transit." ;;
+        ''|https://*) ;;
+        *) die "GS_BASE_URL must be an https://, http:// or file:// URL." ;;
+    esac
+    WGET_HTTPS=""
+    if [ "$dl" = wget ] && [ "$PROTO" = '=https' ] && wget --help 2>&1 </dev/null | grep -q -- --https-only; then
+        WGET_HTTPS=--https-only
+    fi
+}
+
 fetch() {
     # $1 url, $2 destination ("-" = stdout)
     case "$dl" in
-        curl) if [ "$2" = "-" ]; then curl -fsSL --retry 3 --connect-timeout 20 "$1" </dev/null
-              else curl -fsSL --retry 3 --connect-timeout 20 -o "$2" "$1" </dev/null; fi ;;
-        wget) if [ "$2" = "-" ]; then wget -qO- --tries=3 -T 20 "$1" </dev/null
-              else wget -q --tries=3 -T 20 -O "$2" "$1" </dev/null; fi ;;
+        curl) if [ "$2" = "-" ]; then curl -fsSL --proto "$PROTO" --proto-redir "$PROTO" --retry 3 --connect-timeout 20 "$1" </dev/null
+              else curl -fsSL --proto "$PROTO" --proto-redir "$PROTO" --retry 3 --connect-timeout 20 -o "$2" "$1" </dev/null; fi ;;
+        wget) if [ "$2" = "-" ]; then wget -qO- $WGET_HTTPS --tries=3 -T 20 "$1" </dev/null
+              else wget -q $WGET_HTTPS --tries=3 -T 20 -O "$2" "$1" </dev/null; fi ;;
         *) die "neither curl nor wget is installed, and no prerequisite could be installed." ;;
     esac
 }
@@ -367,16 +393,16 @@ resolve_version() {
         VERSION="$(fetch "https://github.com/$REPO/releases.atom" - 2>/dev/null |
             sed -n 's|.*releases/tag/\([^"<]*\).*|\1|p' | head -n 1 || true)"
     elif [ "$dl" = curl ]; then
-        resolved="$(curl -fsSLI --retry 3 --connect-timeout 20 -o /dev/null -w '%{url_effective}' \
+        resolved="$(curl -fsSLI --proto "$PROTO" --proto-redir "$PROTO" --retry 3 --connect-timeout 20 -o /dev/null -w '%{url_effective}' \
             "https://github.com/$REPO/releases/latest" </dev/null 2>/dev/null || true)"
         VERSION="${resolved##*/}"
     else
-        resolved="$(wget -qS --max-redirect=10 -T 20 -O /dev/null "https://github.com/$REPO/releases/latest" 2>&1 </dev/null |
+        resolved="$(wget -qS $WGET_HTTPS --max-redirect=10 -T 20 -O /dev/null "https://github.com/$REPO/releases/latest" 2>&1 </dev/null |
             sed -n 's/^ *Location: *//p' | tail -n 1 || true)"
         VERSION="${resolved##*/}"
     fi
     case "$VERSION" in
-        ''|latest|*/*|*' '*) VERSION=""; netfail "could not work out the $channel release of $REPO." ;;
+        ''|latest|releases|*[!A-Za-z0-9._+-]*) VERSION=""; netfail "could not work out the $channel release of $REPO." ;;
     esac
 }
 
@@ -458,9 +484,33 @@ set_layout() {
 
 ICON_SIZES="16 22 24 32 48 64 96 128 192 256 384 512 1024"
 
+# Is $1 an AppImage (type 1 or 2: "AI" and the type byte at offset 8)?
+is_appimage() {
+    [ -f "$1" ] || return 1
+    m="$(dd if="$1" bs=1 skip=8 count=2 2>/dev/null </dev/null)"
+    [ "$m" = AI ]
+}
+
 legacy_remove() {
-    # What this script installed before the app was renamed.
-    rm -rf "$PREFIX/bin/tmc" "$PREFIX/lib/tmc" "$DATA/applications/tmc.desktop" "$ICONROOT/hicolor/256x256/apps/tmc.png"
+    # What this script installed before the app was renamed: bin/tmc was the
+    # AppImage itself, or a symlink to lib/tmc/AppRun in extract mode. Only
+    # those are removed: `tmc` is also the name of the TMC command-line tool
+    # (pip --user and others put it in ~/.local/bin), which the app's Console
+    # runs, and an installer must never delete it.
+    lt="$PREFIX/bin/tmc"
+    if [ -L "$lt" ]; then
+        case "$(readlink "$lt" 2>/dev/null </dev/null)" in
+            "$PREFIX/lib/tmc/"*) rm -f "$lt" ;;
+        esac
+    elif is_appimage "$lt"; then
+        rm -f "$lt"
+    fi
+    [ -e "$PREFIX/lib/tmc/AppRun" ] && rm -rf "$PREFIX/lib/tmc"
+    if [ -f "$DATA/applications/tmc.desktop" ] && grep -qx 'Name=TMC' "$DATA/applications/tmc.desktop" 2>/dev/null; then
+        rm -f "$DATA/applications/tmc.desktop"
+    fi
+    rm -f "$ICONROOT/hicolor/256x256/apps/tmc.png"
+    return 0
 }
 
 refresh_desktop() {
@@ -469,7 +519,37 @@ refresh_desktop() {
     if [ "$system" = 0 ] && have xdg-icon-resource; then xdg-icon-resource forceupdate >/dev/null 2>&1 </dev/null || true; fi
 }
 
+# The mimeapps.list files `xdg-mime default` may have written for this scope.
+mimeapps_files() {
+    [ "$system" = 1 ] || printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list"
+    printf '%s\n' "$DATA/applications/mimeapps.list"
+}
+
+# Drop gamespice-app.desktop from the gs:/tmc: handler keys, and keys left
+# empty, so the link handlers do not point at a deleted launcher.
+unregister_scheme() {
+    mimeapps_files | while IFS= read -r ma; do
+        [ -f "$ma" ] && grep -q 'gamespice-app\.desktop' "$ma" 2>/dev/null || continue
+        sed -e '/^x-scheme-handler\/gs=/s/\([=;]\)gamespice-app\.desktop;\{0,1\}/\1/g' \
+            -e '/^x-scheme-handler\/tmc=/s/\([=;]\)gamespice-app\.desktop;\{0,1\}/\1/g' \
+            -e '/^x-scheme-handler\/gs=$/d' -e '/^x-scheme-handler\/tmc=$/d' "$ma" >"$ma.gamespice-tmp" \
+            && cat "$ma.gamespice-tmp" >"$ma"
+        rm -f "$ma.gamespice-tmp"
+    done
+    return 0
+}
+
 do_uninstall() {
+    if [ "$dry" = 1 ]; then
+        plan remove "$BIN"
+        plan remove "$LIBDIR"
+        plan remove "$DESKTOP"
+        plan remove "$ICONROOT/hicolor/*/{apps,mimetypes}/gamespice-app*,x-scheme-handler-gs*"
+        plan remove "$STATE"
+        mimeapps_files | while IFS= read -r ma; do plan unregister "$ma"; done
+        say "Dry run: nothing was removed."
+        return 0
+    fi
     say "Removing the GameSpice App from $PREFIX ..."
     if [ -r "$MANIFEST" ]; then
         sed -n 's/^file=//p' "$MANIFEST" | while IFS= read -r f; do
@@ -484,7 +564,7 @@ do_uninstall() {
     rm -f "$ICONROOT/hicolor/scalable/apps/gamespice-app.svg" "$ICONROOT/hicolor/scalable/mimetypes/x-scheme-handler-gs.svg"
     rm -f "$MANIFEST"; rmdir "$STATE" 2>/dev/null || true
     legacy_remove
-    if [ "$dry" = 1 ]; then return 0; fi
+    unregister_scheme
     refresh_desktop
     say "Removed. Your settings and library are untouched, in ${XDG_DATA_HOME:-$HOME/.local/share}/gamespice-app."
 }
@@ -499,7 +579,8 @@ put() {
     d="$(dirname "$2")"
     mkdir -p "$d" || return 1
     t="$d/.gamespice-installer.$$.$(basename "$2")"
-    TMPS="$TMPS $t"
+    TMPS="$TMPS
+$t"
     cp "$1" "$t" && chmod "$3" "$t" && mv -f "$t" "$2" || { rm -f "$t"; return 1; }
     FILES="$FILES
 $2"
@@ -562,14 +643,16 @@ install_icons() {
 }
 
 write_desktop() {
+    exec_q=$(desktop_quote "$BIN")
+    tryexec_q=$(printf '%s' "$BIN" | sed 's/[\\]/&&/g')
     cat >"$tmp/gamespice-app.desktop" <<DESK
 [Desktop Entry]
 Type=Application
 Name=GameSpice App
 GenericName=Game Launcher
 Comment=Play games, browse the store, and install mods, sandboxes and servers.
-Exec=$BIN %u
-TryExec=$BIN
+Exec=$exec_q %u
+TryExec=$tryexec_q
 Icon=gamespice-app
 Terminal=false
 Categories=Game;Utility;
@@ -620,7 +703,11 @@ do_install() {
     mkdir -p "$PREFIX/bin" || die "cannot create $PREFIX/bin."
     if [ "$run_mode" = direct ]; then
         put "$tmp/app.AppImage" "$BIN" 755 || die "could not write $BIN."
+        # A previous extract-mode install kept the image here: it is stale now.
+        rm -rf "$LIBDIR"
+        upd_dir="$PREFIX/bin"
     else
+        upd_dir="$LIBDIR"
         IMG="$LIBDIR/GameSpice-App.AppImage"
         put "$tmp/app.AppImage" "$IMG" 755 || die "could not write $IMG."
         case "$run_mode" in
@@ -630,7 +717,7 @@ do_install() {
         {
             printf '#!/bin/sh\n# Written by the GameSpice installer (%s mode): runs the AppImage without FUSE.\n' "$run_mode"
             printf '%s\n' "$env_line"
-            printf 'exec %s"%s" "$@"\n' "$runner" "$IMG"
+            printf 'exec %s%s "$@"\n' "$runner" "$(shquote "$IMG")"
         } >"$tmp/wrapper"
         put "$tmp/wrapper" "$BIN" 755 || die "could not write $BIN."
     fi
@@ -658,8 +745,8 @@ do_install() {
         *) say "$PREFIX/bin is not on your PATH: run it with $BIN"
            say "  (or add it: echo 'export PATH=\"$PREFIX/bin:\$PATH\"' >> ~/.profile)" ;;
     esac
-    if [ "$system" = 1 ] || [ ! -w "$PREFIX/bin" ]; then
-        warn "the app cannot update itself here: its updater needs to write to $PREFIX/bin. A per-user install (no --system) updates automatically."
+    if [ "$system" = 1 ] || [ ! -w "$upd_dir" ]; then
+        warn "the app cannot update itself here: its updater needs to write to $upd_dir. A per-user install (no --system) updates automatically."
     else
         say "Updates: the app updates itself (Settings > App > Updates); re-running this installer also updates."
     fi
@@ -668,7 +755,7 @@ do_install() {
 
 cleanup() {
     [ -z "${tmp:-}" ] || rm -rf "$tmp"
-    for t in $TMPS; do rm -f "$t"; done
+    [ -z "$TMPS" ] || printf '%s\n' "$TMPS" | while IFS= read -r t; do [ -z "$t" ] || rm -f "$t"; done
     tmp=""; TMPS=""
 }
 
@@ -710,6 +797,8 @@ main() {
         shift
     done
     case "$channel" in stable|beta) ;; *) die "--channel must be stable or beta, not '$channel'." ;; esac
+    case "$VERSION" in *[!A-Za-z0-9._+-]*) die "'$VERSION' is not a release tag." ;; esac
+    case "$REPO" in */*/*|/*|*/|*[!A-Za-z0-9._/-]*) die "GS_REPO must be owner/name, not '$REPO'." ;; */*) ;; *) die "GS_REPO must be owner/name, not '$REPO'." ;; esac
     case "$dry" in 1|yes|true) dry=1 ;; *) dry=0 ;; esac
     case "$yes" in 1|yes|true) yes=1 ;; *) yes=0 ;; esac
     case "$no_desktop" in 1|yes|true) no_desktop=1 ;; *) no_desktop=0 ;; esac
@@ -722,7 +811,7 @@ main() {
     esac
 
     detect_arch; detect_distro; detect_immutable; detect_pm; detect_env; detect_fuse
-    proxy_env
+    proxy_env; set_protocols
     uid_root=0; [ "$uid" = 0 ] && uid_root=1
     # Root with no explicit prefix means a system install.
     if [ "$uid_root" = 1 ] && [ -z "$PREFIX" ]; then system=1; fi
@@ -803,6 +892,8 @@ main() {
     prereqs
     # A refused or failed prerequisite install leaves FUSE missing: fall back.
     if [ "$run_mode" = direct ] && [ "$fuse_ok" = no ]; then run_mode=extract; fi
+    # ...and one that installed FUSE lets the AppImage run directly after all.
+    if [ "$run_mode" = extract ] && [ "$extract" != yes ] && [ "$fuse_ok" = yes ] && [ "$family" != nixos ]; then run_mode=direct; fi
     if [ "$dry" = 1 ]; then
         plan icons "$([ "$no_desktop" = 1 ] && echo none || echo "release-tarball>appimage")"
         plan files "$BIN $DESKTOP $ICONROOT/hicolor/*/apps/gamespice-app.png"

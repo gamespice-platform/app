@@ -55,7 +55,7 @@ Alpine and other musl systems cannot run the glibc-built AppImage. The installer
 
 ## Verification
 
-The AppImage is checked against the release's `checksums.txt` (required; `--no-verify` is the explicit opt-out). Where `minisign` is installed the `.sig` file is verified too against the release key (the one in `src-tauri/updater.pub`, override with `GS_PUBKEY`); without minisign the installer says the signature was not checked. A mismatch aborts before anything is installed. Downloads and installs are staged next to the destination and renamed into place, and a trap removes the temp directory on exit, interrupt and termination, so a failed run leaves the previous install untouched.
+The AppImage is checked against the release's `checksums.txt` (required; `--no-verify` is the explicit opt-out). Where `minisign` is installed the `.sig` file is verified too against the release key (the one in `src-tauri/updater.pub`, override with `GS_PUBKEY`); without minisign the installer says the signature was not checked. A mismatch aborts before anything is installed. Every download is HTTPS-only, redirects included (curl `--proto =https --proto-redir =https`, wget `--https-only` where it has it), so a redirect cannot downgrade to plain HTTP. `GS_BASE_URL` may be `https://`, `file://`, or `http://` with a warning; any other scheme is refused, and `GS_VERSION` and `GS_REPO` must look like a tag and `owner/name`. Downloads and installs are staged next to the destination and renamed into place, and a trap removes the temp directory on exit, interrupt and termination, so a failed run leaves the previous install untouched.
 
 ## Icons
 
@@ -69,8 +69,8 @@ Regenerate the set from `app-icon.png` if the icon changes; the tarball is built
 
 `--dry-run` prints one `plan: key=value` line per detected fact and downloads and changes nothing. Offline, it fails with a message that names `HTTPS_PROXY` and `GS_APPIMAGE`.
 
-`--uninstall` removes the files in the manifest, the wrapper, the launcher, every icon and the legacy `tmc` entries, and leaves the user's settings and library alone.
+`--uninstall` removes the files in the manifest, the wrapper, the launcher, every icon and the legacy `tmc` entries, and drops `gamespice-app.desktop` from the `x-scheme-handler/gs` and `x-scheme-handler/tmc` keys of `mimeapps.list` (`~/.config` and the data dir). It leaves the user's settings and library alone. With `--dry-run` it only prints what it would remove. The legacy `bin/tmc` is removed only when it is the old AppImage or a link into `lib/tmc/`: `tmc` is also the TMC command-line tool the app's Console runs, and the installer never deletes that.
 
 ## Testing
 
-`scripts/install.test.sh` builds a fake root per distribution (an `os-release` plus stub package managers on `PATH`), asserts the `--dry-run` plan for 20 profiles, then installs a fake release over `file://` into a temp prefix and checks the files, icons, checksum refusal, idempotency, the AppImage icon fallback and `--uninstall`. Run it under `sh`, `dash`, `bash` and `busybox sh` (`INSTALLER_SHELL=dash sh scripts/install.test.sh`); it needs no root, network or container. What it cannot cover is the real package managers, a real FUSE mount and `minisign`.
+`scripts/install.test.sh` builds a fake root per distribution (an `os-release` plus stub package managers on `PATH`), asserts the `--dry-run` plan for 20 profiles, then installs a fake release over `file://` into a temp prefix and checks the files, icons, checksum refusal, idempotency, the AppImage icon fallback, `--uninstall` (and its dry run, the `mimeapps.list` cleanup, and a foreign `bin/tmc` surviving), and a prefix containing spaces, quotes and `$`. Run it under `sh`, `dash`, `bash` and `busybox sh` (`INSTALLER_SHELL=dash sh scripts/install.test.sh`); it needs no root, network or container. What it cannot cover is the real package managers, a real FUSE mount and `minisign`.

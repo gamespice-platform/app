@@ -30,7 +30,7 @@ bad() { fail=$((fail + 1)); printf 'FAIL: %s\n' "$*"; }
 # Basic tools the installer needs, linked into one dir so the stub PATH hides
 # everything else (a real apt-get on the host must not leak into a Fedora profile).
 BASE="$W/base"; mkdir -p "$BASE"
-for t in sh sed grep tr head tail cat uname id awk dirname basename cp mv chmod mkdir rm mktemp cut tar gzip printf env sleep find sha256sum rmdir ls date true false; do
+for t in sh sed grep tr head tail cat uname id awk dirname basename cp mv chmod mkdir rm mktemp cut tar gzip printf env sleep find sha256sum rmdir ls date true false dd readlink ln; do
     p="$(command -v $t 2>/dev/null)" && ln -sf "$p" "$BASE/$t"
 done
 
@@ -167,6 +167,10 @@ o="$(run_plan "$P")"; expect "$o" downloader=none nocurl; expect_text "$o" "curl
 profile noescalate 'ID=debian' "apt-get curl"
 o="$(run_plan "$P")"; expect "$o" escalate=none noescalate
 
+profile nocontainer 'ID=debian' "apt-get curl"
+o="$(container='' run_plan "$P")"; expect "$o" container=no no-container-env
+o="$(container=podman run_plan "$P")"; expect "$o" container=yes container-env
+
 echo "== no silent privilege"
 # Without a tty and without --yes the installer must not run the stub sudo.
 profile priv 'ID=debian' "apt-get apt-cache curl"
@@ -181,6 +185,9 @@ echo "== argument handling"
 o="$($SH "$INSTALLER" --bogus 2>&1)"; expect_text "$o" "unknown argument" bogus
 o="$($SH "$INSTALLER" --help 2>&1)"; expect_text "$o" "--uninstall" help
 o="$($SH "$INSTALLER" --channel nightly --dry-run 2>&1)"; expect_text "$o" "stable or beta" bad-channel
+o="$(GS_BASE_URL=ftp://example.org/x $SH "$INSTALLER" --dry-run 2>&1)"; expect_text "$o" "must be an https://" bad-base-scheme
+o="$(GS_VERSION='v1;rm' $SH "$INSTALLER" --dry-run 2>&1)"; expect_text "$o" "is not a release tag" bad-version
+o="$(GS_REPO='a/b/../c' $SH "$INSTALLER" --dry-run 2>&1)"; expect_text "$o" "must be owner/name" bad-repo
 
 echo "== real install of a fake release (file://)"
 REL="$W/rel"; mkdir -p "$REL"
@@ -225,7 +232,7 @@ grep -q APPIMAGE_EXTRACT_AND_RUN "$PRE/bin/gamespice-app" && ok || bad "wrapper 
 [ -x "$PRE/lib/gamespice-app/GameSpice-App.AppImage" ] && ok || bad "AppImage file missing under lib"
 D="$W/home/.local/share"
 grep -q '^Icon=gamespice-app$' "$D/applications/gamespice-app.desktop" && ok || bad "desktop Icon= wrong"
-grep -q "^Exec=$PRE/bin/gamespice-app %u" "$D/applications/gamespice-app.desktop" && ok || bad "desktop Exec= wrong"
+grep -q "^Exec=\"$PRE/bin/gamespice-app\" %u" "$D/applications/gamespice-app.desktop" && ok || bad "desktop Exec= wrong"
 grep -q 'x-scheme-handler/gs' "$D/applications/gamespice-app.desktop" && ok || bad "desktop lacks gs:// handler"
 cnt="$(find "$D/icons/hicolor" -name gamespice-app.png | wc -l)"
 if [ -d "$ICONSRC/hicolor" ]; then
@@ -256,8 +263,25 @@ o="$(inst "$PRE" --force)"
 expect_text "$o" "Icons: appimage" icon-fallback
 [ "$(cat "$D/icons/hicolor/256x256/apps/gamespice-app.png")" = "PNG-from-appimage-256" ] && ok || bad "AppImage fallback icon not installed"
 
+# The tmc CLI (same name as the pre-rename app) must survive install and uninstall.
+printf '#!/bin/sh\necho tmc-cli\n' >"$PRE/bin/tmc"; chmod +x "$PRE/bin/tmc"
+o="$(inst "$PRE" --force)"
+[ -x "$PRE/bin/tmc" ] && ok || bad "install deleted a foreign ~/.local/bin/tmc"
+# xdg-mime wrote the handlers (simulated: no xdg-mime in the stub PATH)
+mkdir -p "$W/home/.config"
+printf '[Default Applications]\nx-scheme-handler/gs=gamespice-app.desktop\nx-scheme-handler/tmc=other.desktop;gamespice-app.desktop;\ntext/html=firefox.desktop\n' >"$W/home/.config/mimeapps.list"
+
+# --uninstall --dry-run changes nothing
+o="$(inst "$PRE" --uninstall --dry-run)"
+expect_text "$o" "nothing was removed" uninstall-dry
+[ -x "$PRE/bin/gamespice-app" ] && [ -e "$D/applications/gamespice-app.desktop" ] && ok || bad "--uninstall --dry-run removed files"
+
 # Uninstall removes binary, desktop entry, all icons, manifest
 o="$(inst "$PRE" --uninstall)"
+[ -x "$PRE/bin/tmc" ] && ok || bad "uninstall deleted a foreign ~/.local/bin/tmc"
+grep -q 'gamespice-app' "$W/home/.config/mimeapps.list" && bad "uninstall left gs:// handlers in mimeapps.list" || ok
+grep -qx 'x-scheme-handler/tmc=other.desktop;' "$W/home/.config/mimeapps.list" && grep -qx 'text/html=firefox.desktop' "$W/home/.config/mimeapps.list" && ok || bad "uninstall damaged other mimeapps.list entries"
+rm -f "$PRE/bin/tmc"
 [ ! -e "$PRE/bin/gamespice-app" ] && ok || bad "binary remains after uninstall"
 [ ! -e "$D/applications/gamespice-app.desktop" ] && ok || bad "desktop entry remains"
 left="$(find "$D/icons" "$D/gamespice-app-installer" "$PRE/lib" \( -name 'gamespice-app*' -o -name 'x-scheme-handler-gs*' -o -name manifest \) 2>/dev/null | wc -l)"
@@ -278,6 +302,23 @@ expect_text "$o" "Could not reach the download" offline
 mk_appimage "$W/local.AppImage"
 o="$(GS_APPIMAGE="$W/local.AppImage" inst "$PRE" --no-desktop)"
 [ -x "$PRE/bin/gamespice-app" ] && ok || bad "GS_APPIMAGE install failed: $o"
+inst "$PRE" --uninstall >/dev/null
+
+# A pre-rename AppImage at bin/tmc is removed (AppImage magic at offset 8).
+printf '\177ELF\002\001\001\000AI\002rest' >"$PRE/bin/tmc"
+inst "$PRE" --force >/dev/null
+[ ! -e "$PRE/bin/tmc" ] && ok || bad "old tmc AppImage not removed"
+inst "$PRE" --uninstall >/dev/null
+
+# A prefix with spaces, quotes and $ still yields a working wrapper and Exec=.
+SP="$W/my apps/it's \$HOME"
+o="$(inst "$SP" --force)"
+out="$(PATH="$BASE" "$SP/bin/gamespice-app" --probe 2>&1)"
+expect_text "$out" "fake gamespice app --probe" spaced-prefix-wrapper
+ex="$(sed -n 's/^Exec=//p' "$SP/share/applications/gamespice-app.desktop")"
+[ "$ex" = "\"$W/my apps/it's \\\\\$HOME/bin/gamespice-app\" %u" ] && ok || bad "spaced prefix Exec= not quoted: $ex"
+inst "$SP" --uninstall >/dev/null
+[ ! -e "$SP/bin/gamespice-app" ] && ok || bad "spaced prefix uninstall left the binary"
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
