@@ -493,6 +493,7 @@ pub fn deploy(req: &DeployRequest<'_>) -> AppResult<DeployReport> {
             size: winner.size,
             mtime_ms: ledger::mtime_ms(&abs),
             backup,
+            patch: None,
         });
     }
 
@@ -630,7 +631,7 @@ fn surviving<'a>(
 ) -> HashMap<String, &'a LedgerEntry> {
     let mut out = HashMap::new();
 
-    for entry in req.previous {
+    for entry in req.previous.iter().filter(|e| !e.is_json_patch()) {
         let Some(winner) = tree.files.get(&entry.path) else {
             continue;
         };
@@ -690,6 +691,7 @@ impl VerifyReport {
 const MAX_REPORTED: usize = 50;
 
 pub fn verify(target: &Path, entries: &[LedgerEntry]) -> VerifyReport {
+    let entries: Vec<&LedgerEntry> = entries.iter().filter(|e| !e.is_json_patch()).collect();
     let mut report = VerifyReport {
         total: entries.len(),
         ..Default::default()

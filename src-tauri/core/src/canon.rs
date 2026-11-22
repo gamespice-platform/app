@@ -65,6 +65,14 @@ const DEVICES: &[&str] = &[
     "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 ];
 
+/// Whether a path component names an MS-DOS device (`CON`, `nul.txt`,
+/// `COM1.log`): Windows opens the device instead, whatever the extension.
+pub fn is_device_name(component: &str) -> bool {
+    let stem = component.split('.').next().unwrap_or(component);
+
+    DEVICES.iter().any(|dev| stem.eq_ignore_ascii_case(dev))
+}
+
 /// Canonicalise `path`, in the spelling the rest of the machine uses.
 ///
 /// `std::fs::canonicalize`, with the Windows verbatim prefix removed where the
@@ -153,9 +161,7 @@ pub fn strip_verbatim(text: &str) -> Option<String> {
             return None;
         }
 
-        let stem = part.split('.').next().unwrap_or(part);
-
-        if DEVICES.iter().any(|dev| stem.eq_ignore_ascii_case(dev)) {
+        if is_device_name(part) {
             return None;
         }
     }

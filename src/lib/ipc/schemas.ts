@@ -102,6 +102,10 @@ export const AppSettingsSchema = z.object({
     gameCacheLimitMb: z.number().default(0),
     /** Whether a TMC game may join over UDP; off joins over WebSocket (TCP). */
     gameUseUdp: z.boolean().default(true),
+    /** Ceiling on one built loader layer in bytes; `0` is unlimited. */
+    layerMaxBytes: z.number().default(8 * 1024 * 1024 * 1024),
+    /** Ceiling on the files in one loader layer; `0` is unlimited. */
+    layerMaxFiles: z.number().default(200_000),
 
     requireSignedPlugins: z.boolean(),
     confirmEveryRun: z.boolean(),

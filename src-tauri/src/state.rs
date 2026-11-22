@@ -33,6 +33,10 @@ pub struct SandboxDirs {
     /// `<data>/local-mods` — the device's imported mods, shared across
     /// sandboxes. See `tmc_core::local`.
     pub local: PathBuf,
+    /// `<data>` — install layers, runtimes, new instance folders.
+    pub data: PathBuf,
+    /// Where a failed installer's log is kept.
+    pub logs: PathBuf,
 }
 
 /// Everything the commands need, assembled once at startup.
@@ -521,6 +525,8 @@ impl AppState {
             staging: self.paths.staging_dir(),
             backups: self.paths.backup_dir(),
             local: self.paths.local_mods_dir(),
+            data: self.paths.data.clone(),
+            logs: self.paths.logs.clone(),
         }
     }
 
@@ -543,6 +549,10 @@ impl AppState {
             staging_root: &dirs.staging,
             backup_root: &dirs.backups,
             local_root: &dirs.local,
+            data_root: &dirs.data,
+            log_dir: &dirs.logs,
+            // The compiled-in plans until the signed catalog is fetched (A2).
+            plan_source: None,
         }
     }
 
@@ -793,6 +803,9 @@ impl AppState {
              * strategy but this one is the same thing.
              */
             vfs: None,
+            // A plain install has no install layers, so no plan variables,
+            // and no extra exec roots or PATH entries.
+            ..Default::default()
         };
 
         let mut plan = build_launch_plan(rule, &jail, &options, &ctx)?;

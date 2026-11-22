@@ -76,6 +76,15 @@ pub struct SandboxCtx<'a> {
     pub local_root: &'a Path,
     /// Where displaced game files go: `<backups>/<id>/<relative path>`.
     pub backup_root: &'a Path,
+    /// The app's data folder: install layers (`layers/`), runtimes
+    /// (`runtimes/`), new isolated instances (`instances/`) and the patched
+    /// overlay of a virtual deploy (`sandboxes/<id>/patched/`).
+    pub data_root: &'a Path,
+    /// Where a failed installer's log is copied.
+    pub log_dir: &'a Path,
+    /// Where install plans come from. `None` is the compiled-in fallback,
+    /// which is the only source until the signed catalog is fetched (A2).
+    pub plan_source: Option<&'a crate::layers::plan::PlanSource>,
 }
 
 /// What staging one mod did.
@@ -490,13 +499,177 @@ fn mod_root(sandbox_id: i64, mod_key: &str, ctx: &SandboxCtx<'_>) -> PathBuf {
     }
 }
 
+// ------------------------------------------------------------ Install plan
+
+/// The side a sandbox installs for: a server sandbox gets the server layer,
+/// everything else the client one.
+fn side_of(sandbox: &Sandbox) -> &'static str {
+    match sandbox.environment {
+        super::sandbox::Environment::Server => "server",
+        _ => "client",
+    }
+}
+
+/// The install plan of this sandbox, or `None` when its game, version or
+/// loader has no managed install (the deploy is then mods only, as before).
+///
+/// `target` is the folder it deploys into, for `{targetDir}`; a sandbox with
+/// no folder yet plans with an empty one, since no step of a layer may write
+/// outside its layer.
+pub fn install_plan(
+    sandbox: &Sandbox,
+    ctx: &SandboxCtx<'_>,
+    target: Option<&Path>,
+) -> AppResult<Option<crate::layers::plan::InstallPlan>> {
+    use crate::layers::plan::{self, PlanRequest, PlanSource};
+
+    let (Some(slug), Some(game_version)) = (&sandbox.app_slug, &sandbox.game_version) else {
+        return Ok(None);
+    };
+
+    let source = ctx.plan_source.unwrap_or_else(|| PlanSource::compiled());
+
+    plan::resolve(
+        source,
+        &PlanRequest {
+            app_slug: slug.clone(),
+            game_version: game_version.clone(),
+            loader: sandbox.loader.clone(),
+            loader_version: sandbox.loader_version.clone(),
+            side: side_of(sandbox).to_string(),
+            platform: plan::current_platform(),
+            sandbox_id: sandbox.id.to_string(),
+            sandbox_name: sandbox.name.clone(),
+            target_dir: target.map(|t| t.display().to_string()).unwrap_or_default(),
+        },
+    )
+}
+
+/// Give an isolated sandbox with no folder its own new instance folder under
+/// `<data>/instances`, and return the sandbox as it now is.
+fn ensure_instance_dir(
+    db: &LibraryDb,
+    sandbox: &Sandbox,
+    ctx: &SandboxCtx<'_>,
+) -> AppResult<Option<Sandbox>> {
+    if sandbox.game_dir.is_some() || !is_isolated(ctx.plugins, sandbox) {
+        return Ok(None);
+    }
+
+    let dir = create_instance_dir(
+        &ctx.data_root.join("instances"),
+        sandbox.app_slug.as_deref().unwrap_or("game"),
+        &sandbox.name,
+    )?;
+
+    db.sandbox_patch(
+        sandbox.id,
+        &super::sandbox::SandboxPatch {
+            game_dir: Some(Some(dir.display().to_string())),
+            ..Default::default()
+        },
+    )?;
+
+    audit!(
+        ctx.audit,
+        Info,
+        Install,
+        "sandbox.instance",
+        format!("{} got its own folder {}", sandbox.name, dir.display())
+    );
+
+    db.sandbox_get(sandbox.id)
+}
+
+/// Build (or reuse) the plan's runtimes and layers, and return the layers as
+/// pseudo-mods below every real mod: `i64::MIN + n`, so a mod always wins over
+/// a layer and a later layer over an earlier one.
+///
+/// A dry run builds nothing: a layer that is already built is listed, one
+/// that is not is a warning.
+async fn layer_mods(
+    plan: &crate::layers::plan::InstallPlan,
+    ctx: &SandboxCtx<'_>,
+    dry_run: bool,
+    warnings: &mut Vec<String>,
+) -> AppResult<Vec<deploy::DeployMod>> {
+    use crate::layers::{build, checks::Limits, runtime};
+
+    let bctx = build::BuildCtx {
+        data_root: ctx.data_root,
+        http: ctx.http,
+        audit: ctx.audit,
+        downloads: ctx.downloads,
+        limits: Limits::from_settings(ctx.settings),
+        log_dir: ctx.log_dir,
+        // No proxy setting exists yet: an installer that needs one fails and
+        // keeps its log.
+        proxy: Vec::new(),
+        on_output: None,
+    };
+
+    let mut runtimes = std::collections::HashMap::new();
+
+    if !dry_run {
+        for rt in plan.install_runtimes() {
+            let (exe, root) = runtime::ensure(&bctx, rt).await?;
+            runtimes.insert(rt.kind.clone(), (exe, root));
+        }
+    }
+
+    let mut mods = Vec::new();
+
+    for (n, layer) in plan.layers.iter().enumerate() {
+        let root = if dry_run {
+            let dir = bctx.layers_root(&plan.app_slug).join(&layer.layer_hash);
+
+            if build::verify(&dir, layer).is_err() {
+                warnings.push(format!("{} would be built first.", layer.title));
+                continue;
+            }
+
+            dir.join("files")
+        } else {
+            build::ensure_layer(&bctx, plan, layer, &runtimes).await?.files_dir
+        };
+
+        mods.push(deploy::DeployMod {
+            key: format!("layer:{}", layer.manifest_key),
+            name: layer.title.clone(),
+            root,
+            priority: i64::MIN + n as i64,
+        });
+    }
+
+    Ok(mods)
+}
+
+/// The patched copies a virtual deploy maps over the real files.
+pub fn patch_overlay(data_root: &Path, sandbox_id: i64) -> PathBuf {
+    data_root
+        .join("sandboxes")
+        .join(sandbox_id.to_string())
+        .join("patched")
+}
+
 /// Put a sandbox in front of the game.
-pub fn deploy_sandbox(
+///
+/// With an install plan, in this order: consent, runtimes, layers (built
+/// outside the game folder, so a failed build changes nothing there), the
+/// merge with the layers as lowest-priority mods, then the JSON patches.
+pub async fn deploy_sandbox(
     db: &LibraryDb,
     sandbox: &Sandbox,
     ctx: &SandboxCtx<'_>,
     dry_run: bool,
 ) -> AppResult<DeployReport> {
+    let fresh = if dry_run {
+        None
+    } else {
+        ensure_instance_dir(db, sandbox, ctx)?
+    };
+    let sandbox = fresh.as_ref().unwrap_or(sandbox);
+
     let target = target_dir(sandbox, ctx.settings, is_isolated(ctx.plugins, sandbox))?;
 
     /*
@@ -533,8 +706,52 @@ pub fn deploy_sandbox(
         }
     }
 
+    // Resolve and consent first: a withdrawn build or an unanswered consent
+    // stops the deploy before anything is downloaded.
+    let plan = install_plan(sandbox, ctx, Some(&target))?;
+
+    if let Some(plan) = &plan {
+        crate::layers::consent::check(db, sandbox.id, plan)?;
+    }
+
+    let mut warnings = Vec::new();
+    let mut mods = match &plan {
+        Some(plan) => layer_mods(plan, ctx, dry_run, &mut warnings).await?,
+        None => Vec::new(),
+    };
+
+    mods.extend(deployable(sandbox, ctx));
+
     let previous = db.sandbox_ledger(sandbox.id)?;
-    let mods = deployable(sandbox, ctx);
+    let patches: &[crate::deploy::json_patch::JsonPatchSpec] =
+        plan.as_ref().map_or(&[], |p| p.patches.as_slice());
+
+    /*
+     * The last deploy's patches are undone before this one merges, so the
+     * patch step below always starts from the user's own file. A value the
+     * user changed since is theirs and stays.
+     */
+    if !dry_run && previous.iter().any(LedgerEntry::is_json_patch) {
+        let undone = deploy::json_patch::revert(&target, &previous);
+        warnings.extend(undone.errors);
+    }
+
+    // A virtual deploy never edits the real file: it maps a patched copy over
+    // it, above every mod.
+    let virtual_patches = sandbox.strategy == Strategy::Usvfs && !patches.is_empty();
+
+    if virtual_patches && !dry_run {
+        let overlay = patch_overlay(ctx.data_root, sandbox.id);
+
+        warnings.extend(deploy::json_patch::write_overlay(&target, &overlay, patches));
+
+        mods.push(deploy::DeployMod {
+            key: "patch:overlay".to_string(),
+            name: "Install plan patches".to_string(),
+            root: overlay,
+            priority: i64::MAX,
+        });
+    }
 
     let staging = deploy::stage_root(ctx.staging_root, sandbox.id);
     let backups = deploy::backup_root(ctx.backup_root, sandbox.id);
@@ -543,7 +760,7 @@ pub fn deploy_sandbox(
 
     let blob = deploy::vfs_blob(ctx.staging_root, sandbox.id);
 
-    let report = deploy::deploy(&DeployRequest {
+    let mut report = deploy::deploy(&DeployRequest {
         strategy: sandbox.strategy,
         target: &target,
         staging: &staging,
@@ -554,8 +771,17 @@ pub fn deploy_sandbox(
         dry_run,
     })?;
 
+    report.warnings.extend(warnings);
+
     if dry_run {
         return Ok(report);
+    }
+
+    if !virtual_patches && !patches.is_empty() {
+        let (rows, errors) = deploy::json_patch::apply(&target, patches);
+
+        report.ledger.extend(rows);
+        report.errors.extend(errors);
     }
 
     /*
@@ -565,6 +791,23 @@ pub fn deploy_sandbox(
      */
     db.sandbox_set_ledger(sandbox.id, &report.ledger)?;
     db.sandbox_mark_deployed(sandbox.id, &serde_json::to_value(&report)?)?;
+
+    let state = plan.as_ref().map(|plan| crate::layers::InstallState {
+        plan_hash: plan.plan_hash.clone(),
+        layers: plan
+            .layers
+            .iter()
+            .map(|l| crate::layers::InstallStateLayer {
+                manifest_key: l.manifest_key.clone(),
+                revision: l.revision,
+                layer_hash: l.layer_hash.clone(),
+            })
+            .collect(),
+        launch_vars: plan.launch_vars.clone(),
+        deployed_at: crate::logging::now_rfc3339(),
+    });
+
+    db.sandbox_set_install_state(sandbox.id, state.as_ref())?;
 
     audit!(
         ctx.audit,
@@ -672,6 +915,11 @@ pub fn launch_plan(
         vfs,
         exec_roots: ctx.exec_roots.clone(),
         path_dirs: crate::launch::system_path_dirs(),
+        launch_vars: sandbox
+            .install_state
+            .as_ref()
+            .map(|s| s.launch_vars.clone())
+            .unwrap_or_default(),
     };
 
     let mut plan = crate::launch::plan(rule, &jail, &options, &launch_ctx)?;
@@ -726,7 +974,20 @@ pub fn purge_sandbox(
     let target = target_dir(sandbox, ctx.settings, is_isolated(ctx.plugins, sandbox))?;
     let previous = db.sandbox_ledger(sandbox.id)?;
 
-    let report = deploy::purge(&target, &previous);
+    let mut report = deploy::purge(&target, &previous);
+
+    // The install plan's patches: undone where the value is still ours, left
+    // where the user changed it since. Either way the row is done with.
+    let undone = deploy::json_patch::revert(&target, &previous);
+    report.errors.extend(undone.errors);
+
+    let overlay = patch_overlay(ctx.data_root, sandbox.id);
+
+    if overlay.exists() {
+        if let Err(e) = std::fs::remove_dir_all(&overlay) {
+            tracing::warn!("could not remove the patch overlay for {}: {e}", sandbox.id);
+        }
+    }
 
     /*
      * The published tree goes too, unconditionally rather than only for a
@@ -748,13 +1009,14 @@ pub fn purge_sandbox(
 
     let remaining: Vec<LedgerEntry> = previous
         .into_iter()
-        .filter(|e| kept.contains(e.path.as_str()))
+        .filter(|e| !e.is_json_patch() && kept.contains(e.path.as_str()))
         .collect();
 
     db.sandbox_set_ledger(sandbox.id, &remaining)?;
 
     if remaining.is_empty() {
         db.sandbox_mark_purged(sandbox.id)?;
+        db.sandbox_set_install_state(sandbox.id, None)?;
     }
 
     audit!(
@@ -872,6 +1134,7 @@ mod tests {
             strategy: Strategy::Direct,
             game_version: None,
             loader: None,
+            loader_version: None,
             preset: None,
             game_dir: None,
             options: BTreeMap::new(),
@@ -1012,6 +1275,9 @@ mod tests {
             staging_root: &tmp.path().join("staging"),
             backup_root: &tmp.path().join("backups"),
             local_root: &tmp.path().join("local-mods"),
+            data_root: tmp.path(),
+            log_dir: tmp.path(),
+            plan_source: None,
         };
 
         let mods = deployable(&sandbox, &ctx);
@@ -1023,8 +1289,8 @@ mod tests {
 
     /// Injecting a DLL is what kernel anti-cheat exists to stop: the virtual
     /// filesystem is refused for such a game, and shown disabled in the picker.
-    #[test]
-    fn kernel_anti_cheat_refuses_the_virtual_filesystem() {
+    #[tokio::test]
+    async fn kernel_anti_cheat_refuses_the_virtual_filesystem() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let plugin_root = tmp.path().join("plugins");
         let own = tmp.path().join("own");
@@ -1075,9 +1341,12 @@ mod tests {
             staging_root: &tmp.path().join("staging"),
             backup_root: &tmp.path().join("backups"),
             local_root: &tmp.path().join("local-mods"),
+            data_root: tmp.path(),
+            log_dir: tmp.path(),
+            plan_source: None,
         };
 
-        let err = deploy_sandbox(&db, &sandbox, &ctx, true).expect_err("must refuse");
+        let err = deploy_sandbox(&db, &sandbox, &ctx, true).await.expect_err("must refuse");
 
         assert!(err.to_string().contains("anti-cheat"), "{err}");
 

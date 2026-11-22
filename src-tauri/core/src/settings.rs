@@ -140,6 +140,13 @@ pub struct AppSettings {
     /// for a network that drops UDP silently, where the shell would otherwise
     /// wait out its UDP attempt on every join.
     pub game_use_udp: bool,
+
+    // ---------------------------------------------------------------- Layers
+    /// Ceiling on one built loader or version layer, in bytes. `0` is
+    /// unlimited. A build over it fails loudly rather than filling the disk.
+    pub layer_max_bytes: u64,
+    /// Ceiling on the number of files in one layer. `0` is unlimited.
+    pub layer_max_files: u64,
 }
 
 impl Default for AppSettings {
@@ -174,6 +181,8 @@ impl Default for AppSettings {
             game_cache_keep: true,
             game_cache_limit_mb: 0,
             game_use_udp: true,
+            layer_max_bytes: 8 * 1024 * 1024 * 1024,
+            layer_max_files: 200_000,
         }
     }
 }

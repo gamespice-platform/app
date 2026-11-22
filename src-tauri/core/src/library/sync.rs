@@ -564,6 +564,9 @@ fn mirror_sandbox(
         strategy,
         game_version: text("gameVersion"),
         loader: text("loader"),
+        // Absent from an older server or client: `loader` is then free text
+        // and the upsert splits it.
+        loader_version: text("loaderVersion"),
         is_default,
         options: json("options"),
         launch_args: payload

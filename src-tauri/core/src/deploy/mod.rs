@@ -48,6 +48,7 @@
 //! right answers.
 
 pub mod engine;
+pub mod json_patch;
 pub mod ledger;
 pub mod link;
 pub mod merge;

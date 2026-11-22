@@ -210,6 +210,9 @@ impl World {
             staging_root: &self.staging,
             backup_root: &self.backups,
             local_root: &self.local,
+            data_root: self.staging.parent().expect("staging has a parent"),
+            log_dir: self.staging.parent().expect("staging has a parent"),
+            plan_source: None,
         }
     }
 
@@ -364,6 +367,7 @@ fn sandbox_with(world: &World, strategy: Strategy) -> Sandbox {
             strategy,
             game_version: Some("1.21".into()),
             loader: None,
+            loader_version: None,
             preset: None,
             game_dir: None,
             options: BTreeMap::from([("memoryMb".into(), serde_json::json!(4096))]),
@@ -474,7 +478,7 @@ async fn a_subscription_becomes_a_deployed_game_folder_and_back_again() {
         let sandbox = world.db.sandbox_get(sandbox.id).expect("get").expect("row");
 
         let planned =
-            deploy_sandbox(&world.db, &sandbox, &ctx, true).expect("dry run must not fail");
+            deploy_sandbox(&world.db, &sandbox, &ctx, true).await.expect("dry run must not fail");
 
         assert_eq!(planned.placed, 2, "{}: dry run", strategy.as_str());
         assert_eq!(
@@ -484,7 +488,7 @@ async fn a_subscription_becomes_a_deployed_game_folder_and_back_again() {
             strategy.as_str()
         );
 
-        let report = deploy_sandbox(&world.db, &sandbox, &ctx, false).expect("deploy");
+        let report = deploy_sandbox(&world.db, &sandbox, &ctx, false).await.expect("deploy");
 
         assert!(report.ok(), "{}: {:?}", strategy.as_str(), report.errors);
         assert_eq!(report.placed, 2, "{}: placed", strategy.as_str());
@@ -621,7 +625,7 @@ async fn a_game_file_a_mod_replaces_is_set_aside_and_put_back() {
     );
 
     let sandbox = world.db.sandbox_get(sandbox.id).expect("get").expect("row");
-    let report = deploy_sandbox(&world.db, &sandbox, &ctx, false).expect("deploy");
+    let report = deploy_sandbox(&world.db, &sandbox, &ctx, false).await.expect("deploy");
 
     assert!(report.ok(), "{:?}", report.errors);
     assert_eq!(report.backed_up, 1, "the shipped file was set aside");
@@ -757,7 +761,7 @@ async fn an_imported_mod_and_a_subscribed_one_deploy_through_one_ledger() {
 
     assert_eq!(sandbox.mods.len(), 2);
 
-    let report = deploy_sandbox(&world.db, &sandbox, &ctx, false).expect("deploy");
+    let report = deploy_sandbox(&world.db, &sandbox, &ctx, false).await.expect("deploy");
 
     assert!(report.ok(), "{:?}", report.errors);
 

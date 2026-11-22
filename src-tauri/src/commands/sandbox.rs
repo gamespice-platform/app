@@ -716,6 +716,7 @@ pub async fn sandbox_import(
             strategy: shared.strategy,
             game_version: shared.game_version.clone(),
             loader: shared.loader.clone(),
+            loader_version: shared.loader_version.clone(),
             preset: shared.preset.clone(),
             /*
              * Never from the code. A game folder is an answer about one machine
@@ -1035,7 +1036,7 @@ pub async fn sandbox_install_item(
      * missing, and the report says it worked.
      */
     if deploy.unwrap_or(true) && staged_ok {
-        match sandbox_deploy(state.clone(), id, Some(false)) {
+        match sandbox_deploy(state.clone(), id, Some(false)).await {
             Ok(deployed) => report.deployed = Some(deployed),
             Err(err) => report.warnings.push(err.to_string()),
         }
@@ -1110,9 +1111,99 @@ pub async fn sandbox_stage(
 
 // ----------------------------------------------------------------- Deployment
 
-/// Put the sandbox in front of the game.
+/// What a sandbox's deploy would install below its mods, and whether the
+/// user has to agree to it first.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallPlanPreview {
+    /// `None` when the game, version or loader has no managed install.
+    pub plan: Option<tmc_core::layers::plan::InstallPlan>,
+    /// True until the user agreed to this plan's hash for this sandbox.
+    pub needs_consent: bool,
+}
+
+/// The install plan of a sandbox: its layers, runtimes, consents and patches.
 #[tauri::command]
-pub fn sandbox_deploy(
+pub fn install_plan_preview(state: State<'_, AppState>, id: i64) -> AppResult<InstallPlanPreview> {
+    let sandbox = state
+        .library
+        .sandbox_get(id)?
+        .ok_or_else(|| AppError::invalid("That sandbox does not exist."))?;
+
+    let plugins = state.app_plugins();
+    let settings = state.settings.get();
+    let roots = state.jail_roots();
+    let dirs = state.sandbox_dirs();
+
+    let ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
+    let target = tmc_core::library::deploy::target_dir(
+        &sandbox,
+        &settings,
+        tmc_core::library::deploy::is_isolated(&plugins, &sandbox),
+    )
+    .ok();
+
+    let plan = tmc_core::library::deploy::install_plan(&sandbox, &ctx, target.as_deref())?;
+    let needs_consent = match &plan {
+        Some(plan) => tmc_core::layers::consent::check(&state.library, id, plan).is_err(),
+        None => false,
+    };
+
+    Ok(InstallPlanPreview {
+        plan,
+        needs_consent,
+    })
+}
+
+/// Record that the user agreed to the install plan with `plan_hash`. Refused
+/// when the plan changed since it was shown.
+#[tauri::command]
+pub fn install_plan_consent(
+    state: State<'_, AppState>,
+    id: i64,
+    plan_hash: String,
+) -> AppResult<()> {
+    let sandbox = state
+        .library
+        .sandbox_get(id)?
+        .ok_or_else(|| AppError::invalid("That sandbox does not exist."))?;
+
+    let plugins = state.app_plugins();
+    let settings = state.settings.get();
+    let roots = state.jail_roots();
+    let dirs = state.sandbox_dirs();
+
+    let ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
+    let target = tmc_core::library::deploy::target_dir(
+        &sandbox,
+        &settings,
+        tmc_core::library::deploy::is_isolated(&plugins, &sandbox),
+    )
+    .ok();
+
+    let plan = tmc_core::library::deploy::install_plan(&sandbox, &ctx, target.as_deref())?
+        .ok_or_else(|| AppError::invalid("This sandbox has nothing to install."))?;
+
+    tmc_core::layers::consent::record(&state.library, id, &plan, &plan_hash)?;
+
+    audit!(
+        state.audit,
+        Info,
+        Install,
+        "sandbox.consent",
+        format!("{} agreed to install plan {}", sandbox.name, plan_hash)
+    );
+
+    Ok(())
+}
+
+/// Put the sandbox in front of the game.
+///
+/// Fails with `needs_consent` (carrying the plan hash) when its install plan
+/// asks for consent the user has not given; the UI shows
+/// [`install_plan_preview`] and calls [`install_plan_consent`].
+#[tauri::command]
+pub async fn sandbox_deploy(
     state: State<'_, AppState>,
     id: i64,
     dry_run: Option<bool>,
@@ -1129,7 +1220,8 @@ pub fn sandbox_deploy(
 
     let ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
 
-    let mut report = deploy_sandbox(&state.library, &sandbox, &ctx, dry_run.unwrap_or(false))?;
+    let mut report =
+        deploy_sandbox(&state.library, &sandbox, &ctx, dry_run.unwrap_or(false)).await?;
 
     /*
      * Dependency problems ride along as WARNINGS on the deploy report, and the

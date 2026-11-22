@@ -63,9 +63,19 @@ pub struct LedgerEntry {
     /// Absolute path of the file that was displaced to make room, if any.
     #[serde(default)]
     pub backup: Option<String>,
+    /// For a [`super::json_patch::KIND`] row: what the patch changed, so undo
+    /// can put back only what is still ours.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub patch: Option<super::json_patch::JsonPatchRecord>,
 }
 
 impl LedgerEntry {
+    /// A JSON patch row rather than a placed file. Those are undone by
+    /// [`super::json_patch::revert`], never by a file purge.
+    pub fn is_json_patch(&self) -> bool {
+        self.kind == super::json_patch::KIND
+    }
+
     pub fn link_kind(&self) -> LinkKind {
         match self.kind.as_str() {
             "hard" => LinkKind::Hard,
@@ -149,7 +159,9 @@ fn matches_recorded(entry: &LedgerEntry, abs: &Path) -> bool {
 pub fn purge(target: &Path, entries: &[LedgerEntry]) -> PurgeReport {
     let mut report = PurgeReport::default();
 
-    let mut ordered: Vec<&LedgerEntry> = entries.iter().collect();
+    // JSON patch rows name files that are not ours (`launcher_profiles.json`):
+    // removing them would delete the user's file. Their undo is a revert.
+    let mut ordered: Vec<&LedgerEntry> = entries.iter().filter(|e| !e.is_json_patch()).collect();
 
     // Deepest first. `/` counts as one level, so a plain component count is
     // exactly the depth.
@@ -344,6 +356,7 @@ mod tests {
             size: std::fs::metadata(abs).map(|m| m.len()).unwrap_or(0),
             mtime_ms: mtime_ms(abs),
             backup: None,
+            patch: None,
         }
     }
 
@@ -488,6 +501,7 @@ mod tests {
                 size: 7,
                 mtime_ms: 1,
                 backup: None,
+                patch: None,
             })
             .collect();
 
@@ -513,6 +527,7 @@ mod tests {
             size: 1,
             mtime_ms: 1,
             backup: None,
+            patch: None,
         };
 
         let report = purge(&game, &[row]);

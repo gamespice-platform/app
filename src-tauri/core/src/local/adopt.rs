@@ -341,6 +341,7 @@ mod tests {
             strategy: Default::default(),
             game_version: None,
             loader: None,
+            loader_version: None,
             preset: None,
             game_dir: None,
             options: Default::default(),
@@ -416,6 +417,7 @@ mod tests {
                     size: 1,
                     mtime_ms: 0,
                     backup: None,
+                    patch: None,
                 },
                 LedgerEntry {
                     path: "mods/OurFolder/inner.dll".into(),
@@ -425,6 +427,7 @@ mod tests {
                     size: 1,
                     mtime_ms: 0,
                     backup: None,
+                    patch: None,
                 },
             ],
         )

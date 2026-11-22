@@ -1,4 +1,4 @@
-How the game version and loader feature of [loaders-and-versions.md](loaders-and-versions.md) and [loader-manifests.md](loader-manifests.md) is split into build units, in what order they land, what each one must prove, and what is knowingly left open. **Status: A1 and A3 are built; the other units are designed, not built.** Each unit is sized for one builder session. Builders write the "what was built" version of the section their unit covers when they land it.
+How the game version and loader feature of [loaders-and-versions.md](loaders-and-versions.md) and [loader-manifests.md](loader-manifests.md) is split into build units, in what order they land, what each one must prove, and what is knowingly left open. **Status: A1, A3 and A4 are built; the other units are designed, not built.** Each unit is sized for one builder session. Builders write the "what was built" version of the section their unit covers when they land it.
 
 ## Units
 
@@ -209,6 +209,53 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
     - consent being required again after a revision bump;
   - every migration pattern is tested, including unknown values kept;
   - the launch arguments for a Forge sandbox contain `--version 1.21.4-forge-54.1.0`.
+
+- **What was built:**
+  - `src-tauri/core/src/layers/`:
+    - `plan.rs` resolves a sandbox into an `InstallPlan`: the layers with their hashes, the runtimes, the consents, the deploy patches, the launch vars and a plan hash. It reads a `PlanSource`; this unit uses only the compiled-in fallback (the shipped `manifests/`), not A2's catalog. A pinned build whose revision does not match the manifest asks for an app update, and a withdrawn loader version is refused with its note. Signed manifests are checked against `manifests/keys/exec-keys.json`.
+    - `build.rs` builds a layer into `<data>/layers/<app>/<layer hash>/` through a `.partial` folder renamed into place once it is complete, and verifies it again on reuse. A file changed since the build fails verification and the layer is rebuilt. `run_install` and the installer runner are wired in here. The proxy is passed empty, because the app has no proxy setting yet.
+    - `checks.rs` refuses symlinks, hardlinks and paths that leave the layer.
+    - `runtime.rs` installs a runtime offer under `<data>/runtimes/`.
+    - `consent.rs` stores consent per sandbox and plan hash.
+  - `deploy/json_patch.rs` and the ledger's `JsonPatch` kind:
+    - The undo restores the original bytes when the file is untouched.
+    - It puts back only the values that are still ours, so a value the user changed is kept.
+    - Under usvfs it writes an overlay copy and never touches the real file.
+  - Layers are merged into the deploy as lowest-priority sources.
+  - `library/deploy.rs` runs the phases in order: resolve, consent, runtimes, layers, merge, patches.
+  - Isolated sandboxes that have no folder get an instance folder.
+  - Sandbox fields and wire formats:
+    - `loader_version`, `install_state` (with `launch_vars`) and consent records.
+    - Migration 11 splits stored free-text loaders and keeps unknown values. It is numbered 11 for now and gets renumbered when A2 lands.
+    - `loaderVersion` goes into sync, share codes and `.mrpack`.
+  - `{launchVersionId}` is set in the Minecraft `launch.json`.
+  - The app gets `install_plan_preview`, `install_plan_consent`, and `NeedsConsent` on deploy.
+  - Tests:
+    - `core/tests/layers_end_to_end.rs` holds 6 tests. They use the shipped manifests, a TLS fixture server, and a shell script packaged as the Java runtime. They cover:
+      - a Fabric plan building its layers;
+      - deploying with every available strategy;
+      - byte-identical undo, including after another profile was edited;
+      - a value the user changed being kept;
+      - a failed installer leaving the game folder untouched;
+      - an escaping symlink being refused;
+      - layer reuse, with no second download;
+      - a tampered layer being rebuilt;
+      - a withdrawn build being refused at resolve;
+      - consent being asked again after a revision bump;
+      - Forge launch args containing `--version 1.21.4-forge-54.1.0`.
+    - The migration patterns are covered by unit tests: `sandbox.rs` `every_loader_pattern_normalises` and `db.rs` `migration_11_splits_stored_loaders_and_keeps_unknown_ones`.
+    - `cargo clippy` is clean for `tmc-core` and for the app crate (built against `npm run sysroot`).
+  - Left open:
+    - A replay guard for consent records.
+    - A runtime catalog from A2, and launch using the installed runtime (`javaPath`, `javaArgs`).
+    - A "Clear unused layers" action.
+    - Plan-step progress events for A5.
+    - The consent dialog UI (A5).
+    - A proxy setting.
+    - A Windows job object for the installer tree kill.
+    - JSON key order: undo re-renders an edited file with sorted keys.
+    - With the hardlink strategy, a file edited in the game folder also changes the shared layer. The next verify catches it and rebuilds the layer, but nothing prevents it.
+    - Renumbering migration 11 after A2.
 
 ### A5: pickers, preview, consent, progress (tmc-app webview)
 

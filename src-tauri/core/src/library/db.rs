@@ -41,7 +41,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AppError, AppResult};
 
 /// Schema version. Bumped whenever `migrate` gains a step.
-const SCHEMA_VERSION: i64 = 10;
+const SCHEMA_VERSION: i64 = 11;
 
 /// One subscribed item as this device knows it.
 ///
@@ -316,6 +316,10 @@ impl LibraryDb {
                     8 => conn.execute_batch(SCHEMA_V8)?,
                     9 => conn.execute_batch(SCHEMA_V9)?,
                     10 => conn.execute_batch(SCHEMA_V10)?,
+                    11 => {
+                        conn.execute_batch(SCHEMA_V11)?;
+                        migrate_v11(conn)?;
+                    }
                     _ => break,
                 }
 
@@ -1600,6 +1604,53 @@ const SCHEMA_V10: &str = r#"
                     ON storage_store (path);
 "#;
 
+/// Loader versions, the deployed plan, patch records and consent (unit A4).
+///
+/// Numbered 11 because 10 was the last step on this branch; it is renumbered
+/// when the A2 migration lands ahead of it.
+const SCHEMA_V11: &str = r#"
+                ALTER TABLE sandbox ADD COLUMN loader_version TEXT;
+                /* The plan the last deploy used. Local only, never synced. */
+                ALTER TABLE sandbox ADD COLUMN install_state TEXT;
+                /* A jsonPatch row's record, for its undo. */
+                ALTER TABLE deployment ADD COLUMN patch TEXT;
+
+                CREATE TABLE IF NOT EXISTS sandbox_consent (
+                    sandbox_id  INTEGER NOT NULL REFERENCES sandbox (id) ON DELETE CASCADE,
+                    plan_hash   TEXT NOT NULL,
+                    /* JSON array of the consent ids shown. */
+                    consents    TEXT NOT NULL DEFAULT '[]',
+                    accepted_at TEXT NOT NULL,
+                    PRIMARY KEY (sandbox_id, plan_hash)
+                );
+"#;
+
+/// Split every stored free-text `loader` into loader and loader version.
+///
+/// Unknown values are kept as they are; see
+/// [`super::sandbox::normalize_loader`].
+fn migrate_v11(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+    let rows: Vec<(i64, Option<String>, Option<String>)> = {
+        let mut stmt = conn.prepare("SELECT id, loader, game_version FROM sandbox")?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        rows
+    };
+
+    for (id, loader, game) in rows {
+        let (l, v, g) = super::sandbox::normalize_loader(loader.as_deref(), game.as_deref());
+
+        conn.execute(
+            "UPDATE sandbox SET loader = ?2, loader_version = ?3, game_version = ?4 WHERE id = ?1",
+            rusqlite::params![id, l, v, g],
+        )?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1667,6 +1718,59 @@ mod tests {
         assert_eq!(count(&dir), 1);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn migration_11_splits_stored_loaders_and_keeps_unknown_ones() {
+        let db = LibraryDb::open_memory().unwrap();
+        let rows = [
+            ("a", Some("Fabric 0.16.9"), Some("1.21.4")),
+            ("b", Some("1.21.4-forge-54.1.0"), None),
+            ("c", Some("vanilla"), Some("1.20.1")),
+            ("d", Some("OptiFine HD_U_J2"), Some("1.21.4")),
+            ("e", None, None),
+        ];
+
+        db.with(|c| {
+            for (name, loader, game) in rows {
+                c.execute(
+                    "INSERT INTO sandbox (app_id, name, environment, strategy, game_version, \
+                     loader, options, created_at, updated_at) \
+                     VALUES (1, ?1, 'client', 'copy', ?2, ?3, '{}', 'now', 'now')",
+                    rusqlite::params![name, game, loader],
+                )?;
+            }
+
+            migrate_v11(c)
+        })
+        .unwrap();
+
+        type Row = (String, Option<String>, Option<String>, Option<String>);
+        let got: Vec<Row> = db
+            .with(|c| {
+                let mut stmt = c.prepare(
+                    "SELECT name, loader, loader_version, game_version FROM sandbox ORDER BY name",
+                )?;
+                let rows = stmt
+                    .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+                    .collect::<rusqlite::Result<Vec<_>>>();
+
+                rows
+            })
+            .unwrap();
+
+        let s = |v: &str| Some(v.to_string());
+
+        assert_eq!(
+            got,
+            vec![
+                ("a".into(), s("fabric"), s("0.16.9"), s("1.21.4")),
+                ("b".into(), s("forge"), s("54.1.0"), s("1.21.4")),
+                ("c".into(), None, None, s("1.20.1")),
+                ("d".into(), s("OptiFine HD_U_J2"), None, s("1.21.4")),
+                ("e".into(), None, None, None),
+            ]
+        );
     }
 
     fn entry(id: &str) -> LibraryEntry {

@@ -400,6 +400,7 @@ mod tests {
             strategy: Strategy::Direct,
             game_version: None,
             loader: None,
+            loader_version: None,
             preset: None,
             game_dir: None,
             options: BTreeMap::new(),

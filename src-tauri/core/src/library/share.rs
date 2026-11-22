@@ -103,6 +103,10 @@ pub struct SharedSandbox {
     pub game_version: Option<String>,
     #[serde(default)]
     pub loader: Option<String>,
+    /// Absent from a code made by an older app; `loader` may then be free
+    /// text, which creating the sandbox splits.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loader_version: Option<String>,
     #[serde(default)]
     pub preset: Option<String>,
     #[serde(default)]
@@ -126,6 +130,7 @@ pub fn to_shared(row: &Sandbox) -> SharedSandbox {
         strategy: row.strategy,
         game_version: row.game_version.clone(),
         loader: row.loader.clone(),
+        loader_version: row.loader_version.clone(),
         preset: row.preset.clone(),
         options: row.options.clone(),
         launch_args: row.launch_args.clone(),
@@ -250,6 +255,8 @@ mod tests {
             strategy: Strategy::Hardlink,
             game_version: Some("1.20.1".into()),
             loader: Some("fabric".into()),
+            loader_version: None,
+            install_state: None,
             preset: Some("fabric".into()),
             is_default: true,
             cloud_sync: true,

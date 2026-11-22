@@ -144,6 +144,14 @@ pub struct Sandbox {
 
     pub game_version: Option<String>,
     pub loader: Option<String>,
+    /// The loader's own version (`0.16.9`, `54.1.0`). Split out of the free
+    /// text `loader` used to hold, by [`normalize_loader`].
+    #[serde(default)]
+    pub loader_version: Option<String>,
+    /// The plan this sandbox's last deploy used. LOCAL ONLY: the layers it
+    /// names live on this machine, so it is never synced or shared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub install_state: Option<crate::layers::InstallState>,
     /// The `sandbox.json` preset this was created from, for the UI to show.
     pub preset: Option<String>,
 
@@ -192,8 +200,13 @@ impl Sandbox {
             return self.enabled_mods().next().is_some();
         }
 
-        let deployed: std::collections::HashSet<&str> =
-            ledger.iter().map(|e| e.mod_key.as_str()).collect();
+        // Layer and patch rows (`layer:`, `patch:`) come from the install plan,
+        // not the mod list, so they never make a sandbox look stale.
+        let deployed: std::collections::HashSet<&str> = ledger
+            .iter()
+            .map(|e| e.mod_key.as_str())
+            .filter(|k| !k.starts_with("layer:") && !k.starts_with("patch:"))
+            .collect();
 
         let wanted: std::collections::HashSet<&str> =
             self.enabled_mods().map(|m| m.mod_key.as_str()).collect();
@@ -240,6 +253,8 @@ pub struct NewSandbox {
     #[serde(default)]
     pub loader: Option<String>,
     #[serde(default)]
+    pub loader_version: Option<String>,
+    #[serde(default)]
     pub preset: Option<String>,
     #[serde(default)]
     pub game_dir: Option<String>,
@@ -275,6 +290,8 @@ pub struct SandboxPatch {
     pub game_version: Option<Option<String>>,
     #[serde(default, deserialize_with = "present")]
     pub loader: Option<Option<String>>,
+    #[serde(default, deserialize_with = "present")]
+    pub loader_version: Option<Option<String>>,
     #[serde(default, deserialize_with = "present")]
     pub game_dir: Option<Option<String>>,
     pub options: Option<BTreeMap<String, serde_json::Value>>,
@@ -327,6 +344,17 @@ impl LibraryDb {
         let now = now_rfc3339();
         let first = self.sandbox_count(new.app_id)? == 0;
 
+        // Free text from an old client or a hand-made share code is split the
+        // same way the migration splits stored rows.
+        let (loader, loader_version, game_version) = match &new.loader_version {
+            Some(v) => (
+                new.loader.clone(),
+                Some(v.trim().to_string()).filter(|v| !v.is_empty()),
+                new.game_version.clone(),
+            ),
+            None => normalize_loader(new.loader.as_deref(), new.game_version.as_deref()),
+        };
+
         let id = self.with(|conn| {
             conn.execute(
                 r#"
@@ -334,9 +362,9 @@ impl LibraryDb {
                     app_id, app_slug, app_name, name, description,
                     environment, strategy, game_version, loader, preset,
                     is_default, cloud_sync, auto_update, game_dir, options,
-                    created_at, updated_at
+                    created_at, updated_at, loader_version
                 ) VALUES (
-                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?16
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?16, ?17
                 )
                 "#,
                 params![
@@ -347,8 +375,8 @@ impl LibraryDb {
                     new.description,
                     new.environment.as_str(),
                     new.strategy.as_str(),
-                    new.game_version,
-                    new.loader,
+                    game_version,
+                    loader,
                     new.preset,
                     // The first sandbox for a game is the default whether or
                     // not anyone asked, so a user with exactly one never has
@@ -359,6 +387,7 @@ impl LibraryDb {
                     new.game_dir,
                     serde_json::to_string(&new.options).unwrap_or_else(|_| "{}".into()),
                     now,
+                    loader_version,
                 ],
             )?;
 
@@ -526,11 +555,111 @@ impl LibraryDb {
             Ok(())
         })?;
 
+        self.sandbox_patch_loader(id, patch)?;
+
         if patch.is_default == Some(true) {
             self.sandbox_set_default(id)?;
         }
 
         Ok(())
+    }
+
+    /// The loader version half of a patch.
+    ///
+    /// A `loader` patch with no `loaderVersion` is free text from an older
+    /// client (`fabric 0.16.9`), so it is split the way the migration splits
+    /// stored rows; an explicit `loaderVersion` is taken as given.
+    fn sandbox_patch_loader(&self, id: i64, patch: &SandboxPatch) -> AppResult<()> {
+        let explicit = patch.loader_version.clone();
+
+        let (loader, version, game) = match (&patch.loader, explicit) {
+            (_, Some(v)) => (None, Some(v.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())), None),
+            (Some(Some(text)), None) => {
+                let (l, v, g) = normalize_loader(Some(text), None);
+
+                (Some(l), Some(v), g)
+            }
+            (Some(None), None) => (None, Some(None), None),
+            (None, None) => return Ok(()),
+        };
+
+        self.with(|conn| {
+            if let Some(l) = loader {
+                conn.execute("UPDATE sandbox SET loader = ?2 WHERE id = ?1", params![id, l])?;
+            }
+            if let Some(v) = version {
+                conn.execute(
+                    "UPDATE sandbox SET loader_version = ?2 WHERE id = ?1",
+                    params![id, v],
+                )?;
+            }
+            if let Some(g) = game {
+                conn.execute(
+                    "UPDATE sandbox SET game_version = COALESCE(game_version, ?2) WHERE id = ?1",
+                    params![id, g],
+                )?;
+            }
+
+            Ok(())
+        })
+    }
+
+    // ------------------------------------------------------ Install state
+
+    /// Record the plan the last deploy used. `None` clears it (a purge).
+    pub fn sandbox_set_install_state(
+        &self,
+        id: i64,
+        state: Option<&crate::layers::InstallState>,
+    ) -> AppResult<()> {
+        let raw = state.map(serde_json::to_string).transpose()?;
+
+        self.with(|conn| {
+            conn.execute(
+                "UPDATE sandbox SET install_state = ?2 WHERE id = ?1",
+                params![id, raw],
+            )?;
+
+            Ok(())
+        })
+    }
+
+    /// The consent ids the user accepted for this exact plan, or `None` when
+    /// this plan hash was never accepted for this sandbox.
+    pub fn sandbox_consent(&self, id: i64, plan_hash: &str) -> AppResult<Option<Vec<String>>> {
+        let raw: Option<String> = self.with(|conn| {
+            conn.query_row(
+                "SELECT consents FROM sandbox_consent WHERE sandbox_id = ?1 AND plan_hash = ?2",
+                params![id, plan_hash],
+                |r| r.get(0),
+            )
+            .optional()
+        })?;
+
+        Ok(raw.map(|r| serde_json::from_str(&r).unwrap_or_default()))
+    }
+
+    /// Record consent to a plan: the hash, and the consent ids shown.
+    pub fn sandbox_record_consent(
+        &self,
+        id: i64,
+        plan_hash: &str,
+        consents: &[String],
+    ) -> AppResult<()> {
+        let now = now_rfc3339();
+        let shown = serde_json::to_string(consents)?;
+
+        self.with(|conn| {
+            conn.execute(
+                "INSERT INTO sandbox_consent (sandbox_id, plan_hash, consents, accepted_at)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT (sandbox_id, plan_hash)
+                 DO UPDATE SET consents = excluded.consents, accepted_at = excluded.accepted_at",
+                params![id, plan_hash, shown, now],
+            )?;
+
+            Ok(())
+        })
     }
 
     /// Make this the pre-selected sandbox for its game, and no other.
@@ -799,7 +928,7 @@ impl LibraryDb {
     pub fn sandbox_ledger(&self, sandbox_id: i64) -> AppResult<Vec<LedgerEntry>> {
         self.with(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT path, kind, mod_key, source, size, mtime_ms, backup
+                "SELECT path, kind, mod_key, source, size, mtime_ms, backup, patch
                  FROM deployment WHERE sandbox_id = ?1",
             )?;
 
@@ -813,6 +942,9 @@ impl LibraryDb {
                         size: row.get::<_, i64>(4)? as u64,
                         mtime_ms: row.get(5)?,
                         backup: row.get(6)?,
+                        patch: row
+                            .get::<_, Option<String>>(7)?
+                            .and_then(|raw| serde_json::from_str(&raw).ok()),
                     })
                 })?
                 .collect();
@@ -838,8 +970,8 @@ impl LibraryDb {
             {
                 let mut stmt = tx.prepare(
                     "INSERT INTO deployment
-                        (sandbox_id, path, kind, mod_key, source, size, mtime_ms, backup)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                        (sandbox_id, path, kind, mod_key, source, size, mtime_ms, backup, patch)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 )?;
 
                 for entry in entries {
@@ -852,6 +984,10 @@ impl LibraryDb {
                         entry.size as i64,
                         entry.mtime_ms,
                         entry.backup,
+                        entry
+                            .patch
+                            .as_ref()
+                            .and_then(|p| serde_json::to_string(p).ok()),
                     ])?;
                 }
             }
@@ -873,6 +1009,16 @@ impl LibraryDb {
     #[allow(clippy::too_many_arguments)]
     pub fn sandbox_upsert_remote(&self, remote: &RemoteSandbox<'_>) -> AppResult<i64> {
         let now = now_rfc3339();
+
+        // An older client still sends `loader: "fabric 0.16.9"`.
+        let (loader, loader_version, game_version) = match remote.loader_version {
+            Some(v) => (
+                remote.loader.map(str::to_string),
+                Some(v.to_string()),
+                remote.game_version.map(str::to_string),
+            ),
+            None => normalize_loader(remote.loader, remote.game_version),
+        };
 
         if let Some(id) = self.sandbox_by_remote(remote.remote_id)? {
             let synced: bool = self.with(|conn| {
@@ -896,7 +1042,7 @@ impl LibraryDb {
                         description = ?6, environment = ?7, strategy = ?8,
                         game_version = ?9, loader = ?10, is_default = ?11,
                         options = ?12, launch_args = ?13, launch_env = ?14,
-                        updated_at = ?15
+                        updated_at = ?15, loader_version = ?16
                     WHERE id = ?1
                     "#,
                     params![
@@ -908,13 +1054,14 @@ impl LibraryDb {
                         remote.description,
                         remote.environment.as_str(),
                         remote.strategy.as_str(),
-                        remote.game_version,
-                        remote.loader,
+                        game_version,
+                        loader,
                         remote.is_default as i64,
                         remote.options,
                         remote.launch_args,
                         remote.launch_env,
                         now,
+                        loader_version,
                     ],
                 )?;
 
@@ -933,9 +1080,9 @@ impl LibraryDb {
                     remote_id, app_id, app_slug, app_name, name, description,
                     environment, strategy, game_version, loader, is_default,
                     cloud_sync, options, launch_args, launch_env,
-                    created_at, updated_at
+                    created_at, updated_at, loader_version
                 ) VALUES (
-                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 1, ?12, ?13, ?14, ?15, ?15
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 1, ?12, ?13, ?14, ?15, ?15, ?16
                 )
                 "#,
                 params![
@@ -947,13 +1094,14 @@ impl LibraryDb {
                     remote.description,
                     remote.environment.as_str(),
                     remote.strategy.as_str(),
-                    remote.game_version,
-                    remote.loader,
+                    game_version,
+                    loader,
                     remote.is_default as i64,
                     remote.options,
                     remote.launch_args,
                     remote.launch_env,
                     now,
+                    loader_version,
                 ],
             )?;
 
@@ -1069,6 +1217,8 @@ pub struct RemoteSandbox<'a> {
     pub strategy: Strategy,
     pub game_version: Option<&'a str>,
     pub loader: Option<&'a str>,
+    /// `None` from an older client, whose `loader` may still be free text.
+    pub loader_version: Option<&'a str>,
     pub is_default: bool,
     /// JSON, verbatim from the payload.
     pub options: String,
@@ -1095,7 +1245,8 @@ const SANDBOX_SELECT: &str = "SELECT
     id, remote_id, app_id, app_slug, app_name, name, description,
     environment, strategy, game_version, loader, preset, is_default,
     cloud_sync, game_dir, options, launch_args, launch_env,
-    deployed_at, last_deploy, created_at, updated_at, auto_update
+    deployed_at, last_deploy, created_at, updated_at, auto_update,
+    loader_version, install_state
  FROM sandbox";
 
 fn row_to_sandbox(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sandbox> {
@@ -1103,6 +1254,7 @@ fn row_to_sandbox(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sandbox> {
     let launch_args: String = row.get(16)?;
     let launch_env: String = row.get(17)?;
     let last_deploy: Option<String> = row.get(19)?;
+    let install_state: Option<String> = row.get(24)?;
 
     Ok(Sandbox {
         id: row.get(0)?,
@@ -1120,6 +1272,8 @@ fn row_to_sandbox(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sandbox> {
         strategy: Strategy::parse(&row.get::<_, String>(8)?).unwrap_or_default(),
         game_version: row.get(9)?,
         loader: row.get(10)?,
+        loader_version: row.get(23)?,
+        install_state: install_state.and_then(|raw| serde_json::from_str(&raw).ok()),
         preset: row.get(11)?,
         is_default: row.get::<_, i64>(12)? != 0,
         cloud_sync: row.get::<_, i64>(13)? != 0,
@@ -1134,6 +1288,106 @@ fn row_to_sandbox(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sandbox> {
         auto_update: row.get::<_, i64>(22)? != 0,
         mods: Vec::new(),
     })
+}
+
+/// Split the free text a sandbox's `loader` used to hold into a loader id, a
+/// loader version and, when the text carries one, a game version.
+///
+/// Returns `(loader, loader_version, game_version)`. `game_version` is the one
+/// passed in when there was one (trimmed), else whatever the text implied.
+///
+/// ```text
+///   "" / vanilla / none / minecraft      → no loader
+///   "Fabric 0.16.9", "fabric-0.16.9",
+///   "fabric@0.16.9", "quilt:v0.27.1"     → (fabric|quilt, version)
+///   "Neo Forge", "neo-forge", "NeoForged" → neoforge;  fabricmc → fabric;
+///   quiltmc → quilt
+///   "1.21.4-forge-54.1.0"               → forge 54.1.0, game 1.21.4
+///   "fabric-loader-0.16.9-1.21.4"       → fabric 0.16.9, game 1.21.4
+///   anything else                       → kept exactly as typed (trimmed)
+/// ```
+///
+/// Unknown values are KEPT: a loader this app does not model yet (`optifine`,
+/// `liteloader`) is still the user's statement about their sandbox, and the
+/// plan refuses it with a message rather than the migration erasing it.
+pub fn normalize_loader(
+    loader: Option<&str>,
+    game_version: Option<&str>,
+) -> (Option<String>, Option<String>, Option<String>) {
+    static ONE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    static FORGE_ID: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    static FABRIC_ID: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+
+    let game = game_version
+        .map(str::trim)
+        .filter(|g| !g.is_empty())
+        .map(str::to_string);
+
+    let Some(raw) = loader.map(str::trim).filter(|l| !l.is_empty()) else {
+        return (None, None, game);
+    };
+
+    let lower = raw.to_ascii_lowercase();
+
+    let canonical = |name: &str| -> Option<&'static str> {
+        match name {
+            "fabric" | "fabricmc" => Some("fabric"),
+            "quilt" | "quiltmc" => Some("quilt"),
+            "forge" | "minecraftforge" => Some("forge"),
+            "neoforge" | "neo forge" | "neo-forge" | "neoforged" => Some("neoforge"),
+            _ => None,
+        }
+    };
+
+    if matches!(lower.as_str(), "vanilla" | "none" | "minecraft") {
+        return (None, None, game);
+    }
+
+    if let Some(name) = canonical(&lower) {
+        return (Some(name.to_string()), None, game);
+    }
+
+    let one = ONE.get_or_init(|| {
+        regex::Regex::new(
+            r"^(fabricmc|fabric|quiltmc|quilt|forge|neo[ \-]?forged?|neoforge)[\s\-@:_]+v?([0-9][A-Za-z0-9._+\-]*)$",
+        )
+        .expect("static regex")
+    });
+
+    if let Some(c) = one.captures(&lower) {
+        let name = c[1].replace("forged", "forge");
+
+        if let Some(name) = canonical(&name) {
+            return (Some(name.to_string()), Some(c[2].to_string()), game);
+        }
+    }
+
+    let forge_id = FORGE_ID.get_or_init(|| {
+        regex::Regex::new(r"^([0-9][0-9.]*)-(forge|neoforge)-([0-9][0-9.]*)$").expect("static regex")
+    });
+
+    if let Some(c) = forge_id.captures(&lower) {
+        return (
+            Some(c[2].to_string()),
+            Some(c[3].to_string()),
+            game.or_else(|| Some(c[1].to_string())),
+        );
+    }
+
+    let fabric_id = FABRIC_ID.get_or_init(|| {
+        regex::Regex::new(r"^(fabric|quilt)-loader-([0-9][0-9.]*)-([0-9][0-9.]*)$")
+            .expect("static regex")
+    });
+
+    if let Some(c) = fabric_id.captures(&lower) {
+        return (
+            Some(c[1].to_string()),
+            Some(c[2].to_string()),
+            game.or_else(|| Some(c[3].to_string())),
+        );
+    }
+
+    (Some(raw.to_string()), None, game)
 }
 
 #[cfg(test)]
@@ -1155,6 +1409,7 @@ mod tests {
             strategy: Strategy::Hardlink,
             game_version: Some("1.21".into()),
             loader: Some("fabric".into()),
+            loader_version: None,
             preset: Some("fabric-1.21".into()),
             game_dir: None,
             options: BTreeMap::from([("memoryMb".into(), serde_json::json!(4096))]),
@@ -1305,6 +1560,7 @@ mod tests {
             size: 10,
             mtime_ms: 1,
             backup: None,
+            patch: None,
         };
 
         db.sandbox_set_ledger(id, &[entry("mods/a.jar"), entry("mods/b.jar")])
@@ -1337,6 +1593,7 @@ mod tests {
                 size: 0,
                 mtime_ms: 0,
                 backup: None,
+                patch: None,
             }],
         )
         .expect("ledger");
@@ -1362,6 +1619,7 @@ mod tests {
             strategy: Strategy::Symlink,
             game_version: Some("1.21"),
             loader: Some("fabric"),
+            loader_version: None,
             is_default: false,
             options: "{}".into(),
             launch_args: "[]".into(),
@@ -1515,5 +1773,118 @@ mod tests {
         assert!(Shared.accepts(Server));
         assert!(!Client.accepts(Server));
         assert!(!Server.accepts(Client));
+    }
+
+    // ------------------------------------------------------ Loader migration
+
+    #[test]
+    fn every_loader_pattern_normalises() {
+        type Split<'a> = (Option<&'a str>, Option<&'a str>, Option<&'a str>);
+        let cases: &[(Option<&str>, Option<&str>, Split)] = &[
+            (None, None, (None, None, None)),
+            (Some(""), Some(" 1.21.4 "), (None, None, Some("1.21.4"))),
+            (Some("  "), None, (None, None, None)),
+            (Some("Vanilla"), Some("1.21.4"), (None, None, Some("1.21.4"))),
+            (Some("none"), None, (None, None, None)),
+            (Some("Minecraft"), None, (None, None, None)),
+            (Some("fabric"), None, (Some("fabric"), None, None)),
+            (Some("FabricMC"), None, (Some("fabric"), None, None)),
+            (Some("QuiltMC"), None, (Some("quilt"), None, None)),
+            (Some("Forge"), None, (Some("forge"), None, None)),
+            (Some("Neo Forge"), None, (Some("neoforge"), None, None)),
+            (Some("neo-forge"), None, (Some("neoforge"), None, None)),
+            (Some("NeoForged"), None, (Some("neoforge"), None, None)),
+            (Some("neoforge"), None, (Some("neoforge"), None, None)),
+            (Some("Fabric 0.16.9"), Some("1.21.4"), (Some("fabric"), Some("0.16.9"), Some("1.21.4"))),
+            (Some("fabric-0.16.9"), None, (Some("fabric"), Some("0.16.9"), None)),
+            (Some("fabric@0.16.9"), None, (Some("fabric"), Some("0.16.9"), None)),
+            (Some("fabric_0.16.9"), None, (Some("fabric"), Some("0.16.9"), None)),
+            (Some("quilt:v0.27.1"), None, (Some("quilt"), Some("0.27.1"), None)),
+            (Some("forge 54.1.0"), None, (Some("forge"), Some("54.1.0"), None)),
+            (Some("NeoForge 21.4.0-beta"), None, (Some("neoforge"), Some("21.4.0-beta"), None)),
+            (Some("neoforged-21.4.1"), None, (Some("neoforge"), Some("21.4.1"), None)),
+            (Some("1.21.4-forge-54.1.0"), None, (Some("forge"), Some("54.1.0"), Some("1.21.4"))),
+            (Some("1.21.4-forge-54.1.0"), Some("1.21.3"), (Some("forge"), Some("54.1.0"), Some("1.21.3"))),
+            (Some("fabric-loader-0.16.9-1.21.4"), None, (Some("fabric"), Some("0.16.9"), Some("1.21.4"))),
+            // Unknown values are kept exactly as typed.
+            (Some(" OptiFine HD_U_J2 "), Some("1.21.4"), (Some("OptiFine HD_U_J2"), None, Some("1.21.4"))),
+            (Some("liteloader"), None, (Some("liteloader"), None, None)),
+            (Some("fabric latest"), None, (Some("fabric latest"), None, None)),
+        ];
+
+        for (loader, game, (want_l, want_v, want_g)) in cases {
+            let got = normalize_loader(*loader, *game);
+
+            assert_eq!(
+                got,
+                (
+                    want_l.map(str::to_string),
+                    want_v.map(str::to_string),
+                    want_g.map(str::to_string)
+                ),
+                "{loader:?} / {game:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn create_and_patch_split_free_text() {
+        let db = db();
+        let mut new = new_sandbox("Split");
+
+        new.loader = Some("Fabric 0.16.9".into());
+        new.game_version = None;
+
+        let id = db.sandbox_create(&new).expect("create");
+        let row = db.sandbox_get(id).expect("get").expect("row");
+
+        assert_eq!(row.loader.as_deref(), Some("fabric"));
+        assert_eq!(row.loader_version.as_deref(), Some("0.16.9"));
+
+        db.sandbox_patch(
+            id,
+            &SandboxPatch {
+                loader: Some(Some("1.21.4-forge-54.1.0".into())),
+                ..Default::default()
+            },
+        )
+        .expect("patch");
+
+        let row = db.sandbox_get(id).expect("get").expect("row");
+
+        assert_eq!(row.loader.as_deref(), Some("forge"));
+        assert_eq!(row.loader_version.as_deref(), Some("54.1.0"));
+        assert_eq!(row.game_version.as_deref(), Some("1.21.4"));
+
+        db.sandbox_patch(
+            id,
+            &SandboxPatch {
+                loader_version: Some(Some("54.1.2".into())),
+                ..Default::default()
+            },
+        )
+        .expect("patch");
+
+        let row = db.sandbox_get(id).expect("get").expect("row");
+
+        assert_eq!(row.loader.as_deref(), Some("forge"));
+        assert_eq!(row.loader_version.as_deref(), Some("54.1.2"));
+    }
+
+    #[test]
+    fn consent_is_per_plan_hash() {
+        let db = db();
+        let id = db.sandbox_create(&new_sandbox("Consent")).expect("create");
+
+        assert_eq!(db.sandbox_consent(id, "aaa").expect("read"), None);
+
+        db.sandbox_record_consent(id, "aaa", &["exec".into()])
+            .expect("record");
+
+        assert_eq!(
+            db.sandbox_consent(id, "aaa").expect("read"),
+            Some(vec!["exec".to_string()])
+        );
+        assert_eq!(db.sandbox_consent(id, "bbb").expect("read"), None);
     }
 }

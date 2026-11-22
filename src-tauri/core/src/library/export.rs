@@ -154,12 +154,29 @@ fn index_json(sandbox: &Sandbox, notes: &mut Vec<String>) -> AppResult<String> {
     let mut dependencies = BTreeMap::new();
     dependencies.insert("minecraft".to_string(), game_version.to_string());
 
-    // The sandbox records a loader NAME, and the format wants a version. A
-    // made-up one would be read as a promise, so it is left out and said so.
+    // `.mrpack` names a loader by its dependency key and wants a version. A
+    // made-up one would be read as a promise, so a loader with no recorded
+    // version (or one the format has no key for) is left out and said so.
     if let Some(loader) = sandbox.loader.as_deref().filter(|l| !l.trim().is_empty()) {
-        notes.push(format!(
-            "The loader ({loader}) has no recorded version, so the pack does not name one."
-        ));
+        let key = match loader {
+            "fabric" => Some("fabric-loader"),
+            "quilt" => Some("quilt-loader"),
+            "forge" => Some("forge"),
+            "neoforge" => Some("neoforge"),
+            _ => None,
+        };
+
+        match (key, sandbox.loader_version.as_deref().filter(|v| !v.trim().is_empty())) {
+            (Some(key), Some(version)) => {
+                dependencies.insert(key.to_string(), version.trim().to_string());
+            }
+            (Some(_), None) => notes.push(format!(
+                "The loader ({loader}) has no recorded version, so the pack does not name one."
+            )),
+            (None, _) => notes.push(format!(
+                "The loader ({loader}) has no .mrpack dependency key, so the pack does not name it."
+            )),
+        }
     }
 
     let index = serde_json::json!({
@@ -340,6 +357,8 @@ mod tests {
             strategy: Strategy::Hardlink,
             game_version: Some("1.20.1".into()),
             loader: Some("fabric".into()),
+            loader_version: None,
+            install_state: None,
             preset: None,
             is_default: true,
             cloud_sync: false,

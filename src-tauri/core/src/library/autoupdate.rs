@@ -159,7 +159,7 @@ pub async fn run(db: &LibraryDb, ctx: &SandboxCtx<'_>) -> AppResult<AutoUpdateRe
             continue;
         };
 
-        match deploy_sandbox(db, &fresh, ctx, false) {
+        match deploy_sandbox(db, &fresh, ctx, false).await {
             Ok(deployed) => {
                 report.redeployed.push(sandbox.name.clone());
 
@@ -312,6 +312,7 @@ mod tests {
             strategy: Strategy::Direct,
             game_version: None,
             loader: None,
+            loader_version: None,
             preset: None,
             game_dir: None,
             options: BTreeMap::new(),

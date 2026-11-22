@@ -226,6 +226,10 @@ pub struct LaunchContext {
     pub exec_roots: crate::detect::DetectRoots,
     /// The directories of `PATH`, for a bare-name `execSearch` candidate.
     pub path_dirs: Vec<PathBuf>,
+    /// The values the deployed install plan's `launch.vars` named
+    /// (`launchVersionId`, `serverJar`): docs/loader-manifests.md, "Launch".
+    /// `{launchVersionId}` falls back to `{gameVersion}` without a plan.
+    pub launch_vars: std::collections::BTreeMap<String, String>,
 }
 
 /// The directories on this process's `PATH`.
@@ -425,6 +429,14 @@ pub fn plan(
     }
     if let Some(v) = &ctx.game_dir {
         table.insert("gameDir".into(), v.display().to_string());
+    }
+    for (key, value) in &ctx.launch_vars {
+        table.insert(key.clone(), value.clone());
+    }
+    if !table.contains_key("launchVersionId") {
+        if let Some(v) = &ctx.game_version {
+            table.insert("launchVersionId".into(), v.clone());
+        }
     }
 
     // ------------------------------------------------------------- Target

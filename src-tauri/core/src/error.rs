@@ -36,6 +36,12 @@ pub enum AppError {
     #[error("Blocked by the plugin file jail: {0}")]
     Jail(String),
 
+    /// A deploy resolved an install plan the user has not accepted yet. The
+    /// payload is the plan hash; the UI fetches the plan with
+    /// `install_plan_preview`, shows it, and calls `install_plan_consent`.
+    #[error("This install needs your consent first.")]
+    NeedsConsent(String),
+
     /// Carries its detail privately — `Display` is the generic sentence, and
     /// [`AppError::detail`] is what the audit log writes.
     #[error("Something went wrong. Check the activity log for details.")]
@@ -65,6 +71,7 @@ impl AppError {
             Self::Api(_) => "api",
             Self::Invalid(_) => "invalid",
             Self::Jail(_) => "jail",
+            Self::NeedsConsent(_) => "needs_consent",
             Self::Internal(_) => "internal",
         }
     }
@@ -73,6 +80,7 @@ impl AppError {
     pub fn detail(&self) -> String {
         match self {
             Self::Internal(src) => src.clone(),
+            Self::NeedsConsent(plan_hash) => format!("needs consent for plan {plan_hash}"),
             other => other.to_string(),
         }
     }
