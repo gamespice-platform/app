@@ -1,5 +1,9 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## Unreleased
+
+- New: backend for mods from other sites (no screens yet). Paste or drop a Modrinth, Thunderstore or GitHub link or a direct .zip/.jar and the core resolves, downloads, verifies (sha512 or sha256 where the site publishes one) and adds it as a library mod; CurseForge, Nexus and mod.io are recognised but stay off until the TMC AdminCP enables them. Links opened from the OS (nxm, curseforge, modrinth, ror2mm, prismlauncher) only ever show a confirm step. New setting `externalMaxDownloadMb` (0, the default, is unlimited).
+
 ## 0.5.15
 
 ### Fixed
