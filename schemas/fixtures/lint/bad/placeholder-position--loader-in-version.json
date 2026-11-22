@@ -1,0 +1,96 @@
+{
+    "$schema": "../../../loader-manifest.v1.schema.json",
+    "app": "demo",
+    "artifacts": {
+        "game": {
+            "description": "The game",
+            "platform": "any",
+            "urlTemplate": "https://dl.example.com/game/{gameVersion}/game-{platform}.zip"
+        }
+    },
+    "consents": [
+        {
+            "id": "terms",
+            "text": "Accept the demo terms.",
+            "url": "https://example.com/terms"
+        }
+    ],
+    "deployPatches": [
+        {
+            "path": "settings.json",
+            "pointer": "/profiles/{sandboxId}",
+            "value": {
+                "dir": "{targetDir}",
+                "name": "{sandboxName}",
+                "version": "{launchVersionId}"
+            }
+        }
+    ],
+    "downloadHosts": [
+        "dl.example.com",
+        "*.cdn.example.net"
+    ],
+    "id": "demo/version",
+    "kind": "version",
+    "launch": {
+        "vars": [
+            "launchVersionId"
+        ]
+    },
+    "revision": 1,
+    "schemaVersion": 1,
+    "steps": [
+        {
+            "action": "download",
+            "artifact": "game",
+            "label": "Downloading the game",
+            "to": {
+                "path": "game-{gameVersion}.zip",
+                "root": "downloads"
+            }
+        },
+        {
+            "action": "download",
+            "mirrors": [
+                "https://us.cdn.example.net/readme.txt"
+            ],
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "to": {
+                "path": "files/readme.txt",
+                "root": "layer"
+            },
+            "url": "https://eu.cdn.example.net/readme.txt"
+        },
+        {
+            "action": "extract",
+            "from": {
+                "path": "game-{gameVersion}.zip",
+                "root": "downloads"
+            },
+            "stripSingleRoot": true,
+            "to": {
+                "path": "files",
+                "root": "layer"
+            }
+        },
+        {
+            "action": "writeText",
+            "content": "{\"literal\": {}} {not a placeholder because of the space}",
+            "path": {
+                "path": "files/{side}.txt",
+                "root": "layer"
+            },
+            "when": {
+                "consent": "terms",
+                "platforms": [
+                    "linux-x64"
+                ]
+            }
+        }
+    ],
+    "title": "Demo",
+    "vars": {
+        "launchVersionId": "{gameVersion}",
+        "x": "{loaderVersion}"
+    }
+}

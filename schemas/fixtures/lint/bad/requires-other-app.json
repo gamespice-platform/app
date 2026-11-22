@@ -1,0 +1,33 @@
+{
+    "$schema": "../../../loader-manifest.v1.schema.json",
+    "app": "demo",
+    "artifacts": {
+        "profile": {
+            "platform": "any",
+            "sourceTemplate": "https://meta.example.org/{gameVersion}/{loaderVersion}/profile.json",
+            "x-tmc-placeholder": "markers are allowed outside --release"
+        }
+    },
+    "id": "demo/loader/basic",
+    "kind": "loader",
+    "loader": "basic",
+    "requires": [
+        "other/version"
+    ],
+    "revision": 2,
+    "schemaVersion": 1,
+    "steps": [
+        {
+            "action": "download",
+            "artifact": "profile",
+            "to": {
+                "path": "files/{launchVersionId}.json",
+                "root": "layer"
+            }
+        }
+    ],
+    "title": "Basic loader",
+    "vars": {
+        "launchVersionId": "basic-{loaderVersion}-{gameVersion}"
+    }
+}

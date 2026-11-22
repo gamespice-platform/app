@@ -1,0 +1,111 @@
+{
+    "$schema": "../../schemas/loader-manifest.v1.schema.json",
+    "app": "minecraft",
+    "artifacts": {
+        "serverJar": {
+            "description": "The dedicated server jar",
+            "platform": "any",
+            "redistributable": false,
+            "sides": [
+                "server"
+            ]
+        },
+        "versionJson": {
+            "description": "The version JSON Mojang publishes for this version",
+            "platform": "any",
+            "redistributable": false
+        }
+    },
+    "consents": [
+        {
+            "id": "eula",
+            "sides": [
+                "server"
+            ],
+            "text": "Running a Minecraft server requires accepting the Minecraft EULA.",
+            "url": "https://aka.ms/MinecraftEULA"
+        }
+    ],
+    "deployPatches": [
+        {
+            "ensure": {
+                "profiles": {},
+                "version": 3
+            },
+            "path": "launcher_profiles.json",
+            "pointer": "/profiles/tmc-{sandboxId}",
+            "value": {
+                "gameDir": "{targetDir}",
+                "icon": "Furnace",
+                "lastVersionId": "{launchVersionId}",
+                "name": "TMC: {sandboxName}",
+                "type": "custom"
+            },
+            "when": {
+                "side": "client"
+            }
+        }
+    ],
+    "downloadHosts": [
+        "piston-meta.mojang.com",
+        "piston-data.mojang.com"
+    ],
+    "id": "minecraft/version",
+    "kind": "version",
+    "launch": {
+        "vars": [
+            "launchVersionId"
+        ]
+    },
+    "requirements": {
+        "runtimes": [
+            {
+                "for": "launch",
+                "kind": "java",
+                "major": "{var.javaMajor}"
+            }
+        ]
+    },
+    "revision": 1,
+    "schemaVersion": 1,
+    "steps": [
+        {
+            "action": "download",
+            "artifact": "versionJson",
+            "to": {
+                "path": "files/versions/{gameVersion}/{gameVersion}.json",
+                "root": "layer"
+            },
+            "when": {
+                "side": "client"
+            }
+        },
+        {
+            "action": "download",
+            "artifact": "serverJar",
+            "to": {
+                "path": "files/server.jar",
+                "root": "layer"
+            },
+            "when": {
+                "side": "server"
+            }
+        },
+        {
+            "action": "writeText",
+            "content": "eula=true\n",
+            "path": {
+                "path": "files/eula.txt",
+                "root": "layer"
+            },
+            "when": {
+                "consent": "eula",
+                "side": "server"
+            }
+        }
+    ],
+    "title": "Minecraft",
+    "vars": {
+        "launchVersionId": "{gameVersion}"
+    }
+}

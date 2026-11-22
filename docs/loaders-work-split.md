@@ -1,4 +1,4 @@
-How the game version and loader feature of [loaders-and-versions.md](loaders-and-versions.md) and [loader-manifests.md](loader-manifests.md) is split into build units, in what order they land, what each one must prove, and what is knowingly left open. **Status: designed, not built.** Each unit is sized for one builder session. Builders write the "what was built" version of the section their unit covers when they land it.
+How the game version and loader feature of [loaders-and-versions.md](loaders-and-versions.md) and [loader-manifests.md](loader-manifests.md) is split into build units, in what order they land, what each one must prove, and what is knowingly left open. **Status: A1 is built; the other units are designed, not built.** Each unit is sized for one builder session. Builders write the "what was built" version of the section their unit covers when they land it.
 
 ## Units
 
@@ -15,11 +15,21 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
 - **Depends on:** nothing. Start first.
 - **Acceptance:**
   - `npm run manifests:check` passes on the seeds, and `--release` fails listing every `x-tmc-placeholder`;
-  - every `lint/bad/*.json` fails with its expected message (the message is in the fixture's file name);
+  - every `lint/bad/*.json` fails with its expected code (the code is in the fixture's file name);
   - the canonical fixtures round-trip byte-identically;
   - sign followed by check verifies with a test key, and a one-byte edit fails;
   - the two placeholder holes this design leaves in `forge.manifest.json` are fixed: `minGameVersionSortKey` is replaced by `requirements.minGameVersion: "1.13"`, with a placeholder note on it.
 - **Signing:** the real exec key is the owner's to create. A1 commits the `forge` and `neoforge` `.sig` files signed with a **test** key, listed in `exec-keys.json` as `"keyId": "tmc-exec-test"`, and leaves a placeholder marker on each. Release CI refuses the test key id.
+- **What was built:**
+  - `scripts/manifests/canonical.ts`: the canonical and pretty forms described in [loader-manifests.md](loader-manifests.md#canonical-form). It refuses floats, unsafe integers and lone surrogates rather than rounding or replacing them.
+  - `scripts/manifests/sign.ts` (`npm run manifests:sign -- <manifest>...`): pure Ed25519 over the canonical bytes, written to `<file>.sig`. The key id is found by matching the private key's public half against `exec-keys.json`, so an unlisted key cannot sign. A test-key signature carries its own `x-tmc-placeholder`.
+  - `scripts/manifests/check.ts` (`npm run manifests:check [-- --release]`). It checks the schema (ajv, draft 2020-12; a failing step is reported against its own action's definition, not every `oneOf` branch), the lint rules, the pretty form, file placement, the signatures, orphan `.sig` files, `catalog.snapshot.json` and `step-labels.en.json`, and runs every lint fixture. `--release` adds one problem per `x-tmc-placeholder` and per use of `tmc-exec-test`. `check:web` runs it.
+  - Problems carry a stable code, listed in [loader-manifests.md](loader-manifests.md#checks-and-problem-codes). Fixtures are named `lint/bad/<code>[--<case>].json`. A bad fixture must yield exactly its code and an ok fixture none. 30 bad and 3 ok fixtures are committed, with a test-only key pair in `lint/keys/` (the private half is committed on purpose and is listed only there).
+  - `schemas/game-catalog.v1.schema.json`: the snapshot's schema, with `app`, `loaders`, `versions` (`{items: [...]}`) and optional `loaderVersions`, `versionBindings` and `builds`. Runtimes have their own snapshot, as the Files table says.
+  - `schemas/step-labels.en.json`: one label per step action. The check fails if an action is missing or extra.
+  - Seeds: the five manifests. Forge has `requirements.minGameVersion: "1.13"` with its marker. NeoForge has no `minGameVersion` and a root marker for the 1.20.1 gap. Quilt is client only, with a root marker for the server. The forge and neoforge `.sig` files are signed by `tmc-exec-test`, whose private key is kept outside the repository by the owner's account (`~core/.config/tmc-app/tmc-exec-test.pem`).
+  - Tests: `scripts/manifests/{canonical,check,sign}.test.mjs`, run by vitest.
+  - Left open: the owner's real exec key, and re-signing with it; Rust's JSON canonical form (A3: `tmc_core::canon` canonicalises paths, not JSON); `release.yml` running `manifests:check --release`.
 
 ### W1: catalog models and domain library (website-city)
 

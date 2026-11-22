@@ -1,4 +1,4 @@
-An install manifest describes, as data, how to install one game version or one loader build into a layer folder. This document covers the JSON Schema, the steps it adds to the plugin step vocabulary, the jail roots they run in, the security model, the trust tiers, where manifests live in this repository, how they move to and from the AdminCP, and the seed manifests. **Status: designed, not built.** It is part of [loaders-and-versions.md](loaders-and-versions.md); the build units are in [loaders-work-split.md](loaders-work-split.md).
+An install manifest describes, as data, how to install one game version or one loader build into a layer folder. This document covers the JSON Schema, the steps it adds to the plugin step vocabulary, the jail roots they run in, the security model, the trust tiers, where manifests live in this repository, how they move to and from the AdminCP, and the seed manifests. **Status: designed; the schemas, seeds, `manifests:check` and `manifests:sign` (unit A1) are built.** It is part of [loaders-and-versions.md](loaders-and-versions.md); the build units are in [loaders-work-split.md](loaders-work-split.md).
 
 ## What it is, and how it differs from a plugin
 
@@ -28,8 +28,11 @@ The installer therefore gets exactly one door, the `runInstaller` step. Three ru
 | `manifests/<appSlug>/*.sig` | the detached signature next to each exec manifest (`forge.manifest.json.sig`) |
 | `manifests/<appSlug>/catalog.snapshot.json` | the exported catalog: versions, loaders, loader versions, builds with bindings and artifacts, for the last-N window. It is compiled in as the offline fallback |
 | `manifests/runtimes/<kind>.snapshot.json` | the exported runtimes, compiled in |
-| `manifests/keys/exec-keys.json` | the public exec keys: `[{ "keyId": "tmc-exec-2026", "ed25519": "<base64>" }]`, compiled in |
-| `scripts/manifests/check.ts` | `npm run manifests:check`: the schema, the lint rules below, and that each signature matches |
+| `manifests/keys/exec-keys.json` | the public exec keys: `[{ "keyId": "tmc-exec-2026", "ed25519": "<base64 of the raw 32-byte key>" }]`, compiled in. Until the owner's key exists it lists only `tmc-exec-test`, with a placeholder marker |
+| `scripts/manifests/check.ts` | `npm run manifests:check [-- --release]`: the schema, the lint rules, the pretty form, file placement, each signature, the catalog snapshot, the step labels and the lint fixtures. See [Checks and problem codes](#checks-and-problem-codes) |
+| `schemas/step-labels.en.json` | the English label of each step action, shared with the AdminCP |
+| `schemas/fixtures/canonical/` | `<name>.json` with the exact bytes of its canonical form in `<name>.canonical` (no trailing newline) |
+| `schemas/fixtures/lint/` | `ok/*.json` that must pass, `bad/<code>[--<case>].json` that must fail with exactly that code, and the test-only key pair in `keys/` that signs them |
 | `scripts/manifests/sign.ts` | `npm run manifests:sign -- <file>`: signs with the key at `$TMC_EXEC_SIGNING_KEY` (an owner-held file, never in a repository or on a server) |
 | `scripts/manifests/canonical.ts` | the canonical form, shared by check and sign |
 
@@ -40,13 +43,25 @@ The installer therefore gets exactly one door, the `runInstaller` step. Three ru
 Signatures and idempotency keys are computed over the **canonical bytes**:
 
 - UTF-8 JSON;
-- object keys sorted by code point, at every depth;
+- object keys sorted by code point, at every depth. This is UTF-8 byte order and Rust's `str` order. It differs from JCS's UTF-16 order only for keys that mix astral characters with U+E000 to U+FFFF;
 - no insignificant whitespace;
-- numbers as integers (the schema has no floats);
-- strings escaped minimally (RFC 8785 JCS);
-- the `$schema` key removed.
+- numbers as integers (the schema has no floats). A fraction, or an integer that is not safe (beyond 2^53 - 1), is an error and is never rounded;
+- strings escaped minimally, as RFC 8785 JCS: `"`, `\` and the controls below U+0020 only, with `\b \t \n \f \r` by name and the rest as lowercase `\u00xx`. A lone surrogate is an error;
+- the top-level `$schema` key removed. A nested `$schema` is data and is kept.
 
-Repository files are pretty-printed (4-space indent, a trailing newline), and `manifests:check` fails if a file is not the pretty form of its own canonical form. Rust (`tmc_core::canon`, which already exists) and TypeScript (`scripts/manifests/canonical.ts`, `website-city/src/lib/game-catalog/canonical.ts`) must produce identical bytes. A shared fixture, `schemas/fixtures/canonical/*.json` with its `.canonical` file, is tested in all three.
+Repository files are pretty-printed: `$schema` first, then the sorted keys, with a 4-space indent and a trailing newline. `manifests:check` fails if a file is not the pretty form of its own canonical form. Rust (a JSON canonicaliser still to be written in A3; the existing `tmc_core::canon` canonicalises paths only) and TypeScript (`scripts/manifests/canonical.ts`, `website-city/src/lib/game-catalog/canonical.ts`) must produce identical bytes. A shared fixture, `schemas/fixtures/canonical/*.json` with its `.canonical` file, is tested in all three.
+
+**Signatures.** An exec manifest's `.sig` is pure Ed25519 over the canonical bytes (not over their sha256: Ed25519 hashes internally). It is a pretty-form JSON file:
+
+```json
+{
+    "alg": "ed25519",
+    "keyId": "tmc-exec-2026",
+    "signature": "<base64 of the 64-byte signature>"
+}
+```
+
+A signature by the test key `tmc-exec-test` also carries an `x-tmc-placeholder`, so `--release` refuses it.
 
 ## Placeholders
 
@@ -207,6 +222,29 @@ The repository is the source of truth for **templates** (`*.manifest.json`). The
 - Artifacts match on owner, key, platform and sha256.
 - Nothing is deleted.
 
+## Checks and problem codes
+
+`manifests:check` reports each problem with a stable code. The lint fixtures are named after the code, so the website's and Rust's linters can share them.
+
+| Code | Meaning |
+| --- | --- |
+| `json`, `canonical` | the file is not JSON, or has no canonical form (a float, an unsafe integer, a lone surrogate) |
+| `not-pretty` | the file is not the pretty form of its own canonical form |
+| `schema` | the JSON Schema fails |
+| `file-id-mismatch` | the file is not where its `id` (or the snapshot's `app`) says |
+| `placeholder-unknown` | a `{name}` outside the closed set |
+| `placeholder-position` | a known placeholder where it is not allowed (the "Allowed in" column above) |
+| `artifact-undeclared`, `runtime-undeclared` | `{artifact.<key>}`, `download.artifact` or `{runtime.<kind>}` without a matching declaration |
+| `host-not-allowed` | a URL, mirror or `urlTemplate` whose host is not in `downloadHosts`, or a templated host |
+| `exec-artifact-no-url-template` | an exec manifest artifact without a `urlTemplate` |
+| `loader-id-mismatch` | a loader manifest's `id` does not end with its `loader` |
+| `requires-unknown`, `requires-other-app` | `requires` names a manifest that does not exist, or one for another app |
+| `signature-missing`, `signature-malformed`, `signature-unknown-key`, `signature-invalid` | an exec manifest without a `.sig`; a `.sig` of the wrong shape; signed by a key not in `exec-keys.json`; a signature that does not match |
+| `signature-orphan` | a `.sig` with no manifest next to it. A `.sig` next to a non-exec manifest is `signature-invalid` |
+| `exec-keys`, `step-labels` | `exec-keys.json` is malformed; `step-labels.en.json` does not label exactly the schema's actions |
+| `fixture` | an ok fixture has problems, or a bad fixture's set of codes is not exactly its own |
+| `placeholder-marker`, `test-key` | `--release` only: an `x-tmc-placeholder`, or a use of `tmc-exec-test` |
+
 ## Seed manifests
 
 These are the real step logic for Minecraft in official-launcher mode. The bindings in the wire example of [loaders-and-versions.md](loaders-and-versions.md) show what the catalog supplies.
@@ -299,7 +337,7 @@ These are the real step logic for Minecraft in official-launcher mode. The bindi
         "installer": { "platform": "any", "urlTemplate": "https://maven.minecraftforge.net/net/minecraftforge/forge/{gameVersion}-{loaderVersion}/forge-{gameVersion}-{loaderVersion}-installer.jar", "description": "The Forge installer" }
     },
     "vars": { "launchVersionId": "{gameVersion}-forge-{loaderVersion}" },
-    "requirements": { "runtimes": [{ "kind": "java", "major": "{var.javaMajor}", "for": "install" }], "minGameVersionSortKey": "x-tmc-placeholder: legacy Forge before 1.13 uses another installer layout; the importer only creates builds for 1.13 and later" },
+    "requirements": { "minGameVersion": "1.13", "runtimes": [{ "kind": "java", "major": "{var.javaMajor}", "for": "install" }], "x-tmc-placeholder": "legacy Forge before 1.13 uses another installer layout; the importer only creates builds for 1.13 and later" },
     "steps": [
         { "action": "download", "artifact": "installer", "to": { "root": "downloads", "path": "forge-{gameVersion}-{loaderVersion}-installer.jar" } },
         { "action": "writeText", "path": { "root": "layer", "path": "files/launcher_profiles.json" }, "content": "{\"profiles\":{}}", "ifMissing": true, "when": { "side": "client" } },
@@ -311,7 +349,7 @@ These are the real step logic for Minecraft in official-launcher mode. The bindi
 }
 ```
 
-The `remove` step is there because the stub `launcher_profiles.json` exists only to satisfy the installer's check. The real profile is a deploy patch. The `minGameVersionSortKey` line above is a placeholder in prose: the schema field is `requirements.minGameVersion` (a version id resolved to a sort key by the catalog). The seed must set it to `1.13` once the importer's cut-off is confirmed.
+The `remove` step is there because the stub `launcher_profiles.json` exists only to satisfy the installer's check. The real profile is a deploy patch. `requirements.minGameVersion` is a version id, which the catalog resolves to a sort key. Its marker stays until the importer's 1.13 cut-off is confirmed.
 
 `manifests/minecraft/loaders/neoforge.manifest.json` is the Forge shape, with these differences:
 - `id` is `minecraft/loader/neoforge`, and `loader` is `neoforge`;
@@ -319,7 +357,8 @@ The `remove` step is there because the stub `launcher_profiles.json` exists only
 - `installer.urlTemplate` is `https://maven.neoforged.net/releases/net/neoforged/neoforge/{loaderVersion}/neoforge-{loaderVersion}-installer.jar`;
 - `launchVersionId` is `neoforge-{loaderVersion}`;
 - the `--installClient` and `--installServer` arguments are marked `"x-tmc-placeholder": "confirm the flag names with 'java -jar <installer> --help' for the 20.4, 21.1 and 21.4 lines"`;
-- builds are created only for `net/neoforged/neoforge`. The 1.20.1 artefacts live at `net/neoforged/forge` with another URL, which is a gap.
+- `requirements` has no `minGameVersion`, since the first NeoForge line is 20.2;
+- builds are created only for `net/neoforged/neoforge`. The 1.20.1 artefacts live at `net/neoforged/forge` with another URL, which is a gap, recorded as a root `x-tmc-placeholder`.
 
 The Java version comes from the game version's `javaMajor` var. The importer reads it from the Mojang version JSON's `javaVersion.majorVersion` and never guesses it. Forge and NeoForge installers run on that runtime. Fabric and Quilt need no runtime at install time.
 

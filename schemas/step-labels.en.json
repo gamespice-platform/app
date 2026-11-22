@@ -1,0 +1,14 @@
+{
+    "copy": "Copying files",
+    "download": "Downloading",
+    "downloadList": "Downloading libraries",
+    "extract": "Extracting",
+    "mergeJson": "Merging settings",
+    "mkdir": "Creating folders",
+    "move": "Moving files",
+    "patchJson": "Updating settings",
+    "remove": "Cleaning up",
+    "requireFile": "Checking files",
+    "runInstaller": "Running the installer",
+    "writeText": "Writing files"
+}

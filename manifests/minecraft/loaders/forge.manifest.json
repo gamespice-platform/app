@@ -1,0 +1,119 @@
+{
+    "$schema": "../../../schemas/loader-manifest.v1.schema.json",
+    "app": "minecraft",
+    "artifacts": {
+        "installer": {
+            "description": "The Forge installer",
+            "platform": "any",
+            "urlTemplate": "https://maven.minecraftforge.net/net/minecraftforge/forge/{gameVersion}-{loaderVersion}/forge-{gameVersion}-{loaderVersion}-installer.jar"
+        }
+    },
+    "downloadHosts": [
+        "maven.minecraftforge.net"
+    ],
+    "id": "minecraft/loader/forge",
+    "kind": "loader",
+    "launch": {
+        "vars": [
+            "launchVersionId"
+        ]
+    },
+    "loader": "forge",
+    "requirements": {
+        "minGameVersion": "1.13",
+        "runtimes": [
+            {
+                "for": "install",
+                "kind": "java",
+                "major": "{var.javaMajor}"
+            }
+        ],
+        "x-tmc-placeholder": "legacy Forge before 1.13 uses another installer layout; the importer only creates builds for 1.13 and later"
+    },
+    "requires": [
+        "minecraft/version"
+    ],
+    "revision": 1,
+    "schemaVersion": 1,
+    "steps": [
+        {
+            "action": "download",
+            "artifact": "installer",
+            "to": {
+                "path": "forge-{gameVersion}-{loaderVersion}-installer.jar",
+                "root": "downloads"
+            }
+        },
+        {
+            "action": "writeText",
+            "content": "{\"profiles\":{}}",
+            "ifMissing": true,
+            "path": {
+                "path": "files/launcher_profiles.json",
+                "root": "layer"
+            },
+            "when": {
+                "side": "client"
+            }
+        },
+        {
+            "action": "runInstaller",
+            "args": [
+                "-jar",
+                "{artifact.installer}",
+                "--installClient",
+                "{layerFiles}"
+            ],
+            "cwd": "{layerWork}",
+            "expectFiles": [
+                {
+                    "path": "files/versions/{launchVersionId}/{launchVersionId}.json",
+                    "root": "layer"
+                }
+            ],
+            "network": true,
+            "program": "{runtime.java}",
+            "timeoutSecs": 900,
+            "when": {
+                "side": "client"
+            }
+        },
+        {
+            "action": "remove",
+            "path": {
+                "path": "files/launcher_profiles.json",
+                "root": "layer"
+            },
+            "when": {
+                "side": "client"
+            }
+        },
+        {
+            "action": "runInstaller",
+            "args": [
+                "-jar",
+                "{artifact.installer}",
+                "--installServer",
+                "{layerFiles}"
+            ],
+            "cwd": "{layerWork}",
+            "expectFiles": [
+                {
+                    "path": "files/run.sh",
+                    "root": "layer"
+                }
+            ],
+            "network": true,
+            "program": "{runtime.java}",
+            "timeoutSecs": 1800,
+            "when": {
+                "side": "server"
+            },
+            "x-tmc-placeholder": "verify expectFiles across 1.17-1.21 server installs; older ones write a forge-*.jar instead of run.sh"
+        }
+    ],
+    "title": "Forge",
+    "vars": {
+        "launchVersionId": "{gameVersion}-forge-{loaderVersion}"
+    }
+}

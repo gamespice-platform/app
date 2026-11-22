@@ -1,0 +1,119 @@
+{
+    "$schema": "../../../schemas/loader-manifest.v1.schema.json",
+    "app": "minecraft",
+    "artifacts": {
+        "installer": {
+            "description": "The NeoForge installer",
+            "platform": "any",
+            "urlTemplate": "https://maven.neoforged.net/releases/net/neoforged/neoforge/{loaderVersion}/neoforge-{loaderVersion}-installer.jar"
+        }
+    },
+    "downloadHosts": [
+        "maven.neoforged.net"
+    ],
+    "id": "minecraft/loader/neoforge",
+    "kind": "loader",
+    "launch": {
+        "vars": [
+            "launchVersionId"
+        ]
+    },
+    "loader": "neoforge",
+    "requirements": {
+        "runtimes": [
+            {
+                "for": "install",
+                "kind": "java",
+                "major": "{var.javaMajor}"
+            }
+        ]
+    },
+    "requires": [
+        "minecraft/version"
+    ],
+    "revision": 1,
+    "schemaVersion": 1,
+    "steps": [
+        {
+            "action": "download",
+            "artifact": "installer",
+            "to": {
+                "path": "neoforge-{loaderVersion}-installer.jar",
+                "root": "downloads"
+            }
+        },
+        {
+            "action": "writeText",
+            "content": "{\"profiles\":{}}",
+            "ifMissing": true,
+            "path": {
+                "path": "files/launcher_profiles.json",
+                "root": "layer"
+            },
+            "when": {
+                "side": "client"
+            }
+        },
+        {
+            "action": "runInstaller",
+            "args": [
+                "-jar",
+                "{artifact.installer}",
+                "--installClient",
+                "{layerFiles}"
+            ],
+            "cwd": "{layerWork}",
+            "expectFiles": [
+                {
+                    "path": "files/versions/{launchVersionId}/{launchVersionId}.json",
+                    "root": "layer"
+                }
+            ],
+            "network": true,
+            "program": "{runtime.java}",
+            "timeoutSecs": 900,
+            "when": {
+                "side": "client"
+            },
+            "x-tmc-placeholder": "confirm the flag names with 'java -jar <installer> --help' for the 20.4, 21.1 and 21.4 lines"
+        },
+        {
+            "action": "remove",
+            "path": {
+                "path": "files/launcher_profiles.json",
+                "root": "layer"
+            },
+            "when": {
+                "side": "client"
+            }
+        },
+        {
+            "action": "runInstaller",
+            "args": [
+                "-jar",
+                "{artifact.installer}",
+                "--installServer",
+                "{layerFiles}"
+            ],
+            "cwd": "{layerWork}",
+            "expectFiles": [
+                {
+                    "path": "files/run.sh",
+                    "root": "layer"
+                }
+            ],
+            "network": true,
+            "program": "{runtime.java}",
+            "timeoutSecs": 1800,
+            "when": {
+                "side": "server"
+            },
+            "x-tmc-placeholder": "confirm the flag names with 'java -jar <installer> --help' for the 20.4, 21.1 and 21.4 lines"
+        }
+    ],
+    "title": "NeoForge",
+    "vars": {
+        "launchVersionId": "neoforge-{loaderVersion}"
+    },
+    "x-tmc-placeholder": "builds are created only for net/neoforged/neoforge; the 1.20.1 artefacts live at net/neoforged/forge under another URL, which this template does not cover"
+}

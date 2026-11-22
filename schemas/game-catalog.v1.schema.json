@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tmc.app/schemas/game-catalog.v1.schema.json",
+  "title": "TMC game catalog snapshot v1 (manifests/<appSlug>/catalog.snapshot.json)",
+  "description": "The wire catalog response (docs/loaders-and-versions.md, 'Wire examples'), plus the loader version lists and the builds with their bindings, for the exported window. Written by catalog.exportSnapshot; read by core/build.rs as the offline fallback.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "app", "loaders", "versions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "generatedAt": { "type": ["string", "null"], "description": "RFC 3339 UTC" },
+    "app": {
+      "type": "object", "additionalProperties": false, "required": ["slug"],
+      "properties": { "id": { "type": "integer", "minimum": 1 }, "slug": { "$ref": "#/$defs/slug" } }
+    },
+    "loaders": { "type": "array", "items": { "$ref": "#/$defs/loader" } },
+    "versions": {
+      "type": "object", "additionalProperties": false, "required": ["items", "nextCursor"],
+      "properties": { "items": { "type": "array", "items": { "$ref": "#/$defs/version" } }, "nextCursor": { "type": ["string", "null"] } }
+    },
+    "loaderVersions": {
+      "description": "Loader key to its versions, newest first.",
+      "type": "object", "propertyNames": { "$ref": "#/$defs/key" },
+      "additionalProperties": { "type": "array", "items": { "$ref": "#/$defs/loaderVersion" } }
+    },
+    "versionBindings": {
+      "description": "Game version id to the bindings of its version layer.",
+      "type": "object", "additionalProperties": { "$ref": "#/$defs/bindings" }
+    },
+    "builds": { "type": "array", "items": { "$ref": "#/$defs/build" } }
+  },
+  "$defs": {
+    "slug": { "type": "string", "pattern": "^[a-z0-9-]{1,48}$" },
+    "key": { "type": "string", "pattern": "^[a-z0-9-]{1,32}$" },
+    "channel": { "enum": ["STABLE", "PREVIEW", "EXPERIMENTAL", "LEGACY"] },
+    "sortKey": { "type": "integer" },
+    "deprecated": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object", "additionalProperties": false, "required": ["at", "note", "withdrawn"],
+          "properties": { "at": { "type": "string" }, "note": { "type": ["string", "null"] }, "withdrawn": { "type": "boolean" } }
+        }
+      ]
+    },
+    "loader": {
+      "type": "object", "additionalProperties": false,
+      "required": ["key", "name", "description", "sides", "onlineNote", "position", "customVersions", "managed"],
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": ["string", "null"] },
+        "sides": { "enum": ["CLIENT", "SERVER", "BOTH"] },
+        "onlineNote": { "type": ["string", "null"] },
+        "position": { "type": "integer", "minimum": 0 },
+        "customVersions": { "type": "boolean" },
+        "managed": { "type": "boolean" }
+      }
+    },
+    "version": {
+      "type": "object", "additionalProperties": false,
+      "required": ["versionId", "label", "channel", "channelLabel", "sortKey", "releasedAt", "deprecated", "managed"],
+      "properties": {
+        "versionId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "label": { "type": ["string", "null"] },
+        "channel": { "$ref": "#/$defs/channel" },
+        "channelLabel": { "type": ["string", "null"] },
+        "sortKey": { "$ref": "#/$defs/sortKey" },
+        "releasedAt": { "type": ["string", "null"] },
+        "deprecated": { "$ref": "#/$defs/deprecated" },
+        "managed": { "type": "boolean" }
+      }
+    },
+    "loaderVersion": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "channel", "sortKey", "recommended", "custom", "deprecated"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "channel": { "$ref": "#/$defs/channel" },
+        "sortKey": { "$ref": "#/$defs/sortKey" },
+        "recommended": { "type": "boolean" },
+        "custom": { "type": "boolean" },
+        "deprecated": { "$ref": "#/$defs/deprecated" }
+      }
+    },
+    "artifactBinding": {
+      "type": "object", "additionalProperties": false, "required": ["url", "mirrors", "sha256", "size"],
+      "properties": {
+        "url": { "type": "string", "pattern": "^https://" },
+        "mirrors": { "type": "array", "items": { "type": "string", "pattern": "^https://" } },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "bindings": {
+      "type": "object", "additionalProperties": false, "required": ["vars", "artifacts"],
+      "properties": {
+        "vars": { "type": "object", "additionalProperties": { "type": "string" } },
+        "artifacts": { "type": "object", "additionalProperties": { "$ref": "#/$defs/artifactBinding" } }
+      }
+    },
+    "build": {
+      "type": "object", "additionalProperties": false,
+      "required": ["loader", "loaderVersion", "gameVersion", "manifestKey", "revision", "bindings"],
+      "properties": {
+        "loader": { "$ref": "#/$defs/key" },
+        "loaderVersion": { "type": "string", "minLength": 1 },
+        "gameVersion": { "type": "string", "minLength": 1 },
+        "manifestKey": { "type": "string" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "bindings": { "$ref": "#/$defs/bindings" }
+      }
+    }
+  }
+}

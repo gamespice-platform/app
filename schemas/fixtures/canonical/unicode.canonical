@@ -1,0 +1,1 @@
+{"z":"日本語","é":"é stays literal","｡":"halfwidth","😀":"astral, sorts after U+FF61 by code point"}

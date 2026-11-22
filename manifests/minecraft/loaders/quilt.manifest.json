@@ -1,0 +1,46 @@
+{
+    "$schema": "../../../schemas/loader-manifest.v1.schema.json",
+    "app": "minecraft",
+    "artifacts": {
+        "profileJson": {
+            "description": "Launcher profile JSON, mirrored by the importer",
+            "platform": "any",
+            "sides": [
+                "client"
+            ],
+            "sourceTemplate": "https://meta.quiltmc.org/v3/versions/loader/{gameVersion}/{loaderVersion}/profile/json"
+        }
+    },
+    "downloadHosts": [],
+    "id": "minecraft/loader/quilt",
+    "kind": "loader",
+    "launch": {
+        "vars": [
+            "launchVersionId"
+        ]
+    },
+    "loader": "quilt",
+    "requires": [
+        "minecraft/version"
+    ],
+    "revision": 1,
+    "schemaVersion": 1,
+    "steps": [
+        {
+            "action": "download",
+            "artifact": "profileJson",
+            "to": {
+                "path": "files/versions/{launchVersionId}/{launchVersionId}.json",
+                "root": "layer"
+            },
+            "when": {
+                "side": "client"
+            }
+        }
+    ],
+    "title": "Quilt",
+    "vars": {
+        "launchVersionId": "quilt-loader-{loaderVersion}-{gameVersion}"
+    },
+    "x-tmc-placeholder": "Quilt servers are installed by quilt-installer 'install server'; needs an exec step and a signed template"
+}

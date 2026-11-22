@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tmc.app/schemas/loader-manifest.v1.schema.json",
+  "title": "TMC install manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "revision", "kind", "app", "title", "steps"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9-]{1,48}/(version|loader/[a-z0-9-]{1,32})$" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "kind": { "enum": ["version", "loader"] },
+    "app": { "$ref": "#/$defs/slug" },
+    "loader": { "$ref": "#/$defs/key" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description": { "type": "string", "maxLength": 2000 },
+    "requires": { "type": "array", "items": { "type": "string" }, "maxItems": 8, "uniqueItems": true },
+    "downloadHosts": { "type": "array", "items": { "$ref": "#/$defs/host" }, "maxItems": 32, "uniqueItems": true },
+    "artifacts": { "type": "object", "propertyNames": { "$ref": "#/$defs/ident" }, "additionalProperties": { "$ref": "#/$defs/artifactDecl" }, "maxProperties": 32 },
+    "vars": { "type": "object", "propertyNames": { "$ref": "#/$defs/ident" }, "additionalProperties": { "type": "string", "maxLength": 256 }, "maxProperties": 32 },
+    "requirements": { "$ref": "#/$defs/requirements" },
+    "consents": { "type": "array", "items": { "$ref": "#/$defs/consent" }, "maxItems": 8 },
+    "steps": { "type": "array", "items": { "$ref": "#/$defs/step" }, "maxItems": 256 },
+    "deployPatches": { "type": "array", "items": { "$ref": "#/$defs/deployPatch" }, "maxItems": 32 },
+    "launch": { "type": "object", "additionalProperties": false, "properties": { "vars": { "type": "array", "items": { "$ref": "#/$defs/ident" }, "maxItems": 16, "uniqueItems": true } } },
+    "x-tmc-placeholder": { "type": "string" }
+  },
+  "allOf": [
+    { "if": { "properties": { "kind": { "const": "loader" } } }, "then": { "required": ["loader"] } },
+    { "if": { "properties": { "kind": { "const": "version" } } }, "then": { "not": { "required": ["loader"] } } }
+  ],
+  "$defs": {
+    "slug": { "type": "string", "pattern": "^[a-z0-9-]{1,48}$" },
+    "key": { "type": "string", "pattern": "^[a-z0-9-]{1,32}$" },
+    "ident": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{0,31}$" },
+    "host": { "type": "string", "pattern": "^(\\*\\.)?[a-z0-9-]+(\\.[a-z0-9-]+)+$" },
+    "platform": { "enum": ["any", "windows-x64", "windows-arm64", "linux-x64", "linux-arm64", "macos-x64", "macos-arm64"] },
+    "side": { "enum": ["client", "server"] },
+    "relPath": { "type": "string", "minLength": 1, "maxLength": 512, "not": { "pattern": "(^/|^[A-Za-z]:|\\\\|(^|/)\\.\\.(/|$))" } },
+    "httpsUrl": { "type": "string", "pattern": "^https://", "maxLength": 2048 },
+    "pathRef": {
+      "type": "object", "additionalProperties": false, "required": ["root", "path"],
+      "properties": { "root": { "enum": ["layer", "downloads", "runtime"] }, "path": { "$ref": "#/$defs/relPath" } }
+    },
+    "when": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "side": { "$ref": "#/$defs/side" },
+        "platforms": { "type": "array", "items": { "$ref": "#/$defs/platform" }, "minItems": 1, "uniqueItems": true },
+        "consent": { "$ref": "#/$defs/ident" }
+      }
+    },
+    "artifactDecl": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "platform": { "$ref": "#/$defs/platform" },
+        "sides": { "type": "array", "items": { "$ref": "#/$defs/side" }, "minItems": 1, "uniqueItems": true },
+        "urlTemplate": { "$ref": "#/$defs/httpsUrl" },
+        "sourceTemplate": { "$ref": "#/$defs/httpsUrl" },
+        "redistributable": { "type": "boolean" },
+        "linkHashPolicy": { "enum": ["pinned", "fetch"] },
+        "description": { "type": "string", "maxLength": 200 },
+        "x-tmc-placeholder": { "type": "string" }
+      }
+    },
+    "requirements": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "runtimes": { "type": "array", "maxItems": 4, "items": {
+          "type": "object", "additionalProperties": false, "required": ["kind", "major", "for"],
+          "properties": { "kind": { "$ref": "#/$defs/key" }, "major": { "type": "string", "maxLength": 32 }, "for": { "enum": ["install", "launch", "both"] } } } },
+        "minGameVersion": { "type": "string", "maxLength": 64 },
+        "maxGameVersion": { "type": "string", "maxLength": 64 },
+        "platforms": { "type": "array", "items": { "$ref": "#/$defs/platform" }, "uniqueItems": true },
+        "x-tmc-placeholder": { "type": "string" }
+      }
+    },
+    "consent": {
+      "type": "object", "additionalProperties": false, "required": ["id", "text"],
+      "properties": { "id": { "$ref": "#/$defs/ident" }, "text": { "type": "string", "maxLength": 500 }, "url": { "$ref": "#/$defs/httpsUrl" }, "sides": { "type": "array", "items": { "$ref": "#/$defs/side" }, "uniqueItems": true } }
+    },
+    "deployPatch": {
+      "type": "object", "additionalProperties": false, "required": ["path", "pointer", "value"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relPath" },
+        "ensure": { "type": "object" },
+        "pointer": { "type": "string", "pattern": "^(/[^/]+)+$", "maxLength": 256 },
+        "value": {},
+        "when": { "$ref": "#/$defs/when" }
+      }
+    },
+    "stepCommon": {
+      "properties": { "when": { "$ref": "#/$defs/when" }, "label": { "type": "string", "maxLength": 120 }, "x-tmc-placeholder": { "type": "string" } }
+    },
+    "step": {
+      "type": "object", "required": ["action"],
+      "oneOf": [
+        { "$ref": "#/$defs/stepDownload" }, { "$ref": "#/$defs/stepExtract" }, { "$ref": "#/$defs/stepCopy" },
+        { "$ref": "#/$defs/stepMove" }, { "$ref": "#/$defs/stepMkdir" }, { "$ref": "#/$defs/stepRemove" },
+        { "$ref": "#/$defs/stepWriteText" }, { "$ref": "#/$defs/stepPatchJson" }, { "$ref": "#/$defs/stepMergeJson" },
+        { "$ref": "#/$defs/stepDownloadList" }, { "$ref": "#/$defs/stepRequireFile" }, { "$ref": "#/$defs/stepRunInstaller" }
+      ]
+    },
+    "stepDownload": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "to"],
+      "properties": {
+        "action": { "const": "download" },
+        "artifact": { "$ref": "#/$defs/ident" },
+        "url": { "$ref": "#/$defs/httpsUrl" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "maxBytes": { "type": "integer", "minimum": 0 },
+        "mirrors": { "type": "array", "items": { "$ref": "#/$defs/httpsUrl" }, "maxItems": 8 },
+        "to": { "$ref": "#/$defs/pathRef" }
+      },
+      "oneOf": [ { "required": ["artifact"], "not": { "required": ["url"] } }, { "required": ["url", "sha256"], "not": { "required": ["artifact"] } } ]
+    },
+    "stepExtract": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "from", "to"],
+      "properties": { "action": { "const": "extract" }, "from": { "$ref": "#/$defs/pathRef" }, "to": { "$ref": "#/$defs/pathRef" }, "strip": { "type": "integer", "minimum": 0, "maximum": 8 }, "stripSingleRoot": { "type": "boolean" }, "include": { "type": "array", "items": { "type": "string", "maxLength": 256 }, "maxItems": 64 } }
+    },
+    "stepCopy": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "from", "to"],
+      "properties": { "action": { "const": "copy" }, "from": { "$ref": "#/$defs/pathRef" }, "to": { "$ref": "#/$defs/pathRef" } }
+    },
+    "stepMove": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "from", "to"],
+      "properties": { "action": { "const": "move" }, "from": { "$ref": "#/$defs/pathRef" }, "to": { "$ref": "#/$defs/pathRef" } }
+    },
+    "stepMkdir": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "path"],
+      "properties": { "action": { "const": "mkdir" }, "path": { "$ref": "#/$defs/pathRef" } }
+    },
+    "stepRemove": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "path"],
+      "properties": { "action": { "const": "remove" }, "path": { "$ref": "#/$defs/pathRef" } }
+    },
+    "stepWriteText": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "path", "content"],
+      "properties": { "action": { "const": "writeText" }, "path": { "$ref": "#/$defs/pathRef" }, "content": { "type": "string", "maxLength": 65536 }, "ifMissing": { "type": "boolean" } }
+    },
+    "stepPatchJson": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "path", "pointer", "value"],
+      "properties": { "action": { "const": "patchJson" }, "path": { "$ref": "#/$defs/pathRef" }, "pointer": { "type": "string", "maxLength": 256 }, "value": {} }
+    },
+    "stepMergeJson": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "base", "overlay", "to"],
+      "properties": {
+        "action": { "const": "mergeJson" }, "base": { "$ref": "#/$defs/pathRef" }, "overlay": { "$ref": "#/$defs/pathRef" }, "to": { "$ref": "#/$defs/pathRef" },
+        "rules": { "type": "array", "maxItems": 32, "items": { "type": "object", "additionalProperties": false, "required": ["pointer", "mode"], "properties": { "pointer": { "type": "string", "maxLength": 256 }, "mode": { "enum": ["replace", "append", "prepend", "union"] } } } }
+      }
+    },
+    "stepDownloadList": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "list", "pointer", "urlField", "pathField", "to"],
+      "properties": {
+        "action": { "const": "downloadList" }, "list": { "$ref": "#/$defs/pathRef" }, "pointer": { "type": "string", "maxLength": 256 },
+        "urlField": { "type": "string", "maxLength": 128 }, "pathField": { "type": "string", "maxLength": 128 },
+        "sha1Field": { "type": "string", "maxLength": 128 }, "sha256Field": { "type": "string", "maxLength": 128 }, "sizeField": { "type": "string", "maxLength": 128 },
+        "to": { "$ref": "#/$defs/pathRef" }, "max": { "type": "integer", "minimum": 0 }
+      },
+      "anyOf": [ { "required": ["sha1Field"] }, { "required": ["sha256Field"] } ]
+    },
+    "stepRequireFile": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "path"],
+      "properties": { "action": { "const": "requireFile" }, "path": { "$ref": "#/$defs/pathRef" }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
+    },
+    "stepRunInstaller": {
+      "type": "object", "unevaluatedProperties": false, "$ref": "#/$defs/stepCommon", "required": ["action", "program", "args", "cwd"],
+      "properties": {
+        "action": { "const": "runInstaller" },
+        "program": { "type": "string", "pattern": "^\\{(runtime|artifact)\\.[A-Za-z][A-Za-z0-9]{0,31}\\}$" },
+        "args": { "type": "array", "items": { "type": "string", "maxLength": 512 }, "maxItems": 32 },
+        "cwd": { "const": "{layerWork}" },
+        "timeoutSecs": { "type": "integer", "minimum": 0 },
+        "network": { "type": "boolean" },
+        "expectFiles": { "type": "array", "items": { "$ref": "#/$defs/pathRef" }, "maxItems": 16 }
+      }
+    }
+  }
+}

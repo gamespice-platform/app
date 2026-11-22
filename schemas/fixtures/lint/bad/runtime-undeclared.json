@@ -1,0 +1,55 @@
+{
+    "$schema": "../../../loader-manifest.v1.schema.json",
+    "app": "demo",
+    "artifacts": {
+        "installer": {
+            "platform": "any",
+            "urlTemplate": "https://maven.example.com/exec/{loaderVersion}/installer.jar"
+        }
+    },
+    "downloadHosts": [
+        "maven.example.com"
+    ],
+    "id": "demo/loader/exec",
+    "kind": "loader",
+    "loader": "exec",
+    "requirements": {
+        "runtimes": [
+            {
+                "for": "install",
+                "kind": "java",
+                "major": "{var.javaMajor}"
+            }
+        ]
+    },
+    "requires": [
+        "demo/version"
+    ],
+    "revision": 1,
+    "schemaVersion": 1,
+    "steps": [
+        {
+            "action": "download",
+            "artifact": "installer",
+            "to": {
+                "path": "installer-{loaderVersion}.jar",
+                "root": "downloads"
+            }
+        },
+        {
+            "action": "runInstaller",
+            "args": [
+                "-jar",
+                "{artifact.installer}",
+                "--install",
+                "{layerFiles}",
+                "--side={side}"
+            ],
+            "cwd": "{layerWork}",
+            "network": false,
+            "program": "{runtime.python}",
+            "timeoutSecs": 600
+        }
+    ],
+    "title": "Exec loader"
+}

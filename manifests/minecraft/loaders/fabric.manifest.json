@@ -1,0 +1,66 @@
+{
+    "$schema": "../../../schemas/loader-manifest.v1.schema.json",
+    "app": "minecraft",
+    "artifacts": {
+        "profileJson": {
+            "description": "Launcher profile JSON, mirrored by the importer",
+            "platform": "any",
+            "sides": [
+                "client"
+            ],
+            "sourceTemplate": "https://meta.fabricmc.net/v2/versions/loader/{gameVersion}/{loaderVersion}/profile/json"
+        },
+        "serverLauncher": {
+            "description": "Fabric server launcher jar, mirrored by the importer",
+            "platform": "any",
+            "sides": [
+                "server"
+            ],
+            "sourceTemplate": "https://meta.fabricmc.net/v2/versions/loader/{gameVersion}/{loaderVersion}/{var.installerVersion}/server/jar"
+        }
+    },
+    "downloadHosts": [],
+    "id": "minecraft/loader/fabric",
+    "kind": "loader",
+    "launch": {
+        "vars": [
+            "launchVersionId",
+            "serverJar"
+        ]
+    },
+    "loader": "fabric",
+    "requires": [
+        "minecraft/version"
+    ],
+    "revision": 1,
+    "schemaVersion": 1,
+    "steps": [
+        {
+            "action": "download",
+            "artifact": "profileJson",
+            "to": {
+                "path": "files/versions/{launchVersionId}/{launchVersionId}.json",
+                "root": "layer"
+            },
+            "when": {
+                "side": "client"
+            }
+        },
+        {
+            "action": "download",
+            "artifact": "serverLauncher",
+            "to": {
+                "path": "files/fabric-server-launch.jar",
+                "root": "layer"
+            },
+            "when": {
+                "side": "server"
+            }
+        }
+    ],
+    "title": "Fabric",
+    "vars": {
+        "launchVersionId": "fabric-loader-{loaderVersion}-{gameVersion}",
+        "serverJar": "fabric-server-launch.jar"
+    }
+}

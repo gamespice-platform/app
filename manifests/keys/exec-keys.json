@@ -1,0 +1,7 @@
+[
+    {
+        "ed25519": "g9ym0mZBAZtc4rdnplflujITLTdvRBrN4JQ9JWnfgUs=",
+        "keyId": "tmc-exec-test",
+        "x-tmc-placeholder": "test key only (private half kept outside the repo); the owner adds the real exec key and removes this one before release"
+    }
+]
