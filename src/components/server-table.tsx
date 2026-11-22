@@ -145,6 +145,13 @@ function SortableTh({
     )
 }
 
+/** Copy one scroller's horizontal position onto the other (equal values don't re-fire, so no echo loop). */
+function syncBar(from: HTMLElement | null, to: HTMLElement | null) {
+    if (from && to && to.scrollLeft !== from.scrollLeft) {
+        to.scrollLeft = from.scrollLeft
+    }
+}
+
 export default function ServerTable({
     items,
     sort,
@@ -170,6 +177,31 @@ export default function ServerTable({
     const [expanded, setExpanded] = useState<ReadonlySet<string>>(
         () => new Set<string>()
     )
+
+    const scroller = useRef<HTMLDivElement>(null)
+    const bar = useRef<HTMLDivElement>(null)
+    const tableEl = useRef<HTMLTableElement>(null)
+    const [scrollWidth, setScrollWidth] = useState(0)
+    const [overflowing, setOverflowing] = useState(false)
+
+    useEffect(() => {
+        const box = scroller.current
+        const table = tableEl.current
+
+        if (!box || !table) return
+
+        const measure = () => {
+            setScrollWidth(box.scrollWidth)
+            setOverflowing(box.scrollWidth > box.clientWidth + 1)
+        }
+        const observer = new ResizeObserver(measure)
+
+        observer.observe(box)
+        observer.observe(table)
+        measure()
+
+        return () => observer.disconnect()
+    }, [])
 
     const toggle = (id: string) =>
         setExpanded((open) => {
@@ -238,16 +270,24 @@ export default function ServerTable({
          * pinned to the page scroller, because a horizontal scroll container
          * is also a vertical one.
          */
-        <div className="overflow-x-auto rounded-xl border border-border">
-            <table className="w-full min-w-[56rem] border-collapse text-sm">
-                <thead className="sticky top-0 z-10">
-                    <tr className="border-b border-border bg-surface-secondary text-left text-xs uppercase tracking-wide text-muted">
-                        <th className="w-6 py-2 pl-2" />
-                        <th className="w-8 px-0 py-2">
-                            <span className="sr-only">Favourite</span>
-                        </th>
+        <div className="rounded-xl border border-border">
+            <div
+                ref={scroller}
+                onScroll={() => syncBar(scroller.current, bar.current)}
+                className="overflow-x-auto rounded-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+                <table
+                    ref={tableEl}
+                    className="w-full min-w-[56rem] border-collapse text-sm"
+                >
+                    <thead className="sticky top-0 z-10">
+                        <tr className="border-b border-border bg-surface-secondary text-left text-xs uppercase tracking-wide text-muted">
+                            <th className="w-6 py-2 pl-2" />
+                            <th className="w-8 px-0 py-2">
+                                <span className="sr-only">Favourite</span>
+                            </th>
 
-                        {/*
+                            {/*
                             Ping leads, exactly as it does on the website.
 
                             It is the column this app exists to provide and the
@@ -256,73 +296,88 @@ export default function ServerTable({
                             what happened when it sat on the right of eight
                             columns in a pane narrower than the table.
                         */}
-                        <th
-                            scope="col"
-                            className="px-2 py-2 pr-5 text-right font-medium"
-                        >
-                            Ping
-                        </th>
+                            <th
+                                scope="col"
+                                className="px-2 py-2 pr-5 text-right font-medium"
+                            >
+                                Ping
+                            </th>
 
-                        {/* Name takes the slack (`w-full`) so every numeric
+                            {/* Name takes the slack (`w-full`) so every numeric
                             column stays exactly as wide as its content — the
                             same trick the website's table uses. */}
-                        <SortableTh
-                            {...sortable}
-                            label="Server"
-                            sortKey="name"
-                            naturalDir="asc"
-                            className="w-full min-w-40"
-                        />
-                        <th className={`${MEDIUM_ONLY} px-2 py-2 font-medium`}>
-                            Country
-                        </th>
-                        {/* `players`, not `curUsers`: same ordering, but it
+                            <SortableTh
+                                {...sortable}
+                                label="Server"
+                                sortKey="name"
+                                naturalDir="asc"
+                                className="w-full min-w-40"
+                            />
+                            <th className={`${MEDIUM_ONLY} px-2 py-2 font-medium`}>
+                                Country
+                            </th>
+                            {/* `players`, not `curUsers`: same ordering, but it
                             is the value the default sends and the one every
                             deployed server understands. Sending the newer
                             spelling here would leave the header inactive on the
                             default view and 400 against an older server. */}
-                        <SortableTh
-                            {...sortable}
-                            label="Players"
-                            sortKey="players"
-                            align="right"
-                        />
-                        <SortableTh
-                            {...sortable}
-                            label="Avg"
-                            sortKey="avgUsers"
-                            align="right"
-                            className={MEDIUM_ONLY}
-                        />
-                        <SortableTh
-                            {...sortable}
-                            label="Map"
-                            sortKey="map"
-                            naturalDir="asc"
-                            className={`${MEDIUM_ONLY} min-w-28`}
-                        />
-                        <th
-                            className={`${WIDE_ONLY} min-w-36 px-2 py-2 font-medium`}
-                        >
-                            Host
-                        </th>
-                        <th className="w-px px-2 py-2 pr-3" />
-                    </tr>
-                </thead>
+                            <SortableTh
+                                {...sortable}
+                                label="Players"
+                                sortKey="players"
+                                align="right"
+                            />
+                            <SortableTh
+                                {...sortable}
+                                label="Avg"
+                                sortKey="avgUsers"
+                                align="right"
+                                className={MEDIUM_ONLY}
+                            />
+                            <SortableTh
+                                {...sortable}
+                                label="Map"
+                                sortKey="map"
+                                naturalDir="asc"
+                                className={`${MEDIUM_ONLY} min-w-28`}
+                            />
+                            <th
+                                className={`${WIDE_ONLY} min-w-36 px-2 py-2 font-medium`}
+                            >
+                                Host
+                            </th>
+                            <th className="w-px px-2 py-2 pr-3" />
+                        </tr>
+                    </thead>
 
-                <tbody>
-                    {items.map((item) => (
-                        <ServerRow
-                            key={`${item.kind}-${item.id}`}
-                            item={item}
-                            expanded={expanded.has(item.id)}
-                            onToggle={() => toggle(item.id)}
-                            onJoin={join}
-                            joinable={canJoin(item)}
-                        />
-                    ))}
-                </tbody>
-            </table>
+                    <tbody>
+                        {items.map((item) => (
+                            <ServerRow
+                                key={`${item.kind}-${item.id}`}
+                                item={item}
+                                expanded={expanded.has(item.id)}
+                                onToggle={() => toggle(item.id)}
+                                onJoin={join}
+                                joinable={canJoin(item)}
+                            />
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {/*
+             * The table's own horizontal scrollbar sits under its last row,
+             * which is far below the fold in a long list, so nobody could
+             * find it. This one is pinned to the bottom of the pane and
+             * mirrors the table's scroll position.
+             */}
+            <div
+                ref={bar}
+                hidden={!overflowing}
+                onScroll={() => syncBar(bar.current, scroller.current)}
+                className="sticky bottom-0 z-20 overflow-x-auto overflow-y-hidden rounded-b-xl bg-background/90"
+            >
+                <div style={{ width: scrollWidth, height: 1 }} />
+            </div>
             {playTarget && (
                 <PlayDialog
                     target={playTarget}
