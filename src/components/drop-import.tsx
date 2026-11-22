@@ -5,6 +5,7 @@ import { FiDownload } from 'react-icons/fi'
 import { ipc } from '~/lib/ipc/commands'
 import { subscribe } from '~/lib/ipc'
 import ImportDialog, { type ImportTarget } from '~/components/import-dialog'
+import { archiveList } from '~/lib/import-formats'
 import { DropBatchSchema, type SandboxRowT } from '~/lib/ipc/schemas'
 
 /**
@@ -136,7 +137,8 @@ export default function DropImport() {
                         <p className="text-sm font-semibold">Drop to import</p>
 
                         <p className="max-w-xs text-[11px] text-muted">
-                            Archives, mod files and folders. They are copied into
+                            Archives ({archiveList()}), modpacks (.mrpack), mod
+                            files and folders. They are copied into
                             the app — nothing is moved and nothing goes into a game
                             folder until you deploy.
                         </p>

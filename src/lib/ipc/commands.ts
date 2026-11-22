@@ -33,6 +33,7 @@ import {
     DropBatchSchema,
     ImportPreviewSchema,
     ImportOutcomeSchema,
+    PackFinalizedSchema,
     AdoptCandidateSchema,
     ManagerInfoSchema,
     ManagerCandidateSchema,
@@ -1000,6 +1001,22 @@ export const ipc = {
      * deployed would list one mod twice and make every one of its files
      * conflict with itself.
      */
+    /**
+     * Queue the downloads an imported modpack listed. Takes the local mod id
+     * and nothing else: Rust validated the URLs and hashes at import time.
+     * Returns how many were queued; asking twice is harmless (stable ids).
+     */
+    localPackDownload: (id: number) =>
+        call('local_pack_download', z.number(), { id }),
+
+    /** Verify what the pack's downloads fetched and move it into the mod. */
+    localPackFinalize: (id: number) =>
+        call('local_pack_finalize', PackFinalizedSchema, { id }),
+
+    // HOOK(export-sandbox): the sandbox-to-pack export command lands here as
+    // `sandboxExport`, and its button goes beside the pack panel's actions in
+    // `components/pack-panel.tsx` (see `ExportSandboxSlot`). Not wired yet.
+
     importUnmanaged: (sandboxId: number) =>
         call('import_unmanaged', z.array(AdoptCandidateSchema), { sandboxId }),
 

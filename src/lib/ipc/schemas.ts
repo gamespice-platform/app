@@ -1322,11 +1322,52 @@ export const ImportPreviewSchema = z.object({
 
 export type ImportPreviewT = z.infer<typeof ImportPreviewSchema>
 
+/**
+ * A modpack an import recognised by its manifest (`.mrpack`, or a zip with a
+ * CurseForge `manifest.json`). Its overrides are already imported; `files`
+ * downloads are still to be queued, and `unresolved` CurseForge `project/file`
+ * ids cannot be fetched by this app at all.
+ */
+export const PackKindSchema = z.enum(['mrpack', 'curseforge'])
+
+export type PackKindT = z.infer<typeof PackKindSchema>
+
+export const PackInfoSchema = z.object({
+    /** The local mod the pack was imported as; what the two pack commands take. */
+    modId: z.number(),
+    kind: PackKindSchema,
+    name: z.string(),
+    version: z.string().nullish(),
+    gameVersion: z.string().nullish(),
+    loader: z.string().nullish(),
+    /** Listed downloads waiting to be queued. */
+    files: z.number(),
+    /** Entries the pack marks client-unsupported, left out. */
+    skippedServerOnly: z.number(),
+    /** CurseForge `projectID/fileID` pairs the app cannot resolve to a URL. */
+    unresolved: z.array(z.string()),
+})
+
+export type PackInfoT = z.infer<typeof PackInfoSchema>
+
+/** What `local_pack_finalize` did. Safe to ask again after more downloads end. */
+export const PackFinalizedSchema = z.object({
+    placed: z.number(),
+    /** Not downloaded yet. */
+    pending: z.number(),
+    /** Downloaded but failed the hash check, by path; the staged copy is gone. */
+    failed: z.array(z.string()),
+})
+
+export type PackFinalizedT = z.infer<typeof PackFinalizedSchema>
+
 export const ImportOutcomeSchema = z.object({
     imported: z.array(LocalModSchema),
     /** One line per thing that did not import, naming it. */
     failed: z.array(z.string()),
     sandboxId: z.number().nullable(),
+    /** Modpacks among `imported`. Absent from an older Rust side. */
+    packs: z.array(PackInfoSchema).default([]),
 })
 
 export type ImportOutcomeT = z.infer<typeof ImportOutcomeSchema>

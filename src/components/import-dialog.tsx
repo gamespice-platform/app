@@ -11,7 +11,9 @@ import {
 
 import { ipc } from '~/lib/ipc/commands'
 import { messageOf } from '~/lib/ipc'
+import PackPanel from '~/components/pack-panel'
 import Select from '~/components/select'
+import { archiveList } from '~/lib/import-formats'
 import {
     type ImportOutcomeT,
     type ImportPayloadT,
@@ -77,7 +79,7 @@ const PAYLOADS: { value: ImportPayloadT; label: string; hint: string }[] = [
     {
         value: 'unpack',
         label: 'Unpack it',
-        hint: 'For an archive holding the loose files a mod is made of.',
+        hint: `For an archive (${archiveList()}) holding the loose files a mod is made of.`,
     },
     {
         value: 'folder',
@@ -422,6 +424,10 @@ function RowEditor({
 function Outcome({ report }: { report: ImportOutcomeT }) {
     return (
         <div className="flex flex-col gap-2">
+            {report.packs.map((pack) => (
+                <PackPanel key={pack.modId} pack={pack} />
+            ))}
+
             {report.imported.map((mod) => (
                 <div
                     key={mod.id}
