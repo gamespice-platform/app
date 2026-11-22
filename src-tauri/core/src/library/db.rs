@@ -41,7 +41,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AppError, AppResult};
 
 /// Schema version. Bumped whenever `migrate` gains a step.
-const SCHEMA_VERSION: i64 = 11;
+const SCHEMA_VERSION: i64 = 12;
 
 /// One subscribed item as this device knows it.
 ///
@@ -316,9 +316,20 @@ impl LibraryDb {
                     8 => conn.execute_batch(SCHEMA_V8)?,
                     9 => conn.execute_batch(SCHEMA_V9)?,
                     10 => conn.execute_batch(SCHEMA_V10)?,
-                    11 => {
-                        conn.execute_batch(SCHEMA_V11)?;
-                        migrate_v11(conn)?;
+                    11 => conn.execute_batch(SCHEMA_V11)?,
+                    12 => {
+                        // A build of A4 from before A2 landed numbered this
+                        // step 11, so a database it migrated is at 11 with the
+                        // sandbox columns already there and no catalog cache.
+                        // Re-running the ALTERs would fail and re-splitting the
+                        // loaders would wipe the stored loader versions, so
+                        // such a database only gets the table it is missing.
+                        if has_column(conn, "sandbox", "loader_version")? {
+                            conn.execute_batch(SCHEMA_V11)?;
+                        } else {
+                            conn.execute_batch(SCHEMA_V12)?;
+                            migrate_v12(conn)?;
+                        }
                     }
                     _ => break,
                 }
@@ -1604,11 +1615,23 @@ const SCHEMA_V10: &str = r#"
                     ON storage_store (path);
 "#;
 
+/// The catalog client's response cache (unit A2): one row per request path
+/// and query, with the ETag it was served with. See `crate::catalog::cache`.
+const SCHEMA_V11: &str = r#"
+                CREATE TABLE IF NOT EXISTS catalog_cache (
+                    key        TEXT PRIMARY KEY,
+                    etag       TEXT,
+                    body       TEXT NOT NULL,
+                    /* Unix seconds of the last 200 or 304. */
+                    fetched_at INTEGER NOT NULL
+                );
+"#;
+
 /// Loader versions, the deployed plan, patch records and consent (unit A4).
 ///
-/// Numbered 11 because 10 was the last step on this branch; it is renumbered
-/// when the A2 migration lands ahead of it.
-const SCHEMA_V11: &str = r#"
+/// Step 12: A2's catalog cache took 11. A database a pre-A2 build of A4
+/// migrated is at 11 with these columns already; `migrate` handles it.
+const SCHEMA_V12: &str = r#"
                 ALTER TABLE sandbox ADD COLUMN loader_version TEXT;
                 /* The plan the last deploy used. Local only, never synced. */
                 ALTER TABLE sandbox ADD COLUMN install_state TEXT;
@@ -1629,7 +1652,7 @@ const SCHEMA_V11: &str = r#"
 ///
 /// Unknown values are kept as they are; see
 /// [`super::sandbox::normalize_loader`].
-fn migrate_v11(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+fn migrate_v12(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
     let rows: Vec<(i64, Option<String>, Option<String>)> = {
         let mut stmt = conn.prepare("SELECT id, loader, game_version FROM sandbox")?;
         let rows = stmt
@@ -1651,9 +1674,73 @@ fn migrate_v11(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
+/// Whether `table` has a column called `column`.
+fn has_column(conn: &rusqlite::Connection, table: &str, column: &str) -> rusqlite::Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let names = stmt
+        .query_map([], |r| r.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    Ok(names.iter().any(|n| n == column))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_fresh_database_has_the_catalog_cache_and_the_a4_columns() {
+        let db = LibraryDb::open_memory().unwrap();
+
+        db.with(|c| {
+            assert!(has_column(c, "catalog_cache", "etag")?);
+            assert!(has_column(c, "sandbox", "loader_version")?);
+            assert!(has_column(c, "deployment", "patch")?);
+
+            let v: i64 = c.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+            assert_eq!(v, SCHEMA_VERSION);
+
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn a_database_a4_migrated_as_11_gets_the_cache_and_keeps_its_loader_versions() {
+        let db = LibraryDb::open_memory().unwrap();
+
+        // What a pre-A2 build of A4 left: its columns, version 11, no cache.
+        db.with(|c| {
+            c.execute(
+                "INSERT INTO sandbox (app_id, name, environment, strategy, game_version, \
+                 loader, loader_version, options, created_at, updated_at) \
+                 VALUES (1, 'a', 'client', 'copy', '1.21.4', 'fabric', '0.16.9', '{}', 'now', 'now')",
+                [],
+            )?;
+            c.execute_batch("DROP TABLE catalog_cache")?;
+            c.pragma_update(None, "user_version", 11)
+        })
+        .unwrap();
+
+        db.migrate().unwrap();
+
+        db.with(|c| {
+            assert!(has_column(c, "catalog_cache", "key")?);
+
+            let kept: Option<String> = c.query_row(
+                "SELECT loader_version FROM sandbox WHERE name = 'a'",
+                [],
+                |r| r.get(0),
+            )?;
+            assert_eq!(kept.as_deref(), Some("0.16.9"));
+
+            let v: i64 = c.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+            assert_eq!(v, 12);
+
+            Ok(())
+        })
+        .unwrap();
+    }
 
     fn temp_dir(tag: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("gs-db-{tag}-{}", std::process::id()));
@@ -1721,7 +1808,7 @@ mod tests {
     }
 
     #[test]
-    fn migration_11_splits_stored_loaders_and_keeps_unknown_ones() {
+    fn migration_12_splits_stored_loaders_and_keeps_unknown_ones() {
         let db = LibraryDb::open_memory().unwrap();
         let rows = [
             ("a", Some("Fabric 0.16.9"), Some("1.21.4")),
@@ -1741,7 +1828,7 @@ mod tests {
                 )?;
             }
 
-            migrate_v11(c)
+            migrate_v12(c)
         })
         .unwrap();
 

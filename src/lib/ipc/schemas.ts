@@ -1,5 +1,12 @@
 import { z } from 'zod'
 
+import {
+    CatalogAppRefSchema,
+    GameLoaderWireSchema,
+    GameVersionPageWireSchema,
+    LoaderVersionWireSchema,
+} from '../api/contract'
+
 /**
  * Mirrors of the Rust types that cross the IPC boundary.
  *
@@ -106,6 +113,10 @@ export const AppSettingsSchema = z.object({
     layerMaxBytes: z.number().default(8 * 1024 * 1024 * 1024),
     /** Ceiling on the files in one loader layer; `0` is unlimited. */
     layerMaxFiles: z.number().default(200_000),
+    /** Minutes a cached catalog list is served as is; `0` revalidates on every read. */
+    catalogTtlMinutes: z.number().default(360),
+    /** Game versions one catalog read asks for; `0` asks for the server's maximum. */
+    versionListCount: z.number().default(30),
 
     requireSignedPlugins: z.boolean(),
     confirmEveryRun: z.boolean(),
@@ -1612,3 +1623,38 @@ export const StoreSchema = z.object({
 })
 
 export type StoreT = z.infer<typeof StoreSchema>
+
+/**
+ * Where a catalog list came from (`tmc_core::catalog::types::Provenance`):
+ * fetched now, the library cache (`stale` when the network failed), or the
+ * snapshot compiled into this build.
+ */
+export const CatalogProvenanceSchema = z.object({
+    source: z.enum(['remote', 'cache', 'compiled']),
+    stale: z.boolean(),
+    /** Unix milliseconds of the last fetch; `null` for the compiled snapshot. */
+    fetchedAt: z.number().nullable(),
+})
+
+/** `catalog_get`: the version and loader pickers in one call. */
+export const CatalogViewSchema = CatalogProvenanceSchema.extend({
+    app: CatalogAppRefSchema,
+    loaders: z.array(GameLoaderWireSchema),
+    versions: GameVersionPageWireSchema,
+    generatedAt: z.string().nullable(),
+})
+
+export type CatalogViewT = z.infer<typeof CatalogViewSchema>
+
+/** `catalog_loader_versions`. */
+export const LoaderVersionsViewSchema = CatalogProvenanceSchema.extend({
+    loader: z.string(),
+    gameVersion: z.string().nullable(),
+    items: z.array(LoaderVersionWireSchema),
+    nextCursor: z.string().nullable(),
+})
+
+export type LoaderVersionsViewT = z.infer<typeof LoaderVersionsViewSchema>
+
+export const CatalogChannelVals = ['STABLE', 'PREVIEW', 'EXPERIMENTAL', 'LEGACY'] as const
+export type CatalogChannelT = (typeof CatalogChannelVals)[number]

@@ -147,6 +147,14 @@ pub struct AppSettings {
     pub layer_max_bytes: u64,
     /// Ceiling on the number of files in one layer. `0` is unlimited.
     pub layer_max_files: u64,
+
+    // --------------------------------------------------------------- Catalog
+    /// How long a cached catalog list is served without asking the server, in
+    /// minutes. `0` revalidates on every read (the ETag still saves the body).
+    pub catalog_ttl_minutes: u32,
+    /// How many game versions one catalog read asks for. `0` asks the server
+    /// for its maximum, which is unlimited when the site sets no cap.
+    pub version_list_count: u32,
 }
 
 impl Default for AppSettings {
@@ -183,6 +191,8 @@ impl Default for AppSettings {
             game_use_udp: true,
             layer_max_bytes: 8 * 1024 * 1024 * 1024,
             layer_max_files: 200_000,
+            catalog_ttl_minutes: 360,
+            version_list_count: 30,
         }
     }
 }

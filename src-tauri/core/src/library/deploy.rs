@@ -82,8 +82,9 @@ pub struct SandboxCtx<'a> {
     pub data_root: &'a Path,
     /// Where a failed installer's log is copied.
     pub log_dir: &'a Path,
-    /// Where install plans come from. `None` is the compiled-in fallback,
-    /// which is the only source until the signed catalog is fetched (A2).
+    /// Where install plans come from: the plan the catalog served (fresh or
+    /// cached, `crate::catalog::plan_source`), or `None` for the compiled-in
+    /// fallback.
     pub plan_source: Option<&'a crate::layers::plan::PlanSource>,
 }
 
@@ -510,39 +511,47 @@ fn side_of(sandbox: &Sandbox) -> &'static str {
     }
 }
 
-/// The install plan of this sandbox, or `None` when its game, version or
-/// loader has no managed install (the deploy is then mods only, as before).
+/// The question this sandbox asks of a plan source, or `None` when it has no
+/// game or game version yet. The shell asks the catalog (A2) for a served
+/// plan with it before deploying.
 ///
 /// `target` is the folder it deploys into, for `{targetDir}`; a sandbox with
 /// no folder yet plans with an empty one, since no step of a layer may write
 /// outside its layer.
+pub fn plan_request(
+    sandbox: &Sandbox,
+    target: Option<&Path>,
+) -> Option<crate::layers::plan::PlanRequest> {
+    let (Some(slug), Some(game_version)) = (&sandbox.app_slug, &sandbox.game_version) else {
+        return None;
+    };
+    Some(crate::layers::plan::PlanRequest {
+        app_slug: slug.clone(),
+        game_version: game_version.clone(),
+        loader: sandbox.loader.clone(),
+        loader_version: sandbox.loader_version.clone(),
+        side: side_of(sandbox).to_string(),
+        platform: crate::layers::plan::current_platform(),
+        sandbox_id: sandbox.id.to_string(),
+        sandbox_name: sandbox.name.clone(),
+        target_dir: target.map(|t| t.display().to_string()).unwrap_or_default(),
+    })
+}
+
+/// The install plan of this sandbox, or `None` when its game, version or
+/// loader has no managed install (the deploy is then mods only, as before).
 pub fn install_plan(
     sandbox: &Sandbox,
     ctx: &SandboxCtx<'_>,
     target: Option<&Path>,
 ) -> AppResult<Option<crate::layers::plan::InstallPlan>> {
-    use crate::layers::plan::{self, PlanRequest, PlanSource};
-
-    let (Some(slug), Some(game_version)) = (&sandbox.app_slug, &sandbox.game_version) else {
+    let Some(req) = plan_request(sandbox, target) else {
         return Ok(None);
     };
-
-    let source = ctx.plan_source.unwrap_or_else(|| PlanSource::compiled());
-
-    plan::resolve(
-        source,
-        &PlanRequest {
-            app_slug: slug.clone(),
-            game_version: game_version.clone(),
-            loader: sandbox.loader.clone(),
-            loader_version: sandbox.loader_version.clone(),
-            side: side_of(sandbox).to_string(),
-            platform: plan::current_platform(),
-            sandbox_id: sandbox.id.to_string(),
-            sandbox_name: sandbox.name.clone(),
-            target_dir: target.map(|t| t.display().to_string()).unwrap_or_default(),
-        },
-    )
+    let source = ctx
+        .plan_source
+        .unwrap_or_else(|| crate::layers::plan::PlanSource::compiled());
+    crate::layers::plan::resolve(source, &req)
 }
 
 /// Give an isolated sandbox with no folder its own new instance folder under
@@ -630,7 +639,9 @@ async fn layer_mods(
 
             dir.join("files")
         } else {
-            build::ensure_layer(&bctx, plan, layer, &runtimes).await?.files_dir
+            build::ensure_layer(&bctx, plan, layer, &runtimes)
+                .await?
+                .files_dir
         };
 
         mods.push(deploy::DeployMod {
@@ -743,7 +754,9 @@ pub async fn deploy_sandbox(
     if virtual_patches && !dry_run {
         let overlay = patch_overlay(ctx.data_root, sandbox.id);
 
-        warnings.extend(deploy::json_patch::write_overlay(&target, &overlay, patches));
+        warnings.extend(deploy::json_patch::write_overlay(
+            &target, &overlay, patches,
+        ));
 
         mods.push(deploy::DeployMod {
             key: "patch:overlay".to_string(),
@@ -1346,7 +1359,9 @@ mod tests {
             plan_source: None,
         };
 
-        let err = deploy_sandbox(&db, &sandbox, &ctx, true).await.expect_err("must refuse");
+        let err = deploy_sandbox(&db, &sandbox, &ctx, true)
+            .await
+            .expect_err("must refuse");
 
         assert!(err.to_string().contains("anti-cheat"), "{err}");
 

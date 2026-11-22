@@ -1,0 +1,23 @@
+{
+    "loader": "forge",
+    "gameVersion": "1.21.4",
+    "items": [
+        {
+            "version": "54.1.0",
+            "channel": "STABLE",
+            "sortKey": 1736100000000,
+            "recommended": true,
+            "custom": false,
+            "deprecated": null
+        },
+        {
+            "version": "54.0.34",
+            "channel": "STABLE",
+            "sortKey": 1735500000000,
+            "recommended": false,
+            "custom": false,
+            "deprecated": null
+        }
+    ],
+    "nextCursor": null
+}

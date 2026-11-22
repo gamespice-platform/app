@@ -1,0 +1,80 @@
+{
+    "app": {
+        "id": 412,
+        "slug": "minecraft"
+    },
+    "request": {
+        "gameVersion": "1.21.4",
+        "loader": "fabric",
+        "loaderVersion": "0.16.9",
+        "platform": "linux-x64",
+        "side": "client"
+    },
+    "layers": [
+        {
+            "manifestKey": "minecraft/version",
+            "revision": 1,
+            "sha256": "f1d7c05808362316b3f008796b6dc644ffb928bc5e8599743ee1692d4e3fa374",
+            "exec": false,
+            "signature": null,
+            "manifest": {
+                "id": "minecraft/version",
+                "app": "minecraft",
+                "kind": "version",
+                "steps": [],
+                "title": "Minecraft",
+                "revision": 1,
+                "schemaVersion": 1
+            },
+            "bindings": {
+                "vars": {
+                    "gameVersion": "1.21.4",
+                    "javaMajor": "21",
+                    "launchVersionId": "1.21.4"
+                },
+                "artifacts": {
+                    "versionJson": {
+                        "url": "https://piston-meta.mojang.com/v1/packages/a3bcba436caa849622fd7e1e5b89489ed6c9ac63/1.21.4.json",
+                        "mirrors": [],
+                        "sha256": "0f7f2fbb3c7e94b4d5e1a3b2c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0",
+                        "size": 27461
+                    }
+                }
+            }
+        },
+        {
+            "manifestKey": "minecraft/loader/fabric",
+            "revision": 1,
+            "sha256": "54124ff556e5e541555e533d1afe6f9415e1b819acd7ca1bc5052b8e56eefbc1",
+            "exec": false,
+            "signature": null,
+            "manifest": {
+                "id": "minecraft/loader/fabric",
+                "app": "minecraft",
+                "kind": "loader",
+                "steps": [],
+                "title": "Fabric",
+                "loader": "fabric",
+                "revision": 1,
+                "schemaVersion": 1
+            },
+            "bindings": {
+                "vars": {
+                    "loaderVersion": "0.16.9",
+                    "launchVersionId": "fabric-loader-0.16.9-1.21.4"
+                },
+                "artifacts": {
+                    "profileJson": {
+                        "url": "https://cdn.gamespice.net/game/catalog/412/9c1d.../fabric-loader-0.16.9-1.21.4.json",
+                        "mirrors": [],
+                        "sha256": "9c1d4e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d",
+                        "size": 5120
+                    }
+                }
+            }
+        }
+    ],
+    "runtimes": [],
+    "deprecated": null,
+    "planVersion": 1
+}

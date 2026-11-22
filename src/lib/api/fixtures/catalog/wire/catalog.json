@@ -1,0 +1,85 @@
+{
+    "app": { "id": 412, "slug": "minecraft" },
+    "loaders": [
+        {
+            "key": "fabric",
+            "name": "Fabric",
+            "description": "Lightweight loader",
+            "sides": "BOTH",
+            "onlineNote": null,
+            "position": 0,
+            "customVersions": false,
+            "managed": true
+        },
+        {
+            "key": "forge",
+            "name": "Forge",
+            "description": null,
+            "sides": "BOTH",
+            "onlineNote": null,
+            "position": 1,
+            "customVersions": false,
+            "managed": true
+        },
+        {
+            "key": "neoforge",
+            "name": "NeoForge",
+            "description": null,
+            "sides": "BOTH",
+            "onlineNote": null,
+            "position": 2,
+            "customVersions": false,
+            "managed": true
+        },
+        {
+            "key": "quilt",
+            "name": "Quilt",
+            "description": null,
+            "sides": "BOTH",
+            "onlineNote": null,
+            "position": 3,
+            "customVersions": false,
+            "managed": true
+        }
+    ],
+    "versions": {
+        "items": [
+            {
+                "versionId": "1.21.4",
+                "label": null,
+                "channel": "STABLE",
+                "channelLabel": "Release",
+                "sortKey": 1733234400000,
+                "releasedAt": "2024-12-03T10:40:00Z",
+                "deprecated": null,
+                "managed": true
+            },
+            {
+                "versionId": "1.21.3",
+                "label": null,
+                "channel": "STABLE",
+                "channelLabel": "Release",
+                "sortKey": 1729591200000,
+                "releasedAt": "2024-10-22T10:00:00Z",
+                "deprecated": null,
+                "managed": true
+            },
+            {
+                "versionId": "1.21.2",
+                "label": null,
+                "channel": "STABLE",
+                "channelLabel": "Release",
+                "sortKey": 1729591100000,
+                "releasedAt": "2024-10-22T09:58:20Z",
+                "deprecated": {
+                    "at": "2025-01-10T00:00:00Z",
+                    "note": "Superseded by 1.21.3 the same day",
+                    "withdrawn": false
+                },
+                "managed": true
+            }
+        ],
+        "nextCursor": "MTcyOTU5MTEwMDAwMDo4OA"
+    },
+    "generatedAt": "2026-11-22T09:00:00Z"
+}

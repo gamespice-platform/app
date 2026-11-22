@@ -1,0 +1,39 @@
+{
+    "items": [
+        {
+            "versionId": "1.21.4",
+            "label": null,
+            "channel": "STABLE",
+            "channelLabel": "Release",
+            "sortKey": 1733234400000,
+            "releasedAt": "2024-12-03T10:40:00Z",
+            "deprecated": null,
+            "managed": true
+        },
+        {
+            "versionId": "1.21.3",
+            "label": null,
+            "channel": "STABLE",
+            "channelLabel": "Release",
+            "sortKey": 1729591200000,
+            "releasedAt": "2024-10-22T10:00:00Z",
+            "deprecated": null,
+            "managed": true
+        },
+        {
+            "versionId": "1.21.2",
+            "label": null,
+            "channel": "STABLE",
+            "channelLabel": "Release",
+            "sortKey": 1729591100000,
+            "releasedAt": "2024-10-22T09:58:20Z",
+            "deprecated": {
+                "at": "2025-01-10T00:00:00Z",
+                "note": "Superseded by 1.21.3 the same day",
+                "withdrawn": false
+            },
+            "managed": true
+        }
+    ],
+    "nextCursor": "MTcyOTU5MTEwMDAwMDo4OA"
+}

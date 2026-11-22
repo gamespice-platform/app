@@ -42,6 +42,11 @@ export const ApiErrorSchema = z.object({
     code: z.string(),
     message: z.string(),
     retryAfter: z.number().int().nonnegative().optional(),
+    /**
+     * A person's sentence for the reader, beside the machine `code` — e.g. why
+     * an admin withdrew a catalog version (`catalog_withdrawn`). Shown as is.
+     */
+    note: z.string().optional(),
 })
 
 export type ApiErrorT = z.infer<typeof ApiErrorSchema>
@@ -564,9 +569,6 @@ export const BrowseQuerySchema = z.object({
     nsfw: QueryBool.optional(),
     archived: QueryBool.optional(),
 
-    /** Servers only: the signed-in account's favourites (unsigned: empty). */
-    favorites: QueryBool.optional(),
-
     /**
      * AND across tags by default; `tagsOr: true` switches to ANY.
      *
@@ -627,6 +629,13 @@ export const BrowseQuerySchema = z.object({
     /** The signed-in user's own items. Resolved server-side from the token. */
     mine: QueryBool.optional(),
 
+    /**
+     * Servers only: restrict to the ones the bearer's account has favourited
+     * (`Favorite.serverId`). Anonymous callers get an empty page, not an
+     * error. Ignored for every other kind.
+     */
+    favorites: QueryBool.optional(),
+
     sort: BrowseSortSchema.default('createdAt'),
     sortDir: z.enum(['asc', 'desc']).default('desc'),
     timeRange: TimeRangeSchema.default('all'),
@@ -640,16 +649,6 @@ export const BrowseQuerySchema = z.object({
     cursor: z.coerce.string().nullish(),
     limit: QueryInt.min(1).max(50).default(30),
 })
-
-export const SetFavoriteBodySchema = z.object({
-    kind: z.literal('server'),
-    id: z.number().int().positive(),
-    favorite: z.boolean(),
-})
-
-export type SetFavoriteBodyT = z.infer<typeof SetFavoriteBodySchema>
-
-export const SetFavoriteResponseSchema = z.object({ favorite: z.boolean() })
 
 export type BrowseQueryT = z.input<typeof BrowseQuerySchema>
 
@@ -899,6 +898,26 @@ export const SubscriptionWriteRequest = z.object({
     subscribed: z.boolean().optional(),
 })
 
+/**
+ * `POST /api/app/v1/favorites` — set a favourite to a state. Idempotent.
+ * Only servers for now; `kind` is an enum so the others can join later.
+ */
+export const FavoriteKindSchema = z.enum(['server'])
+
+export const FavoriteWriteRequest = z.object({
+    kind: FavoriteKindSchema,
+    id: z.number().int().positive(),
+    favorite: z.boolean(),
+})
+
+export type FavoriteWriteRequestT = z.infer<typeof FavoriteWriteRequest>
+
+export const FavoriteWriteResponseSchema = z.object({
+    favorite: z.boolean(),
+})
+
+export type FavoriteWriteResponseT = z.infer<typeof FavoriteWriteResponseSchema>
+
 export const SubscriptionPrefsRequest = z.object({
     kind: SubKindSchema,
     itemId: z.coerce.number().int().positive(),
@@ -1013,6 +1032,11 @@ export const InstallSchema = z.object({
     description: z.string().nullable(),
     gameVersion: z.string().nullable(),
     loader: z.string().nullable(),
+    /**
+     * The loader version this install pins; null = the latest recommended build
+     * for `gameVersion`. Defaulted so an older server's install still parses.
+     */
+    loaderVersion: z.string().nullable().default(null),
     isDefault: z.boolean(),
     /**
      * Defaulted rather than required, so an app talking to a server that
@@ -1048,6 +1072,7 @@ export const InstallCreateRequest = z.object({
     description: z.string().max(500).optional(),
     gameVersion: z.string().max(64).optional(),
     loader: z.string().max(64).optional(),
+    loaderVersion: z.string().max(64).optional(),
     isDefault: z.boolean().optional(),
     strategy: DeployStrategySchema.optional(),
     environment: SandboxEnvSchema.optional(),
@@ -1060,6 +1085,7 @@ export const InstallUpdateRequest = z.object({
     description: z.string().max(500).nullable().optional(),
     gameVersion: z.string().max(64).nullable().optional(),
     loader: z.string().max(64).nullable().optional(),
+    loaderVersion: z.string().max(64).nullable().optional(),
     isDefault: z.boolean().optional(),
     strategy: DeployStrategySchema.optional(),
     environment: SandboxEnvSchema.optional(),
@@ -2343,6 +2369,32 @@ export type AppPresenceT = z.infer<typeof PresenceSchema>
 export const PresenceReadResponse = z.record(z.string(), PresenceSchema)
 export type PresenceReadResponseT = z.infer<typeof PresenceReadResponse>
 
+// ----------------------------------------------------------- Notifications
+
+/**
+ * `GET notifications?since=&limit=` — one row. `url` is a site path (or null);
+ * the app resolves it against the site. No friend/invite action DTOs.
+ */
+export const AppNotificationSchema = z.object({
+    id: z.string(),
+    type: z.string(),
+    title: z.string(),
+    body: z.string().nullable(),
+    url: z.string().nullable(),
+    read: z.boolean(),
+    createdAt: z.string(),
+    actorName: z.string().nullable(),
+    actorAvatarUrl: z.string().nullable(),
+})
+export type AppNotificationT = z.infer<typeof AppNotificationSchema>
+
+/** Newest first; only unread rows when `since` was sent. */
+export const AppNotificationsResponse = z.object({
+    unread: z.number().int().nonnegative(),
+    items: z.array(AppNotificationSchema),
+})
+export type AppNotificationsResponseT = z.infer<typeof AppNotificationsResponse>
+
 // ----------------------------------------------------------------- Friends
 
 /** `GET friends` — one row. Who the website's friend dock lists. */
@@ -2578,7 +2630,7 @@ export type StatDefsResponseT = z.infer<typeof StatDefsResponse>
 /*
  * The Workshop: subscriptions that load into solo games. The site's half of the
  * contract is docs/workshop.md; the client's is dot-cloud's docs/workshop.md.
- * Mirrored in tmc-app like everything above, though only Gamespice games read these.
+ * Mirrored in tmc-app like everything above, though only GameSpice games read these.
  */
 
 export const WorkshopQuerySchema = z.object({
@@ -3255,3 +3307,182 @@ export type StorePurchasesResponseT = z.infer<typeof StorePurchasesResponse>
 export type MeStatsResponseT = z.infer<typeof MeStatsResponse>
 export type AchievementsResponseT = z.infer<typeof AchievementsResponse>
 export type StoreCurrencyT = (typeof StoreCurrencyVals)[number]
+
+// ---------------------------------------------------------- Game catalog
+
+/**
+ * The public game catalog: versions, loaders, install plans and runtimes
+ * (`/api/app/v1/apps/:id/catalog`, `.../versions`, `.../loaders/:key/versions`,
+ * `.../install-plan`, `/api/app/v1/runtimes/:kind/:major`). Website docs:
+ * `docs/api/app-catalog.md`; design: tmc-app `docs/loaders-and-versions.md`.
+ *
+ * Each response is the `data` of the usual envelope. Live examples are
+ * `website-city/src/types/game-catalog/fixtures/*.json`, regenerated from the
+ * routes by `scripts/verify-game-catalog.ts --write` and byte-compared by it.
+ * Times are ISO-8601 to the second, UTC (`2026-11-22T09:00:00Z`).
+ */
+
+const CatalogSha256 = z.string().regex(/^[0-9a-f]{64}$/)
+const CatalogIsoTime = z.iso.datetime({ offset: true })
+
+const CatalogChannel = z.enum(['STABLE', 'PREVIEW', 'EXPERIMENTAL', 'LEGACY'])
+const CatalogPlatform = z.enum([
+    'windows-x64',
+    'windows-arm64',
+    'linux-x64',
+    'linux-arm64',
+    'macos-x64',
+    'macos-arm64',
+])
+const CatalogSide = z.enum(['client', 'server'])
+
+/** `{at, note, withdrawn}` on a deprecated (or withdrawn) row; null otherwise. */
+export const DeprecationWireSchema = z.strictObject({
+    at: CatalogIsoTime,
+    note: z.string().nullable(),
+    withdrawn: z.boolean(),
+})
+export type DeprecationWireT = z.infer<typeof DeprecationWireSchema>
+
+export const CatalogAppRefSchema = z.strictObject({
+    id: z.number().int(),
+    slug: z.string(),
+})
+
+export const GameVersionWireSchema = z.strictObject({
+    versionId: z.string(),
+    label: z.string().nullable(),
+    channel: CatalogChannel,
+    channelLabel: z.string().nullable(),
+    sortKey: z.number().int(),
+    releasedAt: CatalogIsoTime.nullable(),
+    deprecated: DeprecationWireSchema.nullable(),
+    managed: z.boolean(),
+})
+export type GameVersionWireT = z.infer<typeof GameVersionWireSchema>
+
+export const GameLoaderWireSchema = z.strictObject({
+    key: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    sides: z.enum(['CLIENT', 'SERVER', 'BOTH']),
+    onlineNote: z.string().nullable(),
+    position: z.number().int(),
+    customVersions: z.boolean(),
+    managed: z.boolean(),
+})
+export type GameLoaderWireT = z.infer<typeof GameLoaderWireSchema>
+
+export const LoaderVersionWireSchema = z.strictObject({
+    version: z.string(),
+    channel: CatalogChannel,
+    sortKey: z.number().int(),
+    recommended: z.boolean(),
+    custom: z.boolean(),
+    deprecated: DeprecationWireSchema.nullable(),
+})
+export type LoaderVersionWireT = z.infer<typeof LoaderVersionWireSchema>
+
+/** `{items, nextCursor}`; the cursor is opaque (base64url of `sortKey:id`). */
+function CatalogPageOf<T extends z.ZodType>(item: T) {
+    return z.strictObject({
+        items: z.array(item),
+        nextCursor: z.string().nullable(),
+    })
+}
+
+export const GameVersionPageWireSchema = CatalogPageOf(GameVersionWireSchema)
+export type GameVersionPageWireT = z.infer<typeof GameVersionPageWireSchema>
+
+/** `GET /apps/:id/catalog`: the picker in one call. */
+export const CatalogWireSchema = z.strictObject({
+    app: CatalogAppRefSchema,
+    loaders: z.array(GameLoaderWireSchema),
+    versions: GameVersionPageWireSchema,
+    generatedAt: CatalogIsoTime,
+})
+export type CatalogWireT = z.infer<typeof CatalogWireSchema>
+
+/** `GET /apps/:id/loaders/:key/versions`. */
+export const LoaderVersionListWireSchema = z.strictObject({
+    loader: z.string(),
+    gameVersion: z.string().nullable(),
+    items: z.array(LoaderVersionWireSchema),
+    nextCursor: z.string().nullable(),
+})
+export type LoaderVersionListWireT = z.infer<typeof LoaderVersionListWireSchema>
+
+/** One resolved artifact: where to fetch it and what it must hash to. */
+export const ArtifactWireSchema = z.strictObject({
+    url: z.string().regex(/^https:\/\//),
+    mirrors: z.array(z.string().regex(/^https:\/\//)).max(8),
+    sha256: CatalogSha256,
+    size: z.number().int().nonnegative(),
+})
+export type ArtifactWireT = z.infer<typeof ArtifactWireSchema>
+
+export const PlanLayerWireSchema = z.strictObject({
+    manifestKey: z.string(),
+    revision: z.number().int().positive(),
+    sha256: CatalogSha256,
+    exec: z.boolean(),
+    signature: z.string().nullable(),
+    /** The manifest body (its own schema is `LoaderManifestSchema`). */
+    manifest: z.record(z.string(), z.unknown()),
+    bindings: z.strictObject({
+        vars: z.record(z.string(), z.string()),
+        artifacts: z.record(z.string(), ArtifactWireSchema),
+    }),
+})
+export type PlanLayerWireT = z.infer<typeof PlanLayerWireSchema>
+
+/** `GET /runtimes/:kind/:major?platform`, and each entry of a plan's `runtimes`. */
+export const RuntimeWireSchema = z.strictObject({
+    kind: z.string(),
+    major: z.string(),
+    vendorLabel: z.string(),
+    entry: z.string(),
+    stripSingleRoot: z.boolean(),
+    artifact: ArtifactWireSchema,
+})
+export type RuntimeWireT = z.infer<typeof RuntimeWireSchema>
+
+export const PlanRequestWireSchema = z.strictObject({
+    gameVersion: z.string(),
+    loader: z.string().nullable(),
+    loaderVersion: z.string().nullable(),
+    platform: CatalogPlatform,
+    side: CatalogSide,
+})
+export type PlanRequestWireT = z.infer<typeof PlanRequestWireSchema>
+
+/** `GET /apps/:id/install-plan`: the resolved, unexecuted plan. */
+export const InstallPlanWireSchema = z.strictObject({
+    app: CatalogAppRefSchema,
+    request: PlanRequestWireSchema,
+    layers: z.array(PlanLayerWireSchema).min(1),
+    runtimes: z.array(RuntimeWireSchema),
+    deprecated: DeprecationWireSchema.nullable(),
+    planVersion: z.literal(1),
+})
+export type InstallPlanWireT = z.infer<typeof InstallPlanWireSchema>
+
+/**
+ * A catalog refusal, in the ordinary `/api/app/v1` error envelope.
+ *
+ * `catalog_withdrawn` (410) carries the admin's `note` so the app can show why
+ * and suggest another version; `catalog_not_found` and `catalog_unmanaged` are
+ * 404, `catalog_platform` is 422.
+ */
+export const CatalogErrorWireSchema = z.strictObject({
+    ok: z.literal(false),
+    code: z.enum([
+        'catalog_not_found',
+        'catalog_withdrawn',
+        'catalog_unmanaged',
+        'catalog_platform',
+    ]),
+    message: z.string(),
+    note: z.string().optional(),
+})
+export type CatalogErrorWireT = z.infer<typeof CatalogErrorWireSchema>

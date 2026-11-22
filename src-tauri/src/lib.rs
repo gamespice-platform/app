@@ -475,6 +475,8 @@ pub fn run() {
             commands::sandbox::sandbox_export_pack,
             commands::sandbox::sandbox_import_preview,
             commands::sandbox::sandbox_import,
+            commands::catalog::catalog_get,
+            commands::catalog::catalog_loader_versions,
             commands::sandbox::install_plan_preview,
             commands::sandbox::install_plan_consent,
             commands::config::config_available,

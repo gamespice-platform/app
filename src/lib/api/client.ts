@@ -11,9 +11,9 @@ import {
     AppListResponseSchema,
     BrowseQuerySchema,
     BrowseResponseSchema,
-    SetFavoriteBodySchema,
-    SetFavoriteResponseSchema,
-    type SetFavoriteBodyT,
+    FavoriteWriteRequest,
+    FavoriteWriteResponseSchema,
+    type FavoriteWriteRequestT,
     ContentDetailSchema,
     FacetsResponseSchema,
     FriendListResponse,
@@ -182,12 +182,12 @@ export const api = {
             true
         ),
 
-    setFavorite: (body: SetFavoriteBodyT) =>
+    setFavorite: (body: FavoriteWriteRequestT) =>
         send(
             'POST',
             '/favorites',
-            SetFavoriteResponseSchema,
-            SetFavoriteBodySchema.parse(body)
+            FavoriteWriteResponseSchema,
+            FavoriteWriteRequest.parse(body)
         ),
 
     content: (kind: ContentKindT, id: string) =>

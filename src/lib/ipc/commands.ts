@@ -79,6 +79,9 @@ import {
     type RustQueryProtocolT,
     type WalkLimitsT,
     type FsRootT,
+    CatalogViewSchema,
+    LoaderVersionsViewSchema,
+    type CatalogChannelT,
 } from './schemas'
 
 /**
@@ -516,6 +519,36 @@ export const ipc = {
     /** Download and unpack whatever is not staged yet. */
     sandboxStage: (id: number, force = false) =>
         call('sandbox_stage', z.array(StageOutcomeSchema), { id, force }),
+
+    /**
+     * A game's loaders and versions for the pickers: the cache inside
+     * `catalogTtlMinutes`, else the website, else the compiled-in snapshot.
+     * `limit` defaults to `versionListCount`; `refresh` skips the TTL.
+     */
+    catalogGet: (
+        appId: number,
+        appSlug: string,
+        opts: { channels?: CatalogChannelT[]; limit?: number; refresh?: boolean } = {},
+    ) => call('catalog_get', CatalogViewSchema, { appId, appSlug, ...opts }),
+
+    /** One loader's versions, narrowed to `gameVersion`'s builds when given. */
+    catalogLoaderVersions: (
+        appId: number,
+        appSlug: string,
+        loader: string,
+        opts: {
+            gameVersion?: string
+            channels?: CatalogChannelT[]
+            limit?: number
+            refresh?: boolean
+        } = {},
+    ) =>
+        call('catalog_loader_versions', LoaderVersionsViewSchema, {
+            appId,
+            appSlug,
+            loader,
+            ...opts,
+        }),
 
     sandboxDeploy: (id: number, dryRun = false) =>
         call('sandbox_deploy', DeployReportSchema, { id, dryRun }),

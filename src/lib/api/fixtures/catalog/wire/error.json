@@ -1,0 +1,6 @@
+{
+    "ok": false,
+    "code": "catalog_withdrawn",
+    "message": "This Forge version was withdrawn.",
+    "note": "Crashes on world load; use 54.1.0"
+}

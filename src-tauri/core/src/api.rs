@@ -211,6 +211,9 @@ struct Envelope {
     code: Option<String>,
     #[serde(default)]
     message: Option<String>,
+    /// An admin's note on a refusal (`catalog_withdrawn`).
+    #[serde(default)]
+    note: Option<String>,
 }
 
 impl ApiClient {
@@ -436,6 +439,58 @@ impl ApiClient {
         let text = res.text().await.unwrap_or_default();
 
         Self::unwrap(status, &text)
+    }
+
+    /// An unauthenticated conditional GET for the game catalog (A2): the
+    /// cached ETag goes out as `If-None-Match`, and a refusal comes back as
+    /// the envelope's `code`, `message` and `note` rather than an
+    /// [`AppError`], since [`crate::catalog`] treats `catalog_withdrawn` and
+    /// `catalog_not_found` differently. `Err` is only "could not ask": the
+    /// network, or a body that is not our envelope (a proxy's error page).
+    pub async fn get_conditional(
+        &self,
+        path: &str,
+        etag: Option<&str>,
+    ) -> AppResult<crate::catalog::Fetched> {
+        use crate::catalog::Fetched;
+
+        let url = Self::url(path)?;
+        let mut req = self.http.get(url);
+        if let Some(tag) = etag {
+            req = req.header(reqwest::header::IF_NONE_MATCH, tag);
+        }
+
+        let res = req.send().await?;
+        let status = res.status();
+        if status == StatusCode::NOT_MODIFIED {
+            return Ok(Fetched::NotModified);
+        }
+        let etag = res
+            .headers()
+            .get(reqwest::header::ETAG)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+        let text = res.text().await.unwrap_or_default();
+
+        let envelope: Envelope = serde_json::from_str(&text).map_err(|_| {
+            AppError::Network(format!("Unexpected response from the server ({status})."))
+        })?;
+
+        if envelope.ok && status.is_success() {
+            return Ok(Fetched::Body {
+                etag,
+                data: envelope.data,
+            });
+        }
+
+        Ok(Fetched::Refused {
+            status: status.as_u16(),
+            code: envelope.code.unwrap_or_else(|| "api".into()),
+            message: envelope
+                .message
+                .unwrap_or_else(|| "The request failed.".into()),
+            note: envelope.note,
+        })
     }
 
     /// The raw envelope for the device poll, whose non-success outcomes

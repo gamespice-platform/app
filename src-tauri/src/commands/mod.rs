@@ -24,6 +24,7 @@ pub mod auth;
 #[cfg(desktop)]
 pub mod autostart;
 pub mod avatar;
+pub mod catalog;
 pub mod config;
 #[cfg(desktop)]
 pub mod console;

@@ -1,4 +1,4 @@
-Game versions, loaders and loader versions: what a sandbox runs, where the lists come from, and how picking one makes a deploy install it. This is the design and wire contract for a cross-repository feature (`tmc-app` and `website-city`). **Status: designed, not built.** Every part below is to be built by the units in [loaders-work-split.md](loaders-work-split.md); once a unit lands, the section it covers is rewritten to describe what was built.
+Game versions, loaders and loader versions: what a sandbox runs, where the lists come from, and how picking one makes a deploy install it. This is the design and wire contract for a cross-repository feature (`tmc-app` and `website-city`). **Status: the tmc-app side of A1 to A4 is built (manifests, executor, plan and deploy, and the catalog client in "Lists" below); the pickers (A5) and the website units are not.** Every part below is to be built by the units in [loaders-work-split.md](loaders-work-split.md); once a unit lands, the section it covers is rewritten to describe what was built.
 
 Three documents make up the design:
 
@@ -548,14 +548,18 @@ The `manifest` objects are elided to `"steps": []` here for length. On the wire 
 The error shape is as follows. The status is 410 for `catalog_withdrawn`, 404 for `catalog_not_found` and `catalog_unmanaged`, and 422 for `catalog_platform`.
 
 ```json
-{ "error": { "code": "catalog_withdrawn", "message": "This Forge version was withdrawn.", "note": "Crashes on world load; use 54.1.0" } }
+{ "ok": false, "code": "catalog_withdrawn", "message": "This Forge version was withdrawn.", "note": "Crashes on world load; use 54.1.0" }
 ```
+
+This is the `/api/app/v1` envelope with `note` at the top level, beside `code` and `message` (fixture `wire/error.json`). The app shows `message` and `note` together and never falls back to an older plan.
 
 The sync shape of `AppInstall` adds one field:
 
 ```json
-{ "id": "c0a8...", "appId": 412, "name": "Survival 1.21", "gameVersion": "1.21.4", "loader": "fabric", "loaderVersion": "0.16.9" }
+{ "id": 7, "appId": 412, "name": "Survival 1.21", "gameVersion": "1.21.4", "loader": "fabric", "loaderVersion": "0.16.9" }
 ```
+
+`id` is the install's integer id, as in `InstallSchema` (`id: z.number().int()`). The website fixture `wire/app-install-sync.json` still has a placeholder string id there, so the app's fixture test checks every field of it except `id`.
 
 ## App
 
@@ -599,14 +603,16 @@ The sync shape of `AppInstall` adds one field:
 - After the TTL, the read revalidates with `If-None-Match`, and a 304 refreshes `fetched_at`.
 - When the network fails, the stale cache is served and flagged `stale: true`, and the picker says "Offline: list from <date>".
 - With no cache at all, the compiled-in fallback is used:
-  - The source is `manifests/<appSlug>/catalog.snapshot.json`, compiled in by `core/build.rs` the same way app rules are.
-  - The test `the_compiled_in_catalog_matches_the_repository` checks it.
+  - The source is `manifests/<appSlug>/catalog.snapshot.json`, compiled in with the seed manifests (`PlanSource::compiled()`).
+  - The test `the_compiled_in_catalog_reads_as_a_snapshot` checks it.
   - It is flagged `source: "compiled"`.
 - Because the seed manifests are compiled in too, an offline first run can still resolve plans for the snapshot's versions from compiled data. The downloads themselves still need the network: Maven, Mojang and the CDN. An offline first run therefore gets a complete picker and a clear "needs a connection to install" at deploy time, never an empty list.
-- IPC commands go in `src-tauri/src/commands/catalog.rs`, and their wrappers in `src/lib/ipc/commands.ts`. The webview names only slugs and ids:
-  - `catalog_get(appSlug, {channels, limit})`;
-  - `catalog_loader_versions(appSlug, loader, gameVersion?)`;
-  - `catalog_refresh(appSlug)`;
+- A 410 (withdrawn) is an error carrying the server's `note`; a 404 or 422 drops the cached copy and falls back to the snapshot; a 5xx or a body of an unknown shape is treated like a network failure.
+- Deploy, `install_plan_preview` and `install_plan_consent` resolve against the served install plan through the same cache policy, after checking it answers the request and that each manifest it carries hashes to its stated sha256; it then goes through the same resolver, lint and signature check as the compiled manifests. With no served plan they use the compiled-in manifests.
+- IPC commands are in `src-tauri/src/commands/catalog.rs`, and their wrappers (`catalogGet`, `catalogLoaderVersions`) in `src/lib/ipc/commands.ts`. The webview names only slugs and ids:
+  - `catalog_get(appId, appSlug, {channels, limit, refresh})`, where `limit` defaults to the setting `versionListCount` (default 30, `0` is all) and `refresh: true` revalidates now (there is no separate `catalog_refresh`);
+  - `catalog_loader_versions(appId, appSlug, loader, {gameVersion, channels, limit, refresh})`;
+  - every answer carries `provenance: {source: "remote" | "cache" | "compiled", stale, fetchedAt}`;
   - `install_plan_preview(sandboxId)`;
   - `install_plan_consent(sandboxId, planHash, consentIds[])`.
 - No telemetry is involved. A catalog request carries the app version header that every request already carries, and nothing about the sandbox.

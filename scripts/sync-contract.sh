@@ -10,7 +10,8 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-src="${CONTRACT_SRC_ROOT:-$here/../../website-city}/src/types/app-api/contract.ts"
+root="${CONTRACT_SRC_ROOT:-$here/../../website-city}"
+src="$root/src/types/app-api/contract.ts"
 dst="$here/../src/lib/api/contract.ts"
 
 [ -f "$src" ] || {
@@ -40,3 +41,22 @@ awk -v header="$header" '
 ' "$src" > "$dst"
 
 echo "✓ contract mirrored into src/lib/api/contract.ts"
+
+# The game-catalog examples the server's routes produce (W5). The app's tests
+# parse every one through the mirrored schemas and through its own IPC schemas,
+# and the Rust catalog client reads them as wire input, so a field renamed on
+# the server fails here before it fails on a user's machine.
+fixtures="$root/src/types/game-catalog/fixtures"
+fixtures_dst="$here/../src/lib/api/fixtures/catalog"
+
+if [ -d "$fixtures" ]; then
+    rm -rf "$fixtures_dst"
+    mkdir -p "$fixtures_dst/wire"
+    for name in catalog versions loader-versions install-plan runtime; do
+        cp "$fixtures/$name.json" "$fixtures_dst/$name.json"
+    done
+    cp "$fixtures"/wire/*.json "$fixtures_dst/wire/"
+    echo "✓ catalog fixtures mirrored into src/lib/api/fixtures/catalog"
+else
+    echo "No catalog fixtures at $fixtures — left src/lib/api/fixtures/catalog as it was" >&2
+fi

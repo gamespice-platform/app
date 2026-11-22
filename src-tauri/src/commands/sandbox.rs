@@ -1124,18 +1124,23 @@ pub struct InstallPlanPreview {
 
 /// The install plan of a sandbox: its layers, runtimes, consents and patches.
 #[tauri::command]
-pub fn install_plan_preview(state: State<'_, AppState>, id: i64) -> AppResult<InstallPlanPreview> {
+pub async fn install_plan_preview(
+    state: State<'_, AppState>,
+    id: i64,
+) -> AppResult<InstallPlanPreview> {
     let sandbox = state
         .library
         .sandbox_get(id)?
         .ok_or_else(|| AppError::invalid("That sandbox does not exist."))?;
 
+    let served = state.catalog_plan_source(&sandbox).await?;
     let plugins = state.app_plugins();
     let settings = state.settings.get();
     let roots = state.jail_roots();
     let dirs = state.sandbox_dirs();
 
-    let ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
+    let mut ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
+    ctx.plan_source = served.as_ref();
     let target = tmc_core::library::deploy::target_dir(
         &sandbox,
         &settings,
@@ -1158,7 +1163,7 @@ pub fn install_plan_preview(state: State<'_, AppState>, id: i64) -> AppResult<In
 /// Record that the user agreed to the install plan with `plan_hash`. Refused
 /// when the plan changed since it was shown.
 #[tauri::command]
-pub fn install_plan_consent(
+pub async fn install_plan_consent(
     state: State<'_, AppState>,
     id: i64,
     plan_hash: String,
@@ -1168,12 +1173,14 @@ pub fn install_plan_consent(
         .sandbox_get(id)?
         .ok_or_else(|| AppError::invalid("That sandbox does not exist."))?;
 
+    let served = state.catalog_plan_source(&sandbox).await?;
     let plugins = state.app_plugins();
     let settings = state.settings.get();
     let roots = state.jail_roots();
     let dirs = state.sandbox_dirs();
 
-    let ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
+    let mut ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
+    ctx.plan_source = served.as_ref();
     let target = tmc_core::library::deploy::target_dir(
         &sandbox,
         &settings,
@@ -1213,12 +1220,14 @@ pub async fn sandbox_deploy(
         .sandbox_get(id)?
         .ok_or_else(|| AppError::invalid("That sandbox does not exist."))?;
 
+    let served = state.catalog_plan_source(&sandbox).await?;
     let plugins = state.app_plugins();
     let settings = state.settings.get();
     let roots = state.jail_roots();
     let dirs = state.sandbox_dirs();
 
-    let ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
+    let mut ctx = state.sandbox_ctx(&plugins, &settings, &roots, &dirs);
+    ctx.plan_source = served.as_ref();
 
     let mut report =
         deploy_sandbox(&state.library, &sandbox, &ctx, dry_run.unwrap_or(false)).await?;

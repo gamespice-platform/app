@@ -18,6 +18,7 @@ pub mod api;
 pub mod auth;
 pub mod avatar;
 pub mod canon;
+pub mod catalog;
 pub mod child_env;
 pub mod console;
 pub mod crash;

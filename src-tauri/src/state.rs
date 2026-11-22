@@ -551,9 +551,32 @@ impl AppState {
             local_root: &dirs.local,
             data_root: &dirs.data,
             log_dir: &dirs.logs,
-            // The compiled-in plans until the signed catalog is fetched (A2).
+            // The compiled-in plans; a command that deploys or plans swaps in
+            // the served one from `catalog_plan_source`.
             plan_source: None,
         }
+    }
+
+    /// A catalog client over the library cache and the website API, with the
+    /// user's `catalogTtlMinutes`.
+    pub fn catalog_client(&self) -> tmc_core::catalog::CatalogClient<'_, ApiClient> {
+        let ttl = self.settings.get().catalog_ttl_minutes;
+        tmc_core::catalog::CatalogClient::new(&self.library, &self.api, ttl)
+    }
+
+    /// The plan source `sandbox` deploys from: the plan the catalog serves
+    /// (fresh, or cached when offline), or `None` for the compiled-in one when
+    /// nothing was ever fetched. A withdrawn build is an error, not a fallback.
+    pub async fn catalog_plan_source(
+        &self,
+        sandbox: &tmc_core::library::sandbox::Sandbox,
+    ) -> AppResult<Option<tmc_core::layers::plan::PlanSource>> {
+        let Some(req) = tmc_core::library::deploy::plan_request(sandbox, None) else {
+            return Ok(None);
+        };
+        let client = self.catalog_client();
+        let served = tmc_core::catalog::plan_source(&client, sandbox.app_id, &req).await?;
+        Ok(served.map(|(source, _)| source))
     }
 
     /// Where a file the USER asked for by name goes.

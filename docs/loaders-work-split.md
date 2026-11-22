@@ -1,4 +1,4 @@
-How the game version and loader feature of [loaders-and-versions.md](loaders-and-versions.md) and [loader-manifests.md](loader-manifests.md) is split into build units, in what order they land, what each one must prove, and what is knowingly left open. **Status: A1, A3 and A4 are built; the other units are designed, not built.** Each unit is sized for one builder session. Builders write the "what was built" version of the section their unit covers when they land it.
+How the game version and loader feature of [loaders-and-versions.md](loaders-and-versions.md) and [loader-manifests.md](loader-manifests.md) is split into build units, in what order they land, what each one must prove, and what is knowingly left open. **Status: A1, A2, A3 and A4 are built; the other units are designed, not built.** Each unit is sized for one builder session. Builders write the "what was built" version of the section their unit covers when they land it.
 
 ## Units
 
@@ -142,6 +142,15 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
   - the webview test parses every fixture through the zod schemas;
   - `cargo test -p tmc-core catalog` and `npm test` pass.
 - **Coordination:** `library/db.rs` migrations are numbered. A2 and A4 both add one, so A2 lands first and takes N+1, and A4 takes N+2.
+- **What was built:**
+  - `core/src/catalog/`: `types` (the wire structs, `deny_unknown_fields`), `cache` (the `catalog_cache` table, migration 11), `client` (`CatalogClient`: cache inside `catalogTtlMinutes`, then `If-None-Match` revalidation; a 304 restarts the copy's age, a 200 replaces it, a network error, 5xx or unknown shape serves the copy with `stale: true`, a 410 is an error carrying the server's `note`, a 404/422 forgets the copy), `fallback` (the compiled snapshot, read from `PlanSource::compiled()`'s catalogs rather than a separate `build.rs` step) and `wire_plan` (a served install plan checked against the request, the manifest revision and the layer hashes, then resolved through A4's resolver).
+  - Migration numbers: `catalog_cache` is 11 and A4's sandbox fields moved to 12 (`SCHEMA_VERSION` 12; a database stored at 11 by an A4 build is not expected, since A4 was never released).
+  - A4's plan source now comes from the catalog: `install_plan_preview`, `install_plan_consent` and `sandbox_deploy` resolve against the served plan (fresh, then cached, then the compiled-in manifests). `deploy::plan_request` builds the request.
+  - IPC: `catalog_get` and `catalog_loader_versions` (`src-tauri/src/commands/catalog.rs`), with `limit` defaulting to `versionListCount` (`0` is unlimited) and `refresh` forcing a revalidation. The wrappers `catalogGet` and `catalogLoaderVersions` went into `src/lib/ipc/commands.ts` beside the other commands, not a new `catalog.ts`; `CatalogViewSchema`, `LoaderVersionsViewSchema` and `CatalogProvenanceSchema` are in `schemas.ts`.
+  - Settings: `catalogTtlMinutes` (360, `0` revalidates every read) and `versionListCount` (30, `0` is unlimited).
+  - Contract: `scripts/sync-contract.sh` takes `CONTRACT_SRC_ROOT` and copies the W5 fixtures to `src/lib/api/fixtures/catalog/`. The wire install id is a string in the website fixture and a number in `InstallSchema`; the app keeps the number and the fixture test skips the placeholder.
+  - Tests: 20 in `core/src/catalog/tests.rs` (every acceptance case above, every W5 fixture against its struct, the fixture plan through the resolver, tampered plans refused) and `src/lib/api/catalog-fixtures.test.ts` (every fixture through the zod schemas).
+  - Left open: autoupdate deploys (`library/autoupdate.rs`) still use the compiled plan source; the wire signature has no `keyId`; the runtime catalog; the pickers (A5).
 
 ### A3: executor step extensions and jail roots (tmc-app)
 
@@ -212,7 +221,7 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
 
 - **What was built:**
   - `src-tauri/core/src/layers/`:
-    - `plan.rs` resolves a sandbox into an `InstallPlan`: the layers with their hashes, the runtimes, the consents, the deploy patches, the launch vars and a plan hash. It reads a `PlanSource`; this unit uses only the compiled-in fallback (the shipped `manifests/`), not A2's catalog. A pinned build whose revision does not match the manifest asks for an app update, and a withdrawn loader version is refused with its note. Signed manifests are checked against `manifests/keys/exec-keys.json`.
+    - `plan.rs` resolves a sandbox into an `InstallPlan`: the layers with their hashes, the runtimes, the consents, the deploy patches, the launch vars and a plan hash. It reads a `PlanSource`; A4 itself used only the compiled-in fallback (the shipped `manifests/`); A2 now supplies the served plan to preview, consent and deploy. A pinned build whose revision does not match the manifest asks for an app update, and a withdrawn loader version is refused with its note. Signed manifests are checked against `manifests/keys/exec-keys.json`.
     - `build.rs` builds a layer into `<data>/layers/<app>/<layer hash>/` through a `.partial` folder renamed into place once it is complete, and verifies it again on reuse. A file changed since the build fails verification and the layer is rebuilt. `run_install` and the installer runner are wired in here. The proxy is passed empty, because the app has no proxy setting yet.
     - `checks.rs` refuses symlinks, hardlinks and paths that leave the layer.
     - `runtime.rs` installs a runtime offer under `<data>/runtimes/`.
@@ -226,7 +235,7 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
   - Isolated sandboxes that have no folder get an instance folder.
   - Sandbox fields and wire formats:
     - `loader_version`, `install_state` (with `launch_vars`) and consent records.
-    - Migration 11 splits stored free-text loaders and keeps unknown values. It is numbered 11 for now and gets renumbered when A2 lands.
+    - Migration 12 splits stored free-text loaders and keeps unknown values (numbered 11 when A4 landed; A2 took 11).
     - `loaderVersion` goes into sync, share codes and `.mrpack`.
   - `{launchVersionId}` is set in the Minecraft `launch.json`.
   - The app gets `install_plan_preview`, `install_plan_consent`, and `NeedsConsent` on deploy.
@@ -243,7 +252,7 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
       - a withdrawn build being refused at resolve;
       - consent being asked again after a revision bump;
       - Forge launch args containing `--version 1.21.4-forge-54.1.0`.
-    - The migration patterns are covered by unit tests: `sandbox.rs` `every_loader_pattern_normalises` and `db.rs` `migration_11_splits_stored_loaders_and_keeps_unknown_ones`.
+    - The migration patterns are covered by unit tests: `sandbox.rs` `every_loader_pattern_normalises` and `db.rs` `migration_12_splits_stored_loaders_and_keeps_unknown_ones`.
     - `cargo clippy` is clean for `tmc-core` and for the app crate (built against `npm run sysroot`).
   - Left open:
     - A replay guard for consent records.
@@ -255,7 +264,6 @@ Two prefixes are used: `A` units are in `tmc-app` and `W` units in `website-city
     - A Windows job object for the installer tree kill.
     - JSON key order: undo re-renders an edited file with sorted keys.
     - With the hardlink strategy, a file edited in the game folder also changes the shared layer. The next verify catches it and rebuilds the layer, but nothing prevents it.
-    - Renumbering migration 11 after A2.
 
 ### A5: pickers, preview, consent, progress (tmc-app webview)
 
