@@ -308,7 +308,9 @@ export function CatalogCard({
                 </div>
 
                 {gamespice && play ? (
-                    <GameCardStats app={play} accent={look?.accent} />
+                    <div className="mt-auto">
+                        <GameCardStats app={play} accent={look?.accent} />
+                    </div>
                 ) : (
                     <>
                         {app.description && <p className="line-clamp-2 text-[11px] text-muted">{app.description}</p>}
@@ -321,7 +323,7 @@ export function CatalogCard({
                     </>
                 )}
 
-                <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     <PlayButtons entry={entry} options={options} handlers={handlers} />
                     <InstallButton entry={entry} install={install} handlers={handlers} />
                     <span className="ml-auto">
