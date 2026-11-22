@@ -13,6 +13,7 @@
 //! | --- | --- |
 //! | [`metadata`] | `tmc.json` — what an archive says about where it came from |
 //! | [`store`] | The files: importing, laying out, moving, removing |
+//! | [`modpack`] | Modrinth `.mrpack` and CurseForge manifest zips |
 //! | [`adopt`] | Finding what is already in a game folder that nothing claims |
 //! | [`vault`] | How the webview names one of those without ever seeing a path |
 //!
@@ -49,6 +50,7 @@
 
 pub mod adopt;
 pub mod metadata;
+pub mod modpack;
 pub mod store;
 pub mod vault;
 

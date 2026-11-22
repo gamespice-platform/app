@@ -433,6 +433,8 @@ pub fn run() {
             commands::import::import_managers,
             commands::import::import_manager_scan,
             commands::import::local_list,
+            commands::import::local_pack_download,
+            commands::import::local_pack_finalize,
             commands::import::local_get,
             commands::import::local_reveal,
             commands::import::local_patch,

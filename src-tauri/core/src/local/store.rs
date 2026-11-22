@@ -161,6 +161,10 @@ pub struct Prepared {
     pub files: usize,
     pub bytes: u64,
     pub payload: Payload,
+    /// Set when the archive is a Modrinth or CurseForge modpack. Its listed
+    /// downloads are NOT fetched here; the caller saves the plan against the
+    /// new id and the user starts them.
+    pub pack: Option<super::modpack::PackManifest>,
 }
 
 /// What the caller has to supply for a guess to be made.
@@ -219,6 +223,7 @@ pub fn suggest_payload(source: &Path, extensions: &[String]) -> Payload {
 /// (no pure-Rust decoder we would ship; see docs/gaps.md).
 fn is_unpackable(lower_name: &str) -> bool {
     lower_name.ends_with(".zip")
+        || lower_name.ends_with(".mrpack")
         || lower_name.ends_with(".7z")
         || lower_name.ends_with(".tar")
         || lower_name.ends_with(".tar.gz")
@@ -255,7 +260,22 @@ pub fn prepare(store: &Path, source: &Path, opts: &ImportOptions<'_>) -> AppResu
     let raw = incoming.join("payload");
     std::fs::create_dir_all(&raw)?;
 
-    let result = assemble(source, &raw, payload);
+    let pack = match payload {
+        Payload::Unpack => match super::modpack::read(source) {
+            Ok(pack) => pack,
+            Err(e) => {
+                let _ = std::fs::remove_dir_all(&incoming);
+
+                return Err(e);
+            }
+        },
+        _ => None,
+    };
+
+    let result = match &pack {
+        Some(pack) => super::modpack::unpack_overrides(source, &raw, pack, copy_tree),
+        None => assemble(source, &raw, payload),
+    };
 
     let (files, bytes) = match result {
         Ok(counts) => counts,
@@ -266,7 +286,9 @@ pub fn prepare(store: &Path, source: &Path, opts: &ImportOptions<'_>) -> AppResu
         }
     };
 
-    if files == 0 {
+    let has_downloads = pack.as_ref().is_some_and(|p| !p.files.is_empty());
+
+    if files == 0 && !has_downloads {
         let _ = std::fs::remove_dir_all(&incoming);
 
         return Err(AppError::invalid(
@@ -276,7 +298,9 @@ pub fn prepare(store: &Path, source: &Path, opts: &ImportOptions<'_>) -> AppResu
 
     let metadata = read_sidecar(&raw);
 
+    // A pack's paths are relative to the game folder itself.
     let rel_path = match &opts.rel_path {
+        _ if pack.is_some() => String::new(),
         Some(explicit) => sanitise_rel(explicit)?,
         None => suggest_rel_path(&raw, metadata.as_ref(), opts.mod_targets),
     };
@@ -308,6 +332,7 @@ pub fn prepare(store: &Path, source: &Path, opts: &ImportOptions<'_>) -> AppResu
     let name = metadata
         .as_ref()
         .and_then(|m| m.name.clone())
+        .or_else(|| pack.as_ref().map(|p| p.name.clone()))
         .unwrap_or_else(|| display_name(source));
 
     Ok(Prepared {
@@ -318,6 +343,7 @@ pub fn prepare(store: &Path, source: &Path, opts: &ImportOptions<'_>) -> AppResu
         files,
         bytes,
         payload,
+        pack,
     })
 }
 
@@ -484,7 +510,7 @@ fn assemble(source: &Path, dest: &Path, payload: Payload) -> AppResult<(usize, u
 /// [`crate::detect::walk`] gives: `~/.wine/dosdevices/z: -> /` is a layout
 /// people actually have, and following one turns "import this mod folder" into
 /// "copy the filesystem".
-fn copy_tree(source: &Path, dest: &Path) -> AppResult<(usize, u64)> {
+pub(crate) fn copy_tree(source: &Path, dest: &Path) -> AppResult<(usize, u64)> {
     fn inner(
         source: &Path,
         dest: &Path,

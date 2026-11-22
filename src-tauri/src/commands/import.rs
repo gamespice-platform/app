@@ -34,6 +34,7 @@ use tauri::State;
 
 use tmc_core::audit;
 use tmc_core::error::{AppError, AppResult};
+use tmc_core::local::modpack::{self, Finalized};
 use tmc_core::local::store::{self, ImportOptions, Payload};
 use tmc_core::local::vault::is_importable;
 use tmc_core::local::{adopt, LocalMod, LocalPatch, NewLocalMod, Origin, SourceRef};
@@ -380,7 +381,11 @@ fn import_one(
         name,
         app_id,
         app_slug: slug.map(str::to_owned),
-        version: prepared.metadata.as_ref().and_then(|m| m.version.clone()),
+        version: prepared
+            .metadata
+            .as_ref()
+            .and_then(|m| m.version.clone())
+            .or_else(|| prepared.pack.as_ref().and_then(|p| p.version.clone())),
         author: prepared.metadata.as_ref().and_then(|m| m.author.clone()),
         origin,
         origin_label: Some(display_name(path)),
@@ -406,6 +411,16 @@ fn import_one(
         let _ = state.library.local_delete(id);
 
         return Err(e);
+    }
+
+    if let Some(pack) = &prepared.pack {
+        // Remembered, not fetched: the user starts the downloads.
+        if let Err(e) = modpack::save_plan(store_root, id, pack) {
+            let _ = state.library.local_delete(id);
+            store::remove(store_root, id);
+
+            return Err(e);
+        }
     }
 
     audit!(
@@ -519,6 +534,7 @@ pub fn local_delete(state: State<'_, AppState>, id: i64) -> AppResult<Vec<i64>> 
     let affected = state.library.local_delete(id)?;
 
     store::remove(&state.paths.local_mods_dir(), id);
+    modpack::discard(&state.paths.local_mods_dir(), id);
 
     audit!(
         state.audit,
@@ -529,6 +545,42 @@ pub fn local_delete(state: State<'_, AppState>, id: i64) -> AppResult<Vec<i64>> 
     );
 
     Ok(affected)
+}
+
+/// Queue the downloads an imported modpack listed.
+///
+/// Takes a mod id and nothing else: the URLs, hashes and destinations were
+/// read from the pack at import time and validated then. Re-queuing is
+/// harmless (stable ids). Returns how many were queued.
+#[tauri::command]
+pub async fn local_pack_download(state: State<'_, AppState>, id: i64) -> AppResult<usize> {
+    let row = state
+        .library
+        .local_get(id)?
+        .ok_or_else(|| AppError::invalid("That mod does not exist."))?;
+
+    let requests = modpack::download_requests(&state.paths.local_mods_dir(), id, &row.name);
+    let queued = requests.len();
+
+    for request in requests {
+        state.downloads.enqueue(request).await?;
+    }
+
+    Ok(queued)
+}
+
+/// Verify what a modpack's downloads fetched and move it into the mod.
+///
+/// Files whose SHA-512 differs from the pack's are deleted and reported.
+/// Call it again after more downloads finish.
+#[tauri::command]
+pub fn local_pack_finalize(state: State<'_, AppState>, id: i64) -> AppResult<Finalized> {
+    let row = state
+        .library
+        .local_get(id)?
+        .ok_or_else(|| AppError::invalid("That mod does not exist."))?;
+
+    modpack::finalize(&state.paths.local_mods_dir(), id, &row.rel_path)
 }
 
 /// Put an imported mod in a sandbox.

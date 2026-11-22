@@ -20,6 +20,7 @@ This app's per-game rules and manager descriptors are written for it, but the fa
 | ferium | https://github.com/gorilla-devs/ferium | MPL-2.0 |
 | minotaur | https://github.com/modrinth/minotaur | LGPL-2.1 |
 | limo | https://github.com/limo-app/limo | GPL-3.0 |
+| Modrinth modpack format (.mrpack) and CurseForge manifest format | https://docs.modrinth.com/modpacks/format | spec, facts only |
 | sevenz-rust2 (dependency, not copied) | https://github.com/hasenbanck/sevenz-rust2 | Apache-2.0 |
 
 Also consulted: Modrinth's [code](https://github.com/modrinth/code) (per-package licenses, see its COPYING.md) and the Mod Organizer 2 `game_bethesda` plugin (no license file in the copy we read, so only facts, nothing else, were taken).

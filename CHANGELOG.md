@@ -11,6 +11,7 @@ The GameSpice App's releases, newest first. A version here is the one in `packag
 - New: manager descriptors for Gale, GDLauncher, Modrinth App and Prism's .minecraft layout, one per Thunderstore loader for r2modman and Gale; Prism and r2modman descriptors updated.
 - New: the `extract` step takes `stripSingleRoot`, which drops one wrapper folder when the whole archive sits under it; the Paradox rules use it so a mod zipped with or without its folder installs the same.
 - New: `.7z` archives unpack through the same jail and caps as zips (pure-Rust `sevenz-rust2`); links, anti-items and encrypted archives are refused. Imports accept `.7z`. RAR is not supported.
+- New: importing a Modrinth `.mrpack` or a CurseForge manifest zip. The overrides unpack through the usual jail and caps; an `.mrpack`'s listed files download through the queue (https, Modrinth's four allowed hosts, SHA-512 required) into a staging folder and are checked before they reach the mod. CurseForge mod files need CurseForge's keyed API and are listed as unresolved. Export is not implemented.
 - New: `CREDITS.md` names the projects the rules were drafted from.
 
 ## 0.5.16

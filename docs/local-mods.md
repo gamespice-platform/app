@@ -32,6 +32,16 @@ Not signed, deliberately. The app has the machinery, and it would be the wrong q
 
 Whether to unpack. `.jar` is a zip and must not be unpacked; a resource pack is a `.zip` and must not be either; a mod shipped as a zip of loose DLLs must be. So the **game's own install rules decide**: `AppPlugins::mod_extensions` reads `match.extensions` off the `manage_*` rules, and a file whose extension a rule accepts is copied verbatim. Nothing invents a second list, and a game that grows a new packaging format gets it for free. `.7z` is among the formats the importer unpacks when a rule accepts it (same caps and jail as a zip).
 
+## Modpacks
+
+A `.mrpack` (Modrinth) or a zip with a CurseForge `manifest.json` (`manifestType: minecraftModpack`) is recognised by its manifest, not its name, and goes through the same `prepare` as any archive (`local/modpack.rs`). A zip that merely has some `manifest.json` is an ordinary archive. A pack with a manifest it cannot read is an error, never a plain unpack.
+
+- **Overrides.** `overrides/` and `client-overrides/` (or the folder a CurseForge manifest names, one path component only) unpack through `extract_archive` into scratch, then copy over the game folder by `copy_tree`. Same jail, same byte and entry caps, symlinks skipped. The pack's paths are relative to the game folder, so `rel_path` is forced to empty.
+- **Listed downloads (`.mrpack`).** Each needs `https`, no explicit port, a host in `ALLOWED_HOSTS` (the four the format permits), a safe relative path (leading slash, `..`, case-insensitive duplicates refused) and a SHA-512. Files the pack marks `env.client: unsupported` are skipped and counted. The plan is saved under `<store>/.packs/<id>/`.
+- **Nothing is fetched at import.** The webview calls `local_pack_download(id)` (queue, stable ids `pack<id>:<n>`, destinations in the staging folder) and later `local_pack_finalize(id)`, which hashes each staged file and moves it into the mod only on a match; a mismatch is deleted and reported. Neither command takes a URL or a path.
+- **CurseForge.** Files are `projectID/fileID` pairs; turning them into URLs needs the keyed CurseForge API, which the app does not call. Overrides are imported and the pairs are reported as unresolved.
+- **Not done.** Exporting a pack; frontend buttons for the two commands; picking `fileSize` mismatch as a pre-check in the queue.
+
 Where the payload lands is a guess and is treated as one — the sidecar's `installPath`, then "does its top level already hold a declared mod target?", then the game's first `modTargets` entry — and then the user can change it. `store::relayout` is what makes that cheap: a directory rename inside the store, not a re-import.
 
 ## Adopting what is already there

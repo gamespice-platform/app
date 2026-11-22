@@ -577,7 +577,7 @@ pub(crate) fn extract_archive(
         .unwrap_or_default()
         .to_ascii_lowercase();
 
-    if name.ends_with(".zip") {
+    if name.ends_with(".zip") || name.ends_with(".mrpack") {
         extract_zip_within(source, dest, opts, MAX_EXTRACT_BYTES)
     } else if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
         let open = || -> AppResult<_> {
