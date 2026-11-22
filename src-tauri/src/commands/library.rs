@@ -262,7 +262,11 @@ pub async fn library_uninstall(
 /// opens a file-manager window and nothing else, so an edited database row can
 /// at worst point it at some other folder; it never reads, writes or runs it.
 #[tauri::command]
-pub fn library_reveal(app: tauri::AppHandle, state: State<'_, AppState>, id: String) -> AppResult<()> {
+pub fn library_reveal(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<()> {
     let entry = state
         .library
         .get(&id)?
@@ -550,7 +554,9 @@ mod reveal_tests {
         let files = vec![
             format!("removed {here}"),
             "relative/thing".to_string(),
-            dir.join("tmc-reveal-test-does-not-exist").to_string_lossy().into_owned(),
+            dir.join("tmc-reveal-test-does-not-exist")
+                .to_string_lossy()
+                .into_owned(),
             here.clone(),
         ];
 
