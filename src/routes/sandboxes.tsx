@@ -14,6 +14,7 @@ import {
     FiPlus,
     FiRefreshCw,
     FiTrash2,
+    FiUpload,
 } from 'react-icons/fi'
 
 import { api } from '~/lib/api/client'
@@ -24,12 +25,14 @@ import { GameIcon } from '~/components/game-icon'
 import { ItemThumb } from '~/components/item-thumb'
 import { useAppIcons } from '~/lib/hooks/use-app-icons'
 import { useAuth } from '~/lib/auth/provider'
+import { formatBytes } from '~/lib/downloads/provider'
 import { useLibrary } from '~/lib/library/provider'
 import type {
     DependencyReportT,
     LaunchPreviewT,
     OutdatedT,
     DeployReportT,
+    ExportReportT,
     OptionSpecT,
     SandboxRowT,
     SandboxSpecT,
@@ -328,6 +331,7 @@ function SandboxDetail({
     const [busy, setBusy] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [report, setReport] = useState<DeployReportT | null>(null)
+    const [exported, setExported] = useState<ExportReportT | null>(null)
     const [picking, setPicking] = useState(false)
 
     /*
@@ -591,6 +595,40 @@ function SandboxDetail({
                     Check files
                 </button>
 
+                <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() =>
+                        void run('export-mrpack', async () => {
+                            setExported(
+                                await ipc.sandboxExportPack(sandbox.id, 'mrpack')
+                            )
+                        })
+                    }
+                    title="Write a Modrinth .mrpack into the downloads folder"
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:border-accent disabled:opacity-50"
+                >
+                    <FiUpload className="size-3.5" />
+                    {busy === 'export-mrpack' ? 'Exporting…' : 'Export .mrpack'}
+                </button>
+
+                <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() =>
+                        void run('export-share', async () => {
+                            setExported(
+                                await ipc.sandboxExportPack(sandbox.id, 'share')
+                            )
+                        })
+                    }
+                    title="Write a TMC share zip into the downloads folder"
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:border-accent disabled:opacity-50"
+                >
+                    <FiUpload className="size-3.5" />
+                    {busy === 'export-share' ? 'Exporting…' : 'Export share zip'}
+                </button>
+
                 <span className="ml-auto text-xs text-muted">
                     {sandbox.deployedFiles > 0
                         ? `${sandbox.deployedFiles} file${sandbox.deployedFiles === 1 ? '' : 's'} in the game folder`
@@ -599,6 +637,22 @@ function SandboxDetail({
             </section>
 
             {report && <DeploySummary report={report} />}
+
+            {exported && (
+                <div className="selectable rounded-lg border border-border px-3 py-2 text-xs">
+                    Saved <span className="font-mono">{exported.fileName}</span> in
+                    the downloads folder ({exported.files} file
+                    {exported.files === 1 ? '' : 's'},{' '}
+                    {formatBytes(exported.bytes)}).
+                    {exported.notes.length > 0 && (
+                        <ul className="mt-1 list-disc pl-4">
+                            {exported.notes.map((n) => (
+                                <li key={n}>{n}</li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            )}
 
             <UpdatesBanner sandbox={sandbox} onChanged={onChanged} />
 

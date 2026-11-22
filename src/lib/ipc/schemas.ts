@@ -1361,6 +1361,21 @@ export const PackFinalizedSchema = z.object({
 
 export type PackFinalizedT = z.infer<typeof PackFinalizedSchema>
 
+/** What a sandbox export wrote: a file name in the downloads folder, never a path. */
+export const ExportReportSchema = z.object({
+    fileName: z.string(),
+    files: z.number(),
+    bytes: z.number(),
+    /** Things left out of the file, one sentence each. */
+    notes: z.array(z.string()).default([]),
+})
+
+export type ExportReportT = z.infer<typeof ExportReportSchema>
+
+export const ExportKindSchema = z.enum(['mrpack', 'share'])
+
+export type ExportKindT = z.infer<typeof ExportKindSchema>
+
 export const ImportOutcomeSchema = z.object({
     imported: z.array(LocalModSchema),
     /** One line per thing that did not import, naming it. */

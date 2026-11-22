@@ -34,6 +34,8 @@ import {
     ImportPreviewSchema,
     ImportOutcomeSchema,
     PackFinalizedSchema,
+    ExportReportSchema,
+    type ExportKindT,
     AdoptCandidateSchema,
     ManagerInfoSchema,
     ManagerCandidateSchema,
@@ -1013,9 +1015,13 @@ export const ipc = {
     localPackFinalize: (id: number) =>
         call('local_pack_finalize', PackFinalizedSchema, { id }),
 
-    // HOOK(export-sandbox): the sandbox-to-pack export command lands here as
-    // `sandboxExport`, and its button goes beside the pack panel's actions in
-    // `components/pack-panel.tsx` (see `ExportSandboxSlot`). Not wired yet.
+    /**
+     * Write a sandbox to a file in the downloads folder: a Modrinth `.mrpack`
+     * or a TMC share zip. Takes an id and a kind; Rust picks the folder and a
+     * name that never overwrites, and the report names the file only.
+     */
+    sandboxExportPack: (id: number, kind: ExportKindT) =>
+        call('sandbox_export_pack', ExportReportSchema, { id, kind }),
 
     importUnmanaged: (sandboxId: number) =>
         call('import_unmanaged', z.array(AdoptCandidateSchema), { sandboxId }),

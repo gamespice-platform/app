@@ -135,8 +135,6 @@ export default function PackPanel({ pack }: { pack: PackInfoT }) {
                             <FiCheck className="size-3.5" />
                             Verify and add to the mod
                         </button>
-
-                        <ExportSandboxSlot />
                     </div>
 
                     {queued === 0 && (
@@ -184,14 +182,4 @@ export default function PackPanel({ pack }: { pack: PackInfoT }) {
             )}
         </div>
     )
-}
-
-/**
- * HOOK(export-sandbox): the "export sandbox as a pack" command is being added
- * on the Rust side. Its button belongs HERE, beside the pack actions, and on the
- * sandbox editor's menu; render it from this component and add `sandboxExport`
- * to `lib/ipc/commands.ts`. Deliberately renders nothing until then.
- */
-function ExportSandboxSlot() {
-    return null
 }
