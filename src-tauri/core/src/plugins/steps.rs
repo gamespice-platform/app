@@ -93,6 +93,26 @@ impl RunContext {
     }
 }
 
+/// The message of a digest mismatch from a direct download, kept as a constant
+/// because mirror failover recognises it by value.
+const CHECKSUM_MISMATCH: &str = "Downloaded file did not match the expected checksum.";
+
+/// Whether another mirror may be tried after `e`: a network failure, or the
+/// bytes arriving with the wrong digest. Everything else (a refused URL, a
+/// cancel) is final.
+fn failover_worthy(e: &AppError) -> bool {
+    match e {
+        AppError::Network(_) => true,
+        AppError::Jail(m) => m == CHECKSUM_MISMATCH,
+        _ => false,
+    }
+}
+
+/// Exactly 64 hex digits.
+pub(crate) fn is_sha256_hex(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
 pub struct Executor<'a> {
     pub manifest: &'a Manifest,
     pub jail: &'a Jail,
@@ -205,18 +225,29 @@ impl Executor<'_> {
                 to,
                 sha256,
                 max_bytes,
+                mirrors,
             } => {
                 let target = self.resolve(to, ctx, true)?;
                 let resolved = ctx.fill(url);
 
-                self.download(
-                    &resolved,
-                    &target,
-                    ctx.expected_sha(&resolved, sha256.as_deref()).as_deref(),
-                    *max_bytes,
-                    ctx,
-                )
-                .await?;
+                if mirrors.is_empty() {
+                    self.download(
+                        &resolved,
+                        &target,
+                        ctx.expected_sha(&resolved, sha256.as_deref()).as_deref(),
+                        *max_bytes,
+                        ctx,
+                        0,
+                    )
+                    .await?;
+                } else {
+                    let all: Vec<String> = std::iter::once(resolved)
+                        .chain(mirrors.iter().map(|m| ctx.fill(m)))
+                        .collect();
+
+                    self.download_mirrored(&all, &target, sha256.as_deref(), *max_bytes, ctx)
+                        .await?;
+                }
 
                 applied.push(display(&target));
             }
@@ -348,14 +379,10 @@ impl Executor<'_> {
 
     // ------------------------------------------------------------- Download
 
-    async fn download(
-        &self,
-        url: &str,
-        target: &Path,
-        expect_sha: Option<&str>,
-        max_bytes: Option<u64>,
-        ctx: &RunContext,
-    ) -> AppResult<()> {
+    /// The https and allow-list gate every download URL passes, primary or
+    /// mirror, after placeholder substitution. One function so a mirror can
+    /// never be held to a looser standard than the first URL.
+    fn check_url(&self, url: &str) -> AppResult<url::Url> {
         let parsed = url::Url::parse(url)
             .map_err(|_| AppError::jail(format!("'{url}' is not a valid URL.")))?;
 
@@ -382,6 +409,80 @@ impl Executor<'_> {
             )));
         }
 
+        Ok(parsed)
+    }
+
+    /// A download step with mirrors: the first URL, then each mirror in order.
+    ///
+    /// Every URL is gated BEFORE any byte moves, so a bad mirror is a refusal
+    /// of the whole step and not something discovered only once the primary
+    /// happens to fail. The pinned digest is the step's own `sha256`, required
+    /// and well-formed: a mirror is somebody else's server, and the digest is
+    /// the only thing that makes its bytes the author's bytes.
+    ///
+    /// Failover happens on a network failure or a digest mismatch, and on
+    /// nothing else. A jail refusal, a cancel or a pause ends the step, and no
+    /// attempt ever runs with a check the first one did not.
+    async fn download_mirrored(
+        &self,
+        urls: &[String],
+        target: &Path,
+        pinned: Option<&str>,
+        max_bytes: Option<u64>,
+        ctx: &RunContext,
+    ) -> AppResult<()> {
+        let pinned = pinned
+            .map(str::trim)
+            .filter(|s| is_sha256_hex(s))
+            .ok_or_else(|| {
+                AppError::jail("A download with mirrors needs a pinned 64-hex sha256.")
+            })?;
+
+        for url in urls {
+            self.check_url(url)?;
+        }
+
+        let mut last = None;
+
+        for (attempt, url) in urls.iter().enumerate() {
+            match self
+                .download(url, target, Some(pinned), max_bytes, ctx, attempt)
+                .await
+            {
+                Ok(()) => return Ok(()),
+                Err(e) if failover_worthy(&e) => {
+                    audit!(
+                        self.audit,
+                        Warn,
+                        Network,
+                        "plugin.download.failover",
+                        format!("{url}: {e}"),
+                        plugin = self.manifest.id
+                    );
+
+                    // A half-written or mismatching file never stays for the
+                    // next attempt to resume over.
+                    let _ = std::fs::remove_file(target);
+                    last = Some(e);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
+        Err(last.unwrap_or_else(|| AppError::invalid("No download URL.")))
+    }
+
+    async fn download(
+        &self,
+        url: &str,
+        target: &Path,
+        expect_sha: Option<&str>,
+        max_bytes: Option<u64>,
+        ctx: &RunContext,
+        attempt: usize,
+    ) -> AppResult<()> {
+        let parsed = self.check_url(url)?;
+
         let cap = max_bytes
             .unwrap_or(DEFAULT_MAX_DOWNLOAD)
             .min(DEFAULT_MAX_DOWNLOAD);
@@ -405,7 +506,13 @@ impl Executor<'_> {
              * does, and what two sandboxes staging the same mod would do if the
              * destination were shared.
              */
-            let id = format!("plugin:{}:{}", self.manifest.id, display(target));
+            let mut id = format!("plugin:{}:{}", self.manifest.id, display(target));
+
+            // A mirror is a different transfer: sharing the failed one's id
+            // would hand back its terminal state instead of trying again.
+            if attempt > 0 {
+                id.push_str(&format!("#mirror{attempt}"));
+            }
 
             return queue
                 .run_to_completion(crate::download::DownloadRequest {
@@ -470,9 +577,7 @@ impl Executor<'_> {
                     plugin = self.manifest.id
                 );
 
-                Err(AppError::jail(
-                    "Downloaded file did not match the expected checksum.",
-                ))
+                Err(AppError::jail(CHECKSUM_MISMATCH))
             }
         }
     }
@@ -1063,6 +1168,7 @@ pub fn required_roots(steps: &[Step]) -> Vec<&'static str> {
             crate::plugins::manifest::FsRoot::GameDir => "gameDir",
             crate::plugins::manifest::FsRoot::PluginData => "pluginData",
             crate::plugins::manifest::FsRoot::Downloads => "downloads",
+            crate::plugins::manifest::FsRoot::Prefix => "prefix",
         };
 
         if !out.contains(&key) {
@@ -1695,5 +1801,144 @@ mod tests {
             !tmp.path().join("escaped.txt").exists(),
             "nothing landed outside"
         );
+    }
+
+    // ---------------------------------------------------------- mirror lists
+
+    const PIN: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    fn net_manifest(hosts: &[&str]) -> Manifest {
+        let mut m = writable_manifest();
+
+        m.permissions.net = hosts.iter().map(|h| h.to_string()).collect();
+        m
+    }
+
+    /// Run `download_mirrored` offline and return its result and the audit text.
+    async fn mirrored(urls: &[&str], pin: Option<&str>, hosts: &[&str]) -> (AppResult<()>, String) {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let game = tmp.path().join("game");
+
+        std::fs::create_dir_all(&game).expect("mkdir");
+
+        let manifest = net_manifest(hosts);
+        let jail = jail_over(&manifest, &game);
+        let audit_at = tmp.path().join("audit.jsonl");
+        let audit = Audit::new(audit_at.clone());
+
+        let executor = Executor {
+            manifest: &manifest,
+            jail: &jail,
+            http: &crate::http::client(),
+            audit: &audit,
+            downloads: None,
+        };
+
+        let urls: Vec<String> = urls.iter().map(|u| u.to_string()).collect();
+
+        let result = executor
+            .download_mirrored(
+                &urls,
+                &game.join("f.bin"),
+                pin,
+                Some(1024),
+                &RunContext(HashMap::new()),
+            )
+            .await;
+
+        drop(audit);
+
+        let log = std::fs::read_to_string(&audit_at).unwrap_or_default();
+
+        (result, log)
+    }
+
+    #[tokio::test]
+    async fn mirrors_without_a_well_formed_pin_are_refused_before_any_request() {
+        for pin in [None, Some(""), Some("abc"), Some(&PIN[..63])] {
+            let (r, log) = mirrored(
+                &["https://127.0.0.1:1/a", "https://127.0.0.1:2/b"],
+                pin,
+                &["127.0.0.1"],
+            )
+            .await;
+
+            assert!(matches!(r, Err(AppError::Jail(_))), "{pin:?}");
+            assert!(!log.contains("plugin.download"), "no request for {pin:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn every_mirror_passes_the_same_https_and_host_checks() {
+        let bad = [
+            "http://127.0.0.1:2/b",
+            "https://evil.example/b",
+            "ftp://127.0.0.1/b",
+            "not a url",
+        ];
+
+        for mirror in bad {
+            let (r, log) = mirrored(
+                &["https://127.0.0.1:1/a", mirror],
+                Some(PIN),
+                &["127.0.0.1"],
+            )
+            .await;
+
+            assert!(matches!(r, Err(AppError::Jail(_))), "{mirror}");
+
+            // Refused up front: the good primary was never even tried.
+            assert!(
+                !log.contains("plugin.download"),
+                "{mirror} reached the network"
+            );
+        }
+    }
+
+    /// Two unreachable mirrors: the second IS tried (a failover is audited),
+    /// and the result is the network error, not a success and not a panic.
+    #[tokio::test]
+    async fn a_network_failure_moves_on_to_the_next_mirror() {
+        let (r, log) = mirrored(
+            &["https://127.0.0.1:1/a", "https://127.0.0.1:2/b"],
+            Some(PIN),
+            &["127.0.0.1"],
+        )
+        .await;
+
+        assert!(r.is_err());
+        assert!(log.contains("127.0.0.1:1/a"), "primary tried");
+        assert!(log.contains("127.0.0.1:2/b"), "mirror tried");
+        assert!(log.contains("plugin.download.failover"));
+    }
+
+    #[test]
+    fn only_a_network_failure_or_a_mismatch_fails_over() {
+        assert!(failover_worthy(&AppError::Network("down".into())));
+        assert!(failover_worthy(&AppError::jail(CHECKSUM_MISMATCH)));
+
+        assert!(!failover_worthy(&AppError::jail("not in allowed hosts")));
+        assert!(!failover_worthy(&AppError::invalid(
+            "The download was cancelled."
+        )));
+        assert!(!failover_worthy(&AppError::internal("x")));
+    }
+
+    #[test]
+    fn a_manifest_with_mirrors_and_no_pin_does_not_load() {
+        let manifest = |extra: &str| {
+            format!(
+                r#"{{"manifestVersion":1,"id":"app.test","name":"m","version":"1","author":"a",
+                "permissions":{{"net":["a.test"],"fs":[{{"root":"gameDir","path":"","write":true}}]}},
+                "installer":{{"install":[{{"action":"download","url":"https://a.test/f",
+                "mirrors":["https://a.test/g"],"to":{{"root":"gameDir","path":"f"}}{extra}}}]}}}}"#
+            )
+        };
+
+        assert!(Manifest::parse(&manifest("")).is_err());
+        assert!(Manifest::parse(&manifest(r#","sha256":"abc""#)).is_err());
+        let ok = Manifest::parse(&manifest(&format!(r#","sha256":"{PIN}""#)));
+
+        assert!(ok.is_ok(), "{:?}", ok.err());
     }
 }

@@ -61,7 +61,30 @@ fn root_key(root: FsRoot) -> &'static str {
         FsRoot::GameDir => "gameDir",
         FsRoot::PluginData => "pluginData",
         FsRoot::Downloads => "downloads",
+        FsRoot::Prefix => "prefix",
     }
+}
+
+/// The only subtrees of a Wine/Proton prefix a manifest may grant. A prefix is
+/// a whole fake Windows install (registry hives, other users, the system
+/// directory), so a grant is refused unless it lies inside one of the places a
+/// game keeps its documents, settings and mods. Components are compared
+/// exactly, so `Documents2` is not `Documents`.
+pub const PREFIX_ALLOWED: &[&[&str]] = &[
+    &["drive_c", "users", "steamuser", "Documents"],
+    &["drive_c", "users", "steamuser", "My Documents"],
+    &["drive_c", "users", "steamuser", "Saved Games"],
+    &["drive_c", "users", "steamuser", "AppData"],
+    &["drive_c", "ProgramData"],
+];
+
+/// Is `path` (already known to be lexically clean) inside [`PREFIX_ALLOWED`]?
+pub(crate) fn prefix_allowed(path: &str) -> bool {
+    let parts: Vec<&str> = path.split(['/', '\\']).filter(|p| !p.is_empty()).collect();
+
+    PREFIX_ALLOWED
+        .iter()
+        .any(|allowed| parts.len() >= allowed.len() && parts[..allowed.len()] == **allowed)
 }
 
 impl Jail {
@@ -80,6 +103,20 @@ impl Jail {
 
         for grant in &manifest.permissions.fs {
             let key = root_key(grant.root);
+
+            // Checked before availability, so a manifest naming the prefix
+            // outside the allowlist is refused on every platform, not only the
+            // one where the prefix exists.
+            if grant.root == FsRoot::Prefix {
+                join_relative(Path::new("/x"), &grant.path)?;
+
+                if !prefix_allowed(&grant.path) {
+                    return Err(AppError::jail(format!(
+                        "'{}' is not a part of a Wine prefix a plugin may reach.",
+                        grant.path
+                    )));
+                }
+            }
 
             let Some(root) = available.get(key) else {
                 continue;

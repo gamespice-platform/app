@@ -21,9 +21,19 @@ That is a real limitation and it is the point: the alternative is third-party co
 
 `extract` reads `.zip`, `.tar`, `.tar.gz`/`.tgz` and `.7z`. A 7z is read by the pure-Rust `sevenz-rust2` crate (Apache-2.0; no C code, no external program) and goes through the same jail: every entry name is checked before it is written, entries with a link or reparse-point attribute, anti-items and encrypted archives are refused, and the same byte and entry caps are counted as it unpacks. RAR is not supported; see [gaps.md](gaps.md).
 
-Every path is a `PathRef { root, path }` where `root` is one of `gameDir`, `pluginData`, `downloads`. The type cannot express an absolute path.
+Every path is a `PathRef { root, path }` where `root` is one of `gameDir`, `pluginData`, `downloads`, `prefix`. The type cannot express an absolute path.
 
 **`path` is relative to the ROOT, not to any grant.** A plugin granted `{gameDir, "mods", write}` writes to `{ root: gameDir, path: "mods/foo.jar" }`. Grants are *filters* over the resolved path, so several narrow grants under one root compose as a union and stay narrow — the alternative, anchoring each grant at its own subdirectory, cannot say which grant a `PathRef` meant and used to merge them into the widest one.
+
+### The Wine prefix root
+
+`prefix` is the game's Proton/Wine prefix (`.../compatdata/<appid>/pfx`) for games that keep their saves and settings inside it. It resolves on Linux only, and only for a Steam install: the app takes the configured game folder, requires `<library>/steamapps/common/<dir>`, finds the app id by matching `<dir>` against `installdir` in the library's `appmanifest_<id>.acf` files, and requires `compatdata/<id>/pfx` to exist and, once symlinks are resolved, to stay inside `compatdata`. Anywhere else (Windows, macOS, a non-Steam game, no prefix yet) the root is unavailable, and a config location on it is skipped like any unavailable root. A plugin never names the prefix; it is derived from the game folder.
+
+It is **allowlisted**, not just jailed. A grant on `prefix` must sit under one of: `drive_c/users/steamuser/{Documents, My Documents, Saved Games, AppData}` or `drive_c/ProgramData` (`jail::PREFIX_ALLOWED`, matched by whole path components). A grant on the prefix root, `drive_c`, the registry files (`user.reg`, `system.reg`) or `dosdevices` makes the manifest fail to load. The usual three defences (lexical join, containment, symlink-aware deepest-ancestor check) apply on top, so a path cannot leave the grant, the prefix, or follow a link out of either. A `Documents` folder that is itself a symlink out of the prefix (what Wine makes for a prefix it created) is therefore refused; Steam-made Proton prefixes use real folders. Shipped rules: The Sims 4 (`Options.ini`, `Resource.cfg`) and Baldur's Gate 3 (`modsettings.lsx`); a test checks every shipped `prefix` location against the allowlist.
+
+### Mirrors on a download
+
+A `download` step may list `mirrors`: more URLs for the same file, tried in order. Every URL, primary and mirror, goes through the same https and `permissions.net` host check after placeholder substitution, and all of them are checked before any is fetched. `sha256` is mandatory (64 hex digits) when mirrors are listed; a manifest without it does not load, and the step refuses at run time too. The next mirror is tried only after a network failure or a digest mismatch; a refused URL, a cancel or a pause ends the step. At most 8 mirrors.
 
 ## The defences, and what each one catches
 

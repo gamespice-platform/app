@@ -1,0 +1,15 @@
+{
+    "manifestVersion": 1,
+    "label": "Baldur's Gate 3 mod settings",
+    "description": "modsettings.lsx is the list of mods the game loads, in order. A .pak in the Mods folder does nothing until it is listed here. Reached through the game's Proton prefix, so it is only offered on Linux, for a Steam install.",
+    "config": {
+        "locations": [
+            {
+                "label": "Mod list (Proton/Wine prefix)",
+                "root": "prefix",
+                "path": "drive_c/users/steamuser/AppData/Local/Larian Studios/Baldur's Gate 3/PlayerProfiles/Public",
+                "files": ["modsettings.lsx"]
+            }
+        ]
+    }
+}

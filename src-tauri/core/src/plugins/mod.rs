@@ -3,6 +3,7 @@ pub mod config;
 pub mod jail;
 pub mod managers;
 pub mod manifest;
+pub mod prefix;
 pub mod query;
 pub mod registry;
 pub mod signature;
@@ -97,6 +98,12 @@ pub fn jail_for_scoped(
                 return Err(AppError::invalid(format!(
                     "The install folder configured for this game does not exist: {dir}"
                 )));
+            }
+
+            // Linux only; `None` anywhere else, or when the game is not a Steam
+            // install with a Proton prefix.
+            if let Some(prefix) = prefix::steam_prefix(&path) {
+                available.insert("prefix", prefix);
             }
 
             available.insert("gameDir", path);

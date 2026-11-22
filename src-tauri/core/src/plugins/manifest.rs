@@ -26,6 +26,9 @@ pub const MANIFEST_VERSION: u32 = 1;
 /// File a plugin bundle must contain at its root.
 pub const MANIFEST_FILE: &str = "plugin.json";
 
+/// Most mirrors one download step may list.
+pub const MAX_MIRRORS: usize = 8;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Manifest {
@@ -104,6 +107,10 @@ pub enum FsRoot {
     /// The user's configured download directory. Read-write, but shared with
     /// other plugins — anything durable belongs in `pluginData`.
     Downloads,
+    /// The game's Proton/Wine prefix (`steamapps/compatdata/<id>/pfx`), found
+    /// from the configured game folder. Linux only, and only subtrees named in
+    /// [`crate::plugins::jail::PREFIX_ALLOWED`]; see [`crate::plugins::prefix`].
+    Prefix,
 }
 
 /// One subtree of one root the plugin may touch.
@@ -170,6 +177,13 @@ pub enum Step {
         sha256: Option<String>,
         #[serde(default)]
         max_bytes: Option<u64>,
+        /// Alternative URLs for the same file, tried in order after `url`
+        /// fails on the network or arrives with the wrong digest.
+        ///
+        /// Each passes the same https and `permissions.net` checks as `url`,
+        /// and `sha256` is REQUIRED (64 hex digits) when any are listed.
+        #[serde(default)]
+        mirrors: Vec<String>,
     },
 
     /// Unpack a `.zip`, `.tar`, `.tar.gz` inside the jail.
@@ -445,6 +459,27 @@ impl Manifest {
                 return Err(AppError::invalid("Plugin has too many steps."));
             }
 
+            for step in installer.install.iter().chain(installer.uninstall.iter()) {
+                if let Step::Download {
+                    mirrors, sha256, ..
+                } = step
+                {
+                    if mirrors.len() > MAX_MIRRORS {
+                        return Err(AppError::invalid("A download lists too many mirrors."));
+                    }
+
+                    let pinned = sha256
+                        .as_deref()
+                        .is_some_and(|s| crate::plugins::steps::is_sha256_hex(s.trim()));
+
+                    if !mirrors.is_empty() && !pinned {
+                        return Err(AppError::invalid(
+                            "A download with mirrors needs a pinned 64-hex sha256.",
+                        ));
+                    }
+                }
+            }
+
             /*
              * A plan with no write grant can only fail, loudly, halfway
              * through. Catching it at install time means the user is told
@@ -522,6 +557,7 @@ impl Manifest {
                 FsRoot::GameDir => "the game's install folder",
                 FsRoot::PluginData => "its own private folder",
                 FsRoot::Downloads => "your downloads folder",
+                FsRoot::Prefix => "the game's Wine/Proton prefix (Linux only)",
             };
 
             let sub = if grant.path.is_empty() {
