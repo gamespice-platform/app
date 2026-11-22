@@ -235,6 +235,82 @@ pub async fn external_install(
     })
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallPathRequest {
+    /// Vault token of the dropped file or folder. Never a path.
+    pub token: String,
+    /// Relative paths (files or folders) to keep; `None` installs everything.
+    pub selected: Option<Vec<String>>,
+    pub name: Option<String>,
+    pub app_id: Option<i64>,
+    pub sandbox_id: Option<i64>,
+}
+
+/// Install a dropped file, folder or zip (or the chosen part of it) as an
+/// external mod. The user's own act, so it installs directly.
+#[tauri::command]
+pub fn external_install_path(
+    state: State<'_, AppState>,
+    request: InstallPathRequest,
+) -> AppResult<InstallReport> {
+    let path = state
+        .vault
+        .resolve(&request.token)
+        .ok_or_else(|| AppError::invalid("That file is no longer available — drop it again."))?;
+    let sandbox = match request.sandbox_id {
+        Some(id) => Some(
+            state
+                .library
+                .sandbox_get(id)?
+                .ok_or_else(|| AppError::invalid("That sandbox does not exist."))?,
+        ),
+        None => None,
+    };
+    let app_id = sandbox.as_ref().map(|s| s.app_id).or(request.app_id);
+    let slug = sandbox
+        .as_ref()
+        .and_then(|s| s.app_slug.clone())
+        .or_else(|| app_id.and_then(|id| state.app_slug_for(id)));
+    let plugins = state.app_plugins();
+    let targets = slug
+        .as_deref()
+        .map(|s| plugins.mod_targets(s))
+        .unwrap_or_default();
+    let extensions = slug
+        .as_deref()
+        .map(|s| plugins.mod_extensions(s))
+        .unwrap_or_default();
+    let store_root = state.paths.local_mods_dir();
+    let env = InstallEnv {
+        db: &state.library,
+        store_root: &store_root,
+        mod_targets: &targets,
+        mod_extensions: &extensions,
+    };
+    let installed = install::install_path(
+        &env,
+        &path,
+        request.selected.as_deref(),
+        request.name.as_deref().unwrap_or_default(),
+        &Target {
+            app_id,
+            app_slug: slug,
+        },
+    )?;
+    let mut added_to = None;
+    if let Some(sb) = &sandbox {
+        if let Some(local) = state.library.local_get(installed.local_id)? {
+            state.library.sandbox_add_local(sb.id, &local)?;
+            added_to = Some(sb.id);
+        }
+    }
+    Ok(InstallReport {
+        outcome: AddOutcome::Installed(installed),
+        sandbox_id: added_to,
+    })
+}
+
 /// Remove a mod that was added from a link. Returns sandboxes needing a redeploy.
 #[tauri::command]
 pub fn external_remove(state: State<'_, AppState>, local_id: i64) -> AppResult<Vec<i64>> {

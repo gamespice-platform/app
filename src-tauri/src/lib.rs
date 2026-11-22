@@ -418,6 +418,7 @@ pub fn run() {
             commands::external::external_parse,
             commands::external::external_resolve,
             commands::external::external_install,
+            commands::external::external_install_path,
             commands::external::external_remove,
             commands::external::external_inspect_path,
             commands::external::external_scheme_status,

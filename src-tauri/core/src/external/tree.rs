@@ -202,6 +202,86 @@ pub fn build(source: &Source, mod_extensions: &[String]) -> AppResult<FileTree> 
     })
 }
 
+/// A selected path as a clean relative path, or an error. Rejects absolute
+/// paths, `..` and empty names: the selection comes from the webview.
+fn clean_selected(raw: &str) -> AppResult<String> {
+    let p = raw.replace('\\', "/");
+    let p = p.trim_matches('/');
+    if p.is_empty()
+        || p.split('/')
+            .any(|c| c.is_empty() || c == "." || c == ".." || c.contains(':'))
+    {
+        return Err(AppError::invalid(format!(
+            "not a path inside the mod: {raw}"
+        )));
+    }
+    Ok(p.to_string())
+}
+
+impl Source {
+    /// Copy only the chosen files into `dest` (created), keeping their relative
+    /// layout. A chosen folder takes everything under it. Returns the number of
+    /// files copied; none is an error, so an empty ticking cannot install nothing.
+    /// Only paths that exist in this source are copied, so a made-up or `..`
+    /// path cannot reach outside it.
+    pub fn copy_selected(&self, selected: &[String], dest: &Path) -> AppResult<usize> {
+        let chosen: std::collections::BTreeSet<String> = selected
+            .iter()
+            .map(|s| clean_selected(s))
+            .collect::<AppResult<_>>()?;
+        let wanted = |path: &str| {
+            let mut cur = path;
+            loop {
+                if chosen.contains(cur) {
+                    return true;
+                }
+                match cur.rsplit_once('/') {
+                    Some((parent, _)) => cur = parent,
+                    None => return false,
+                }
+            }
+        };
+        let files: Vec<String> = self
+            .entries()?
+            .into_iter()
+            .filter(|(p, is_dir, _)| !*is_dir && wanted(p))
+            .map(|(p, _, _)| p)
+            .collect();
+        std::fs::create_dir_all(dest)?;
+        let mut zip = match self {
+            Self::Zip(p) => Some(
+                zip::ZipArchive::new(std::fs::File::open(p)?)
+                    .map_err(|e| AppError::invalid(format!("Not a readable zip: {e}")))?,
+            ),
+            Self::Dir(_) => None,
+        };
+        for rel in &files {
+            let out = dest.join(rel);
+            if let Some(parent) = out.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            match (self, zip.as_mut()) {
+                (Self::Dir(root), _) => {
+                    std::fs::copy(root.join(rel), &out)?;
+                }
+                (_, Some(z)) => {
+                    let mut e = z
+                        .by_name(rel)
+                        .map_err(|e| AppError::invalid(format!("Bad zip entry: {e}")))?;
+                    std::io::copy(&mut e, &mut std::fs::File::create(&out)?)?;
+                }
+                _ => {}
+            }
+        }
+        if files.is_empty() {
+            return Err(AppError::invalid(
+                "none of the chosen files exist in that mod",
+            ));
+        }
+        Ok(files.len())
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod testutil {
     use std::io::Write;
@@ -263,5 +343,50 @@ mod tests {
         std::fs::write(d.path().join("x.dll"), "1").unwrap();
         assert!(Source::open(&d.path().join("x.dll")).is_err());
         assert!(Source::open(&d.path().join("gone")).is_err());
+    }
+
+    #[test]
+    fn copy_selected_takes_files_and_folders_and_nothing_else() {
+        let d = tempfile::tempdir().unwrap();
+        let z = d.path().join("m.zip");
+        testutil::write_zip(
+            &z,
+            &[("a/x.dll", "1"), ("a/sub/y.dll", "22"), ("b/z.txt", "3")],
+        );
+        {
+            let src = Source::open(&z).unwrap();
+            let out = d.path().join("out");
+            let n = src
+                .copy_selected(&["a".into(), "b/z.txt".into()], &out)
+                .unwrap();
+            assert_eq!(n, 3);
+            assert!(out.join("a/sub/y.dll").is_file());
+            assert!(out.join("b/z.txt").is_file());
+            let out2 = d.path().join("out2");
+            assert_eq!(src.copy_selected(&["a/x.dll".into()], &out2).unwrap(), 1);
+            assert!(!out2.join("a/sub/y.dll").exists());
+        }
+        let dir = d.path().join("src");
+        std::fs::create_dir_all(dir.join("p")).unwrap();
+        std::fs::write(dir.join("p/m.dll"), "1").unwrap();
+        std::fs::write(dir.join("skip.txt"), "1").unwrap();
+        let out = d.path().join("out3");
+        Source::open(&dir)
+            .unwrap()
+            .copy_selected(&["p".into()], &out)
+            .unwrap();
+        assert!(out.join("p/m.dll").is_file() && !out.join("skip.txt").exists());
+    }
+
+    #[test]
+    fn copy_selected_refuses_escapes_and_empty_picks() {
+        let d = tempfile::tempdir().unwrap();
+        std::fs::write(d.path().join("a.dll"), "1").unwrap();
+        let s = Source::open(d.path()).unwrap();
+        let out = d.path().join("o");
+        assert!(s.copy_selected(&["../a.dll".into()], &out).is_err());
+        assert!(s.copy_selected(&["/etc/passwd".into()], &out).is_err());
+        assert!(s.copy_selected(&["nope".into()], &out).is_err());
+        assert!(s.copy_selected(&[], &out).is_err());
     }
 }

@@ -276,6 +276,52 @@ pub fn install_downloaded(
     })
 }
 
+/// Install the files the user ticked from a dropped folder or zip, or the whole
+/// path when `selected` is `None`. The chosen files are staged under the store
+/// and registered like any other external mod (no provider; `Direct`).
+pub fn install_path(
+    env: &InstallEnv<'_>,
+    source: &Path,
+    selected: Option<&[String]>,
+    name: &str,
+    target: &Target,
+) -> AppResult<Installed> {
+    let name = name.trim();
+    let name = if name.is_empty() {
+        source
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    } else {
+        name.to_string()
+    };
+    let stub = Resolved {
+        provider: ProviderId::Direct,
+        project_id: String::new(),
+        version_id: String::new(),
+        title: name,
+        version: String::new(),
+        author: None,
+        game: Default::default(),
+        files: vec![],
+        deps: vec![],
+        page_url: None,
+        manual_only: None,
+        licence: None,
+    };
+    let label = "dropped";
+    let Some(selected) = selected else {
+        return install_downloaded(env, &stub, label, source, Verified::None, target);
+    };
+    let staging = env.store_root.join(".selected");
+    let _ = std::fs::remove_dir_all(&staging);
+    let result = super::tree::Source::open(source)
+        .and_then(|s| s.copy_selected(selected, &staging))
+        .and_then(|_| install_downloaded(env, &stub, label, &staging, Verified::None, target));
+    let _ = std::fs::remove_dir_all(&staging);
+    result
+}
+
 /// Remove an external mod: its row, its files, and (through the next deploy's
 /// ledger purge) its place in every sandbox. Refuses a mod that did not come
 /// from a link, so this cannot be used to delete someone's dropped import.
@@ -550,5 +596,36 @@ mod tests {
             .unwrap();
         assert!(remove(&db, work.path(), id).is_err());
         assert!(db.local_get(id).unwrap().is_some(), "left alone");
+    }
+
+    #[test]
+    fn install_path_registers_only_the_chosen_files() {
+        let d = tempfile::tempdir().unwrap();
+        let store_root = d.path().join("store");
+        let z = d.path().join("pack.zip");
+        write_zip(
+            &z,
+            &[("keep/a.dll", "x"), ("drop/b.dll", "y"), ("c.txt", "z")],
+        );
+        let db = LibraryDb::open_memory().unwrap();
+        let env = InstallEnv {
+            db: &db,
+            store_root: &store_root,
+            mod_targets: &[],
+            mod_extensions: &[],
+        };
+        let got = install_path(
+            &env,
+            &z,
+            Some(&["keep".to_string()]),
+            "My pack",
+            &Target::default(),
+        )
+        .unwrap();
+        assert_eq!((got.name.as_str(), got.files), ("My pack", 1));
+        assert!(store::get(&db, got.local_id).unwrap().is_some());
+        assert!(!store_root.join(".selected").exists(), "staging is cleaned");
+        assert!(install_path(&env, &z, Some(&[]), "x", &Target::default()).is_err());
+        assert!(remove(&db, &store_root, got.local_id).is_ok());
     }
 }
