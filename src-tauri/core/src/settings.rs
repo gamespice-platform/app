@@ -98,6 +98,11 @@ pub struct AppSettings {
     pub download_limit_bps: u64,
     /// How many transfers run at once. Clamped to `download::MAX_CONCURRENT`.
     pub download_concurrency: u8,
+    /// Largest external-mod download the app accepts, in MiB. `0` is
+    /// unlimited and is the default: the app is a convenience layer on the
+    /// user's own machine, not a gatekeeper. A download over a non-zero cap
+    /// FAILS with a sentence rather than being truncated.
+    pub external_max_download_mb: u64,
     /// Keep finished downloads in the list until they are cleared.
     pub download_keep_history: bool,
 
@@ -161,6 +166,7 @@ impl Default for AppSettings {
             notification_poll_secs: 60,
             download_limit_bps: 0,
             download_concurrency: crate::download::DEFAULT_CONCURRENT as u8,
+            external_max_download_mb: 0,
             download_keep_history: true,
             require_signed_plugins: false,
             confirm_every_run: true,

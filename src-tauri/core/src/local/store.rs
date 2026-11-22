@@ -97,6 +97,9 @@ pub enum Origin {
     Adopted,
     /// Read out of another mod manager's own storage.
     Manager,
+    /// Downloaded from a link: see `crate::external`. Where it came from is in
+    /// the `external_mod` table, keyed by this row's id.
+    External,
 }
 
 impl Origin {
@@ -106,6 +109,7 @@ impl Origin {
             Self::Folder => "folder",
             Self::Adopted => "adopted",
             Self::Manager => "manager",
+            Self::External => "external",
         }
     }
 
@@ -114,6 +118,7 @@ impl Origin {
             "folder" => Self::Folder,
             "adopted" => Self::Adopted,
             "manager" => Self::Manager,
+            "external" => Self::External,
             // An unknown value from a future schema reads as the most
             // conservative thing it could be, rather than failing the row.
             _ => Self::Dropped,

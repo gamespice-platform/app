@@ -61,6 +61,16 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `local/store.rs` | Imported mods on disk: assembling one, laying it out under the game folder, moving it, removing it |
 | `local/adopt.rs` | What is already in a game folder that the ledger, a subscription and a previous adoption cannot account for |
 | `local/vault.rs` | Paths this process found, named from the webview by token. What that buys, and what it does not |
+| `external/mod.rs` | Mods from other sites: provider ids, `ExternalRef`, `Resolved`, hashes, credential state; the module doc is the rules |
+| `external/parse.rs` | `parse_input`: any pasted link, `nxm://`, `curseforge://`, `ror2mm://`, `prismlauncher://` to an `ExternalRef`. Pure |
+| `external/provider.rs` | `ModProvider` trait, `Registry`, `Fetch` (HTTP with an identifying User-Agent, mockable), `ProviderAvailability` (stub until the site has an endpoint) |
+| `external/providers/` | Modrinth, Thunderstore, GitHub, direct; `keyed.rs` is CurseForge/Nexus/mod.io (off until enabled) and the Steam Workshop hand-off |
+| `external/meta.rs`, `tree.rs` | Metadata readers (fabric/quilt/mods.toml/mcmod/manifest/Prism/Oxide) into `ExternalMeta`; file tree for the "pick what to install" case |
+| `external/matching.rs` | Which game and sandbox a mod fits, with warnings |
+| `external/install.rs` | Download with size cap and hash check, install as an `Origin::External` local mod, remove, and `add` (the `tmc mods add <url>` entry point) |
+| `external/store.rs` | The `external_mod` side table: where an installed mod came from |
+| `external/pending.rs` | OS deep links become a `Pending` confirm, never an install |
+| `external/scheme.rs` | Who owns `nxm://` and friends; claim or release only on request, never over another app without `override` |
 | `plugins/managers.rs` | **Another mod manager, read.** Where it keeps its mods, declaratively — the fourth plugin type |
 
 **`src-tauri/usvfs/src/` — `tmc-usvfs`**
@@ -83,6 +93,7 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `commands/downloads.rs` | The queue. No command here takes a URL or a destination — `download_release` takes ids |
 | `commands/detect.rs` | Scan, and separately apply. A scan configures nothing |
 | `commands/rcon.rs` | Consoles. No command returns a password |
+| `commands/external.rs` | `external_parse/resolve/install/remove/inspect_path/scheme_status/scheme_set`; `route_link` for the deep-link handler |
 | `commands/console.rs` | The Console screen: runs the installed `tmc` CLI (desktop only), streams `tmc://console` events; signs it in with the app's session via `TMC_APP_TOKEN` (`core/console.rs::app_session_env` withholds it when the line carries a host flag). `tmc` is found on `PATH` then `~/.local/bin`, Homebrew, `/usr/local/bin`, pip-user Scripts; release builds bundle one beside the app, which wins over PATH unless `TMC_CLI_PATH` is set (see [console.md](console.md)) |
 | `commands/library.rs` | Sync, install, uninstall, launch |
 | `commands/play.rs` | The two ways a game starts that the SERVER resolves. Names IDS, never a loader URL or a connect link |
@@ -169,6 +180,7 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `components/quick-install.tsx` | One-click install of a mod or asset INTO a sandbox |
 | `components/drop-import.tsx` | The drop overlay, above the router. Listens to Rust, never to the DOM |
 | `components/import-dialog.tsx` | What is about to be imported, where it will land, and the three fields worth editing |
+| `lib/external/` | Zod schemas and typed `externalIpc` wrappers for the external-mod commands (no UI yet) |
 | `components/local-mods.tsx` | Imported mods: the list, the game-folder scan, the other-manager import |
 | `routes/sandboxes.tsx` | The mod manager: what is in a sandbox, and whether it is applied |
 | `routes/downloads.tsx` | The queue, and everything to do when one is stuck |

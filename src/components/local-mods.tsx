@@ -62,6 +62,7 @@ const ORIGIN_LABEL: Record<LocalModT['origin'], string> = {
     folder: 'Folder',
     adopted: 'Found in the game folder',
     manager: 'From another manager',
+    external: 'Added from a link',
 }
 
 export default function LocalMods({

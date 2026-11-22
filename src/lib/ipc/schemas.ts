@@ -92,6 +92,8 @@ export const AppSettingsSchema = z.object({
     /** Ceiling across every download, bytes per second. `0` is unlimited. */
     downloadLimitBps: z.number(),
     downloadConcurrency: z.number(),
+    /** Largest external-mod download in MiB. `0` is unlimited (the default). */
+    externalMaxDownloadMb: z.number().default(0),
     downloadKeepHistory: z.boolean(),
 
     /** Whether a TMC game keeps what it downloads between sessions. */
@@ -1227,7 +1229,7 @@ export type AutoUpdateReportT = z.infer<typeof AutoUpdateReportSchema>
  * archive can be re-dropped, an adopted folder is still in the game directory,
  * one from another manager is still in that manager.
  */
-export const LocalOriginSchema = z.enum(['dropped', 'folder', 'adopted', 'manager'])
+export const LocalOriginSchema = z.enum(['dropped', 'folder', 'adopted', 'manager', 'external'])
 
 export type LocalOriginT = z.infer<typeof LocalOriginSchema>
 

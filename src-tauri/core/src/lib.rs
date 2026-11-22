@@ -27,6 +27,7 @@ pub mod deploy;
 pub mod detect;
 pub mod download;
 pub mod error;
+pub mod external;
 pub mod games;
 pub mod http;
 pub mod launch;

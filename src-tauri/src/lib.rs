@@ -211,6 +211,16 @@ pub fn run() {
 
                     for url in event.urls() {
                         /*
+                         * nxm://, curseforge:// and the rest become a PENDING
+                         * confirm, never an install: any web page can fire one.
+                         */
+                        if let Some(p) = commands::external::route_link(url.as_str()) {
+                            let _ = emitter.emit("tmc://external-link", &p);
+
+                            continue;
+                        }
+
+                        /*
                          * A link the app does not understand does NOTHING. It
                          * does not fall through to the auth wake-up and it does
                          * not reach the webview — anything on the machine can
@@ -405,6 +415,13 @@ pub fn run() {
             commands::settings::settings_reset,
             commands::fs::fs_roots,
             commands::fs::fs_list_dirs,
+            commands::external::external_parse,
+            commands::external::external_resolve,
+            commands::external::external_install,
+            commands::external::external_remove,
+            commands::external::external_inspect_path,
+            commands::external::external_scheme_status,
+            commands::external::external_scheme_set,
             commands::import::import_dropped,
             commands::import::import_preview,
             commands::import::import_paths,
