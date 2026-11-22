@@ -230,6 +230,15 @@ export const LIBRARY: NavNode = {
             description: 'Mod profiles you can deploy, share and switch between.',
         },
         {
+            // Per-game settings (install folder, Find my games) live here, on
+            // a game's Manage view, not in Settings.
+            id: 'my-apps',
+            to: '/my-apps',
+            label: 'Apps',
+            icon: FiGrid,
+            description: 'Your games: install folders and Find my games.',
+        },
+        {
             id: 'workshop',
             to: '/workshop',
             label: 'Workshop',

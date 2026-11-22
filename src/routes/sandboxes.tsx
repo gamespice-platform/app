@@ -435,7 +435,7 @@ function SandboxDetail({
                     </h2>
                     <p className="mt-1 text-xs text-muted">
                         Choose the game&rsquo;s folder, or set one for{' '}
-                        {sandbox.appName ?? 'this game'} under Settings → Games.
+                        {sandbox.appName ?? 'this game'} under Library → Apps.
                         Nothing is written until you deploy.
                     </p>
 

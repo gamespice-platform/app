@@ -24,6 +24,7 @@ import JoinRoute from '~/routes/join'
 import LibraryRoute from '~/routes/library'
 import InstallsRoute from '~/routes/installs'
 import SandboxesRoute from '~/routes/sandboxes'
+import MyAppsRoute from '~/routes/my-apps'
 import DownloadsRoute from '~/routes/downloads'
 import RconRoute from '~/routes/rcon'
 import ViewRoute from '~/routes/view'
@@ -34,7 +35,7 @@ import AccountRoute from '~/routes/account'
 import SettingsLayout from '~/routes/settings'
 import AppSettingsRoute from '~/routes/settings/app'
 import AccountSettingsRoute from '~/routes/settings/account'
-import GamesRoute from '~/routes/settings/games'
+import DownloadsSettingsRoute from '~/routes/settings/downloads'
 import PluginsRoute from '~/routes/settings/plugins'
 import LoggingRoute from '~/routes/settings/logging'
 
@@ -108,6 +109,7 @@ const router = createHashRouter([
             { path: 'join', element: <JoinRoute /> },
             { path: 'library', element: <LibraryRoute /> },
             { path: 'installs', element: <InstallsRoute /> },
+            { path: 'my-apps', element: <MyAppsRoute /> },
             { path: 'sandboxes', element: <SandboxesRoute /> },
             { path: 'sandboxes/:id', element: <SandboxesRoute /> },
             { path: 'downloads', element: <DownloadsRoute /> },
@@ -122,7 +124,8 @@ const router = createHashRouter([
                 children: [
                     { index: true, element: <AppSettingsRoute /> },
                     { path: 'account', element: <AccountSettingsRoute /> },
-                    { path: 'games', element: <GamesRoute /> },
+                    { path: 'downloads', element: <DownloadsSettingsRoute /> },
+                    { path: 'games', element: <Navigate to="/settings/downloads" replace /> },
                     { path: 'plugins', element: <PluginsRoute /> },
                     { path: 'logging', element: <LoggingRoute /> },
                 ],

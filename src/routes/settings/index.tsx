@@ -12,7 +12,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 const PANES = [
     { to: '/settings', end: true, label: 'App' },
     { to: '/settings/account', label: 'Account' },
-    { to: '/settings/games', label: 'Games' },
+    { to: '/settings/downloads', label: 'Downloads' },
     { to: '/settings/plugins', label: 'Plugins' },
     { to: '/settings/logging', label: 'Logging' },
 ]

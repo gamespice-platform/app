@@ -158,7 +158,7 @@ function GameCard({
                         <FiFolder className="size-3 shrink-0" />
                         <span className="selectable truncate">
                             {row.dir ?? (
-                                <Link to="/settings/games" className="underline">
+                                <Link to="/my-apps" className="underline">
                                     No folder set for this game
                                 </Link>
                             )}

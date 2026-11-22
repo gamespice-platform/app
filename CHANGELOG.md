@@ -29,6 +29,9 @@ The GameSpice App's releases, newest first. A version here is the one in `packag
 
 - Changed: pressing Play on a game you have not installed now opens the chooser with "Install and play" ready (with a progress percentage), instead of silently opening the web build. With native installed, left click still launches native; right click always opens the chooser.
 - Fixed: on Linux AppImage, native games inherited the AppImage's library paths, which could leave the game window gray. Games now start with a clean environment.
+## Unreleased
+
+- New: Library > Apps lists your games with a Manage button for each: install folder and Find my games moved there from Settings > Games, which is now Settings > Downloads (the download cache location only). The old address redirects.
 
 ## 0.5.5
 

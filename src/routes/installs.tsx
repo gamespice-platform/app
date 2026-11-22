@@ -206,7 +206,7 @@ function InstallCard({
                 <div className="min-w-0">
                     <p className="text-xs">Folder on this device</p>
                     <p className="selectable truncate text-[11px] text-muted">
-                        {localDir ?? 'Using the game folder from Settings → Games'}
+                        {localDir ?? 'Using the game folder from Library → Apps'}
                     </p>
                 </div>
 
