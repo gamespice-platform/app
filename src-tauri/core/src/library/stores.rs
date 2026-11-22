@@ -384,6 +384,11 @@ impl LibraryDb {
         download_dir: Option<&str>,
         cache_downloads: &Path,
     ) -> AppResult<()> {
+        // The built-in store is the app's own folder, so make it rather than
+        // show a fresh install (or one whose folder was removed) a "folder is
+        // missing" error for it.
+        std::fs::create_dir_all(cache_downloads)?;
+
         let cache = path_text(&canon::canonicalize_or_keep(cache_downloads));
         let now = now_rfc3339();
 
@@ -934,6 +939,22 @@ mod tests {
         std::fs::write(cache.join("x"), b"1").expect("x");
 
         assert_eq!(db.store_sweep_temporary().expect("sweep").removed, 0);
+    }
+
+    #[test]
+    fn sync_creates_the_builtin_folder_when_it_is_missing() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let db = db();
+        let cache = tmp.path().join("cache/downloads");
+
+        assert!(!cache.exists());
+        db.store_sync_default(None, &cache).expect("sync");
+        assert!(cache.is_dir());
+
+        std::fs::remove_dir_all(&cache).expect("remove");
+        db.store_sync_default(None, &cache).expect("resync");
+        assert!(cache.is_dir());
+        assert!(db.store_list().expect("list")[0].exists);
     }
 
     #[test]
