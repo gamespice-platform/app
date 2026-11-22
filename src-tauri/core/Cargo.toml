@@ -95,6 +95,10 @@ zip = { version = "9", default-features = false, features = ["deflate", "bzip2"]
 bzip2 = "0.6"
 crc32fast = "1"
 tar = "0.4"
+# 7z, read side only. Pure Rust (LZMA, LZMA2, BCJ filters), Apache-2.0, no
+# default features: the encoder, AES, and the C-backed codecs (zstd, lz4, brotli)
+# stay out, so a hostile archive can only reach the pure-Rust decoders.
+sevenz-rust2 = { version = "0.10", default-features = false }
 flate2 = "1"
 
 tracing = "0.1"
@@ -123,6 +127,9 @@ keyring = { version = "4", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
+# The encoder, to build 7z fixtures in the tests. The shipped dependency has no
+# default features, so the app never links it.
+sevenz-rust2 = "0.10"
 # Key generation for `examples/plugin-sign`. A dev-dependency on purpose: the
 # shipped crate only ever VERIFIES, and nothing in it should be able to mint a
 # signing key.

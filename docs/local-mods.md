@@ -30,7 +30,7 @@ Not signed, deliberately. The app has the machinery, and it would be the wrong q
 
 ## The one genuinely ambiguous decision
 
-Whether to unpack. `.jar` is a zip and must not be unpacked; a resource pack is a `.zip` and must not be either; a mod shipped as a zip of loose DLLs must be. So the **game's own install rules decide**: `AppPlugins::mod_extensions` reads `match.extensions` off the `manage_*` rules, and a file whose extension a rule accepts is copied verbatim. Nothing invents a second list, and a game that grows a new packaging format gets it for free.
+Whether to unpack. `.jar` is a zip and must not be unpacked; a resource pack is a `.zip` and must not be either; a mod shipped as a zip of loose DLLs must be. So the **game's own install rules decide**: `AppPlugins::mod_extensions` reads `match.extensions` off the `manage_*` rules, and a file whose extension a rule accepts is copied verbatim. Nothing invents a second list, and a game that grows a new packaging format gets it for free. `.7z` is among the formats the importer unpacks when a rule accepts it (same caps and jail as a zip).
 
 Where the payload lands is a guess and is treated as one — the sidecar's `installPath`, then "does its top level already hold a declared mod target?", then the game's first `modTargets` entry — and then the user can change it. `store::relayout` is what makes that cheap: a directory rename inside the store, not a re-import.
 

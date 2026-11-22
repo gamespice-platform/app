@@ -591,9 +591,11 @@ pub(crate) fn extract_archive(
         let open = || -> AppResult<_> { Ok(tar::Archive::new(std::fs::File::open(source)?)) };
 
         extract_tar(open, dest, opts)
+    } else if name.ends_with(".7z") {
+        extract_7z_within(source, dest, opts, MAX_EXTRACT_BYTES)
     } else {
         Err(AppError::invalid(
-            "Only .zip, .tar, .tar.gz and .tgz archives can be extracted.",
+            "Only .zip, .7z, .tar, .tar.gz and .tgz archives can be extracted.",
         ))
     }
 }
@@ -716,6 +718,157 @@ fn extract_zip_within(
 
 /// `open` yields a fresh reader each call: a tar stream cannot seek, so the
 /// single-root scan and the extraction are two separate reads.
+/// 7z, through the same caps and the same jail as the other formats.
+///
+/// What is refused beyond zip's list: a symlink or reparse-point entry (the 7z
+/// header carries the Unix mode in the attribute word's high half, and a link
+/// is a jail escape by construction), encrypted archives (no password is ever
+/// supplied, so the reader fails), and a header whose declared sizes already
+/// exceed the budget. As with zip, the declared size is only an early refusal:
+/// the copy itself is bounded by what is left of the budget.
+fn extract_7z_within(
+    source: &Path,
+    dest: &Path,
+    opts: &ExtractOpts,
+    max_bytes: u64,
+) -> AppResult<Vec<PathBuf>> {
+    use sevenz_rust2::{Password, SevenZReader};
+
+    const UNIX_EXTENSION: u32 = 0x8000;
+    const S_IFMT: u32 = 0o170_000;
+    const S_IFLNK: u32 = 0o120_000;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+
+    let bad = |e: sevenz_rust2::Error| AppError::invalid(format!("Not a readable 7z: {e}"));
+    let too_large = || AppError::jail("Archive expands to more than the allowed size.");
+
+    let file = std::fs::File::open(source)?;
+    let mut reader = SevenZReader::new(file, Password::empty()).map_err(bad)?;
+
+    /*
+     * The whole header is judged before any data is decoded: the entry count,
+     * every name, every link attribute and the declared total. A solid block
+     * cannot be skipped into, so refusing late would mean decoding first.
+     */
+    let files = &reader.archive().files;
+
+    if files.len() > MAX_EXTRACT_ENTRIES {
+        return Err(AppError::jail("Archive has too many entries."));
+    }
+
+    let mut declared: u64 = 0;
+    let mut names: Vec<Vec<String>> = Vec::new();
+
+    for entry in files {
+        let raw = sevenz_name(entry.name())?;
+
+        let attrs = entry.windows_attributes();
+        let unix_mode = if attrs & UNIX_EXTENSION != 0 {
+            attrs >> 16
+        } else {
+            0
+        };
+
+        if unix_mode & S_IFMT == S_IFLNK || attrs & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(AppError::jail("Archive contains a link or special file."));
+        }
+
+        if entry.is_directory() || entry.is_anti_item() {
+            continue;
+        }
+
+        declared = declared.saturating_add(entry.size());
+        names.push(components(&raw));
+    }
+
+    if declared > max_bytes {
+        return Err(too_large());
+    }
+
+    let extra = if opts.strip_single_root {
+        single_root_extra(&names, opts.strip)
+    } else {
+        0
+    };
+
+    let mut total: u64 = 0;
+    let mut written: Vec<PathBuf> = Vec::new();
+
+    reader
+        .for_each_entries(|entry, data| {
+            // Errors from our own checks travel out of the library's closure as
+            // io errors carrying a message, and are mapped back below.
+            let refuse = |m: &str| sevenz_rust2::Error::from(std::io::Error::other(m.to_string()));
+
+            if entry.is_directory() || entry.is_anti_item() {
+                return Ok(true);
+            }
+
+            let raw = sevenz_name(entry.name()).map_err(|_| refuse("unsafe path"))?;
+
+            if opts.strip_single_root && is_mac_junk(&raw) {
+                return Ok(true);
+            }
+
+            let Some(relative) = strip_and_filter(&raw, opts.strip as usize + extra, opts.include)
+            else {
+                return Ok(true);
+            };
+
+            let remaining = max_bytes.saturating_sub(total);
+            let target = crate::plugins::jail::join_relative(dest, &relative)
+                .map_err(|_| refuse("unsafe path"))?;
+
+            if !target.starts_with(dest) {
+                return Err(refuse("unsafe path"));
+            }
+
+            ensure_parent(&target).map_err(|e| refuse(&e.to_string()))?;
+
+            let mut out = std::fs::File::create(&target)?;
+            let copied = std::io::copy(&mut data.take(remaining + 1), &mut out)?;
+
+            if copied > remaining {
+                drop(out);
+                let _ = std::fs::remove_file(&target);
+
+                return Err(refuse("too large"));
+            }
+
+            total += copied;
+            written.push(target);
+
+            Ok(true)
+        })
+        .map_err(|e| match e.to_string() {
+            m if m.contains("too large") => too_large(),
+            m if m.contains("unsafe path") => AppError::jail("Archive contains an unsafe path."),
+            _ => bad(e),
+        })?;
+
+    Ok(written)
+}
+
+/// A 7z entry name as a relative path. `\` is a separator on the machine that
+/// wrote it; anything that is not a plain relative component is refused.
+fn sevenz_name(name: &str) -> AppResult<PathBuf> {
+    let unified = name.replace('\\', "/");
+    let path = PathBuf::from(&unified);
+
+    let plain = path.components().all(|c| {
+        matches!(
+            c,
+            std::path::Component::Normal(_) | std::path::Component::CurDir
+        )
+    });
+
+    if unified.is_empty() || unified.starts_with('/') || unified.contains('\0') || !plain {
+        return Err(AppError::jail("Archive contains an unsafe path."));
+    }
+
+    Ok(path)
+}
+
 fn extract_tar<R: Read>(
     open: impl Fn() -> AppResult<tar::Archive<R>>,
     dest: &Path,
@@ -1243,6 +1396,116 @@ mod tests {
         assert!(dest.join("a.txt").is_file());
         assert!(dest.join("sub/b.txt").is_file());
         assert!(!dest.join("pkg").exists());
+    }
+
+    /// `(name, body, windows_attributes)` entries into a fresh `.7z`.
+    fn sevenz_of(path: &Path, entries: &[(&str, &[u8], u32)]) {
+        use sevenz_rust2::{SevenZArchiveEntry, SevenZWriter};
+
+        let mut w = SevenZWriter::create(path).expect("create 7z");
+
+        for (name, body, attrs) in entries {
+            let mut e = SevenZArchiveEntry::new_file(name);
+            if *attrs != 0 {
+                e.has_windows_attributes = true;
+                e.windows_attributes = *attrs;
+            }
+            w.push_archive_entry(e, Some(*body)).expect("push");
+        }
+        w.finish().expect("finish");
+    }
+
+    fn sevenz_extract(
+        entries: &[(&str, &[u8], u32)],
+        opts: &ExtractOpts,
+        cap: u64,
+    ) -> (tempfile::TempDir, AppResult<Vec<PathBuf>>) {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let archive = tmp.path().join("m.7z");
+        sevenz_of(&archive, entries);
+        let dest = tmp.path().join("out");
+        std::fs::create_dir_all(&dest).expect("mkdir");
+
+        let r = extract_7z_within(&archive, &dest, opts, cap);
+        (tmp, r)
+    }
+
+    #[test]
+    fn a_7z_extracts_and_honours_strip_single_root() {
+        let (tmp, r) = sevenz_extract(
+            &[("w/a.txt", b"one", 0), ("w/sub/b.txt", b"two", 0)],
+            &SINGLE,
+            1024,
+        );
+
+        assert_eq!(r.expect("extract").len(), 2);
+        assert_eq!(
+            std::fs::read(tmp.path().join("out/a.txt")).expect("a"),
+            b"one"
+        );
+        assert!(tmp.path().join("out/sub/b.txt").is_file());
+        assert!(!tmp.path().join("out/w").exists());
+    }
+
+    #[test]
+    fn a_7z_extract_is_dispatched_by_extension() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let archive = tmp.path().join("M.7Z");
+        sevenz_of(&archive, &[("x.txt", b"x", 0)]);
+        let dest = tmp.path().join("out");
+        std::fs::create_dir_all(&dest).expect("mkdir");
+
+        extract_archive(&archive, &dest, &ExtractOpts::default()).expect("extract");
+        assert!(dest.join("x.txt").is_file());
+    }
+
+    #[test]
+    fn a_7z_path_escape_is_refused_and_nothing_is_written_outside() {
+        for name in [
+            "../escape.txt",
+            "a/../../escape.txt",
+            "/abs.txt",
+            "..\\escape.txt",
+        ] {
+            let (tmp, r) = sevenz_extract(&[(name, b"x", 0)], &ExtractOpts::default(), 1024);
+
+            r.expect_err(name);
+            assert!(!tmp.path().join("escape.txt").exists(), "{name} escaped");
+            assert!(!tmp.path().join("abs.txt").exists());
+        }
+    }
+
+    #[test]
+    fn a_7z_symlink_entry_is_refused() {
+        // Unix extension bit plus S_IFLNK in the high half.
+        let attrs = 0x8000 | (0o120_777u32 << 16);
+        let (_tmp, r) = sevenz_extract(&[("link", b"/etc", attrs)], &ExtractOpts::default(), 1024);
+
+        r.expect_err("symlink accepted");
+    }
+
+    #[test]
+    fn a_7z_over_the_byte_cap_is_refused() {
+        // Declared total over the cap: refused before any data is decoded.
+        let (tmp, r) = sevenz_extract(
+            &[("a.bin", &[7u8; 600], 0), ("b.bin", &[7u8; 600], 0)],
+            &ExtractOpts::default(),
+            1000,
+        );
+
+        r.expect_err("cap ignored");
+        assert!(!tmp.path().join("out/a.bin").exists());
+    }
+
+    #[test]
+    fn a_7z_that_is_not_a_7z_is_an_error_not_a_panic() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let archive = tmp.path().join("junk.7z");
+        std::fs::write(&archive, b"7z\xbc\xaf\x27\x1c\x00\x04 truncated nonsense").expect("write");
+        let dest = tmp.path().join("out");
+        std::fs::create_dir_all(&dest).expect("mkdir");
+
+        extract_archive(&archive, &dest, &ExtractOpts::default()).expect_err("junk accepted");
     }
 
     #[test]

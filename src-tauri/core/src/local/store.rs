@@ -215,11 +215,11 @@ pub fn suggest_payload(source: &Path, extensions: &[String]) -> Payload {
     }
 }
 
-/// Archives this crate can open. Deliberately not `.jar`, `.7z` or `.rar`:
-/// the first is a mod, and the other two need a decoder that is not a
-/// dependency here.
+/// Archives this crate can open. Deliberately not `.jar` (a mod) or `.rar`
+/// (no pure-Rust decoder we would ship; see docs/gaps.md).
 fn is_unpackable(lower_name: &str) -> bool {
     lower_name.ends_with(".zip")
+        || lower_name.ends_with(".7z")
         || lower_name.ends_with(".tar")
         || lower_name.ends_with(".tar.gz")
         || lower_name.ends_with(".tgz")
