@@ -2,6 +2,8 @@ The GameSpice App's releases, newest first. A version here is the one in `packag
 
 ## Unreleased
 
+- New: the monitor's Players table sorts by any column (click a header), and a new Vars tab lists every server variable with a filter and sortable Var and Value columns; Rules moved out of Details into it.
+
 - New: the monitor's latency line is coloured by height (green under 90 ms, yellow, orange, red from 300 ms), so spikes stand out.
 - New: the monitor window's Join button opens the main window's server page and starts the Play dialog straight away. For games started through an installed client, a per-game "Never ask me again" box in the Connect step makes a quick Join connect immediately (kept on this device only).
 - New: screens for mods from other sites, as ready-made pieces for the Mods page: paste field with progress and Undo, confirm step for opened links, setup and edit dialogs for the link handlers (nxm, curseforge, modrinth, ror2mm, prismlauncher; nothing is replaced without an explicit tick), provider key panel, and a file picker with folder tri-state, search, presets and remembered layout. Installs from a chosen set of files work. Not on a page yet.

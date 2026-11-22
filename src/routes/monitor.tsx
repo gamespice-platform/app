@@ -7,6 +7,7 @@ import {
     FiCopy,
     FiExternalLink,
     FiLayout,
+    FiList,
     FiPause,
     FiPlay,
     FiSidebar,
@@ -904,10 +905,11 @@ function SidePanel({
     paused: boolean
     wide: boolean
 }) {
-    const [tab, setTab] = useState<'players' | 'details'>('players')
+    const [tab, setTab] = useState<'players' | 'vars' | 'details'>('players')
     const players = result?.playerList ?? []
+    const varCount = Object.keys(result?.rules ?? {}).length
 
-    const tabBtn = (id: 'players' | 'details', label: string, icon: React.ReactNode) => (
+    const tabBtn = (id: 'players' | 'vars' | 'details', label: string, icon: React.ReactNode) => (
         <button
             type="button"
             role="tab"
@@ -931,12 +933,19 @@ function SidePanel({
         >
             <div role="tablist" className="flex border-b border-border">
                 {tabBtn('players', `Players${players.length ? ` (${players.length})` : ''}`, <FiUsers className="size-3.5" />)}
+                {tabBtn(
+                    'vars',
+                    `Vars${varCount ? ` (${varCount})` : ''}`,
+                    <FiList className="size-3.5" />,
+                )}
                 {tabBtn('details', 'Details', <FiSidebar className="size-3.5" />)}
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto">
                 {tab === 'players' ? (
                     <PlayerList players={players} result={result} paused={paused} />
+                ) : tab === 'vars' ? (
+                    <VarsList result={result} />
                 ) : (
                     <Details result={result} summary={summary} />
                 )}
@@ -976,15 +985,86 @@ function PlayerList({
             </p>
         )
 
-    const sorted = [...players].sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity))
+    return <PlayerTable players={players} paused={paused} />
+}
+
+type PlayerSortKey = 'name' | 'score' | 'time'
+
+function SortHeader<K extends string>({
+    label,
+    k,
+    sort,
+    onSort,
+    className,
+}: {
+    label: string
+    k: K
+    sort: { key: K; dir: 'asc' | 'desc' }
+    onSort: (k: K) => void
+    className: string
+}) {
+    const active = sort.key === k
+
+    return (
+        <th
+            scope="col"
+            aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+            className={className}
+        >
+            <button
+                type="button"
+                onClick={() => onSort(k)}
+                className={`inline-flex items-center gap-0.5 font-semibold uppercase tracking-wide transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                    active ? 'text-foreground' : ''
+                }`}
+            >
+                {label}
+                <span aria-hidden="true" className="w-2.5 text-[9px]">
+                    {active ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
+                </span>
+            </button>
+        </th>
+    )
+}
+
+function PlayerTable({
+    players,
+    paused,
+}: {
+    players: ServerQueryResultT['playerList']
+    paused: boolean
+}) {
+    const [sort, setSort] = useState<{ key: PlayerSortKey; dir: 'asc' | 'desc' }>({
+        key: 'score',
+        dir: 'desc',
+    })
+
+    const onSort = (key: PlayerSortKey) =>
+        setSort((cur) =>
+            cur.key === key
+                ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
+                : { key, dir: key === 'name' ? 'asc' : 'desc' },
+        )
+
+    const sorted = [...players].sort((a, b) => {
+        let c: number
+
+        if (sort.key === 'name') c = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        else if (sort.key === 'score') c = (a.score ?? -Infinity) - (b.score ?? -Infinity)
+        else c = (a.duration ?? -Infinity) - (b.duration ?? -Infinity)
+
+        if (Number.isNaN(c)) c = 0
+
+        return sort.dir === 'asc' ? c : -c
+    })
 
     return (
         <table className="w-full text-xs">
             <thead className="sticky top-0 bg-surface text-left text-[10px] uppercase tracking-wide text-muted">
                 <tr>
-                    <th className="px-3 py-1.5 font-semibold">Name</th>
-                    <th className="px-2 py-1.5 text-right font-semibold">Score</th>
-                    <th className="px-3 py-1.5 text-right font-semibold">Time</th>
+                    <SortHeader label="Name" k="name" sort={sort} onSort={onSort} className="px-3 py-1.5" />
+                    <SortHeader label="Score" k="score" sort={sort} onSort={onSort} className="px-2 py-1.5 text-right" />
+                    <SortHeader label="Time" k="time" sort={sort} onSort={onSort} className="px-3 py-1.5 text-right" />
                 </tr>
             </thead>
             <tbody>
@@ -1011,6 +1091,82 @@ function PlayerList({
     )
 }
 
+type VarSortKey = 'name' | 'value'
+
+function VarsList({ result }: { result: ServerQueryResultT | null }) {
+    const [filter, setFilter] = useState('')
+    const [sort, setSort] = useState<{ key: VarSortKey; dir: 'asc' | 'desc' }>({
+        key: 'name',
+        dir: 'asc',
+    })
+
+    if (!result) return <p className="p-4 text-xs text-muted">Waiting for the first answer…</p>
+
+    const all = Object.entries(result.rules ?? {})
+
+    if (all.length === 0)
+        return <p className="p-4 text-xs text-muted">This server does not publish any vars.</p>
+
+    const q = filter.trim().toLowerCase()
+    const entries = all
+        .filter(([k, v]) => !q || k.toLowerCase().includes(q) || v.toLowerCase().includes(q))
+        .sort(([ak, av], [bk, bv]) => {
+            const c =
+                sort.key === 'name'
+                    ? ak.localeCompare(bk)
+                    : av.localeCompare(bv, undefined, { numeric: true }) || ak.localeCompare(bk)
+
+            return sort.dir === 'asc' ? c : -c
+        })
+
+    const onSort = (key: VarSortKey) =>
+        setSort((cur) =>
+            cur.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
+        )
+
+    return (
+        <div className="text-xs">
+            <div className="sticky top-0 z-10 bg-surface p-2">
+                <input
+                    type="search"
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    placeholder={`Filter ${all.length} vars`}
+                    aria-label="Filter vars"
+                    className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-accent"
+                />
+            </div>
+            <table className="w-full table-fixed">
+                <thead className="text-left text-[10px] uppercase tracking-wide text-muted">
+                    <tr>
+                        <SortHeader label="Var" k="name" sort={sort} onSort={onSort} className="px-3 py-1" />
+                        <SortHeader label="Value" k="value" sort={sort} onSort={onSort} className="px-3 py-1 text-right" />
+                    </tr>
+                </thead>
+                <tbody>
+                    {entries.map(([k, v]) => (
+                        <tr key={k} className="border-t border-border/60">
+                            <td className="selectable truncate px-3 py-1 font-mono text-muted" title={k}>
+                                {k}
+                            </td>
+                            <td className="selectable truncate px-3 py-1 text-right font-mono" title={v}>
+                                {v}
+                            </td>
+                        </tr>
+                    ))}
+                    {entries.length === 0 && (
+                        <tr>
+                            <td colSpan={2} className="px-3 py-2 text-muted">
+                                No vars match.
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+    )
+}
+
 function Details({
     result,
     summary,
@@ -1018,7 +1174,6 @@ function Details({
     result: ServerQueryResultT | null
     summary: ContentSummaryT | null
 }) {
-    const [filter, setFilter] = useState('')
     const server = summary?.server ?? null
     const rules = result?.rules ?? {}
 
@@ -1053,14 +1208,6 @@ function Details({
         ['Bots', result?.bots != null ? String(result.bots) : '—'],
     ]
 
-    const entries = Object.entries(rules)
-        .filter(([k, v]) => {
-            const q = filter.trim().toLowerCase()
-
-            return !q || k.toLowerCase().includes(q) || v.toLowerCase().includes(q)
-        })
-        .sort(([a], [b]) => a.localeCompare(b))
-
     return (
         <div className="p-3 text-xs">
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
@@ -1084,36 +1231,6 @@ function Details({
                 </div>
             )}
 
-            <h3 className="mb-1.5 mt-4 text-[10px] font-semibold uppercase tracking-wide text-muted">
-                Rules{Object.keys(rules).length ? ` (${Object.keys(rules).length})` : ''}
-            </h3>
-
-            {Object.keys(rules).length === 0 ? (
-                <p className="text-muted">This server does not publish any rules.</p>
-            ) : (
-                <>
-                    <input
-                        type="search"
-                        value={filter}
-                        onChange={(e) => setFilter(e.target.value)}
-                        placeholder="Filter rules"
-                        aria-label="Filter rules"
-                        className="mb-2 w-full rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-accent"
-                    />
-                    <dl className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-1">
-                        {entries.map(([k, v]) => (
-                            <div key={k} className="contents">
-                                <dt className="selectable truncate font-mono text-muted" title={k}>
-                                    {k}
-                                </dt>
-                                <dd className="selectable truncate text-right font-mono" title={v}>
-                                    {v}
-                                </dd>
-                            </div>
-                        ))}
-                    </dl>
-                </>
-            )}
         </div>
     )
 }
