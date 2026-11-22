@@ -1,7 +1,7 @@
 import type { DetectedGameT } from '~/lib/ipc/schemas'
 
 /**
- * The rows of Library -> Apps, as pure data.
+ * The rows of Library -> My apps, as pure data.
  *
  * Three states, in the order a person cares about them:
  *   * `installed`: a folder is set for the game, or it has a sandbox here;
@@ -44,6 +44,43 @@ const STATUS_ORDER: Record<ManageStatus, number> = {
     other: 2,
 }
 
+/**
+ * Which game id a scan result belongs to: the id Rust resolved, else the
+ * catalogue game whose slug it names. Null when neither places it.
+ */
+function placeOf(d: DetectedGameT, bySlug: Map<string, number>): number | null {
+    if (d.appId !== null && d.appId !== undefined) return d.appId
+
+    const slug = d.slug?.toLowerCase()
+
+    return slug ? (bySlug.get(slug) ?? null) : null
+}
+
+function slugIndex(catalogue: CatalogGame[]): Map<string, number> {
+    const out = new Map<string, number>()
+
+    for (const g of catalogue) {
+        const slug = slugOf(g)
+
+        if (slug && !out.has(slug)) out.set(slug, g.id)
+    }
+
+    return out
+}
+
+/** Is `a` the same folder as `b`, ignoring slash direction and a trailing one? */
+export function sameDir(a: string | null, b: string | null): boolean {
+    if (a === null || b === null) return false
+
+    const norm = (p: string) => {
+        const t = p.replace(/\\/g, '/').replace(/\/+$/, '')
+
+        return /^[a-z]:/i.test(t) ? t.toLowerCase() : t
+    }
+
+    return norm(a) === norm(b)
+}
+
 export function buildManageRows(input: {
     catalogue: CatalogGame[]
     gameDirs: Record<string, string>
@@ -66,6 +103,21 @@ export function buildManageRows(input: {
 
     for (const id of withSandbox) ids.add(id)
 
+    const bySlug = slugIndex(input.catalogue)
+    const placed = new Map<number, DetectedGameT[]>()
+    const detectedNames = new Map<number, string>()
+
+    for (const d of input.detected) {
+        const id = placeOf(d, bySlug)
+
+        if (id === null) continue
+
+        placed.set(id, [...(placed.get(id) ?? []), d])
+        if (!detectedNames.has(id)) detectedNames.set(id, d.name)
+        // A result for a game the catalogue facet omits is still a game.
+        ids.add(id)
+    }
+
     const term = (input.search ?? '').trim().toLowerCase()
 
     const rows = [...ids].map((appId): ManageRow => {
@@ -73,14 +125,13 @@ export function buildManageRows(input: {
         const slug = game ? slugOf(game) : null
         const dir = input.gameDirs[String(appId)] ?? null
         const hasSandbox = withSandbox.has(appId)
-        const detected = slug
-            ? input.detected.filter((d) => d.slug?.toLowerCase() === slug)
-            : []
+        const detected = placed.get(appId) ?? []
         const installed = dir !== null || hasSandbox
 
         return {
             appId,
-            name: game?.name.trim() || `Game #${appId}`,
+            name:
+                game?.name.trim() || detectedNames.get(appId) || `Game #${appId}`,
             icon: game?.icon ?? null,
             slug,
             dir,
@@ -103,7 +154,25 @@ export function buildManageRows(input: {
         )
 }
 
-/** Detected games the catalogue cannot place: shown as a count, not rows. */
+/**
+ * Slugged results nothing can place: the app has a rule, the site has no game
+ * for it. They get their own group so "Use this" can say why it fails.
+ */
+export function unplacedDetected(input: {
+    catalogue: CatalogGame[]
+    detected: DetectedGameT[]
+}): DetectedGameT[] {
+    const bySlug = slugIndex(input.catalogue)
+
+    return input.detected.filter((d) => d.slug && placeOf(d, bySlug) === null)
+}
+
+/** Results the app has no rule for at all (no slug): shown as a count and a list. */
+export function unsupportedDetected(detected: DetectedGameT[]): DetectedGameT[] {
+    return detected.filter((d) => !d.slug)
+}
+
+/** Kept for callers that only want the number. */
 export function unmatchedCount(detected: DetectedGameT[]): number {
-    return detected.filter((d) => !d.slug).length
+    return unsupportedDetected(detected).length
 }

@@ -24,7 +24,7 @@ Shot from the running app in its dark theme, with a demo account on the dev site
 ### Gaming Platform
 - **Integrated Game Launcher**: Launch external games from the app, or launch integrated games right within the built-in Game Player, in a window of its own or full screen.
 - **Install TMC's own games**: Games we publish are downloaded and installed by the app for whatever machine you are on, kept up to date automatically, and started as real programs rather than in a browser. You can turn automatic updates off per game, and remove one at any time.
-- **UDP or TCP**: TMC games join over UDP by default; Settings → Games → *Connect over UDP* off switches to TCP (WebSocket) for networks that drop UDP. Both kinds of player share the same server.
+- **UDP or TCP**: TMC games join over UDP by default; Settings → App → *Connect over UDP* off switches to TCP (WebSocket) for networks that drop UDP. Both kinds of player share the same server.
 - **Join from a link**: A `gs://play/<host>:<port>` link from the website opens the app on that server, showing which game is running there and the latency measured from *your* machine, with the ways you can actually join it. It never joins on its own.
 - **Find fun games or servers**: Our gaming platform relies on third-party communities creating games and servers. Browse these games and servers right through our app and connect to them with one click!
 - **Assets**: Automatically download and install game assets onto servers where the game supports it (integrated games only).

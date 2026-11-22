@@ -125,7 +125,7 @@ const router = createHashRouter([
                     { index: true, element: <AppSettingsRoute /> },
                     { path: 'account', element: <AccountSettingsRoute /> },
                     { path: 'downloads', element: <DownloadsSettingsRoute /> },
-                    { path: 'games', element: <Navigate to="/settings/downloads" replace /> },
+                    { path: 'games', element: <Navigate to="/my-apps" replace /> },
                     { path: 'plugins', element: <PluginsRoute /> },
                     { path: 'logging', element: <LoggingRoute /> },
                 ],

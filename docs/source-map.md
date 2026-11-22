@@ -115,7 +115,7 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `lib/library/provider.tsx` | The subscription sync loop |
 | `lib/external.ts` | Which content kinds are handed to the system browser |
 | `components/shell.tsx` | Sidebar ≥768px, bottom tabs below; draws the tree in `lib/nav.ts` |
-| `lib/nav.ts` | The primary navigation as data: Play, Discover (Apps, Mods, Assets, Servers > RCON, More), Library (Sandboxes, Downloads, Stores), Friends, Console, Settings. Feeds the rail, the bottom bar and the landing cards |
+| `lib/nav.ts` | The primary navigation as data: Play, Discover (Apps, Mods, Assets, Servers > RCON, More), Library (My apps, Sandboxes, Workshop, Downloads, Stores), Friends, Console, Settings. Feeds the rail, the bottom bar and the landing cards |
 | `components/section-cards.tsx` | The card grid on the Discover and Library landing pages |
 | `components/titlebar.tsx` | The app's own window frame — [frontend.md](frontend.md#the-window-frame-is-the-apps-not-the-oss) |
 | `components/update-banner.tsx` | "There is a newer version", with an Install button when this build can verify one |
@@ -145,6 +145,8 @@ What each file owns, per crate. The shape and the rule behind it are in [archite
 | `routes/store.tsx` | Store directory, per-game store (search, kind/currency/show filters, sort), item dialog (points buy with confirm, credits open the website externally, equip), loadout panel, inventory tab |
 | `routes/stats.tsx` | Stats overview (totals, 30-day activity, play share, per-game cards) and per-game drill-down (my stats, achievements, leaderboards) |
 | `components/add-friend-button.tsx` | "Add friend" on a member's page |
+| `routes/my-apps.tsx` | Library → My apps: every game, its install folder, and Find my games; unplaced and unsupported scan results |
+| `lib/app-manage/rows.ts` | The My apps rows as pure data: places scan results by `appId` (slug fallback), `sameDir`, unplaced and unsupported lists |
 | `routes/library.tsx` | Three views: the games on this machine, the games TMC published here, and what the account subscribed to |
 | `components/library-tmc.tsx` | TMC's own games: install, update, auto-update, remove |
 | `routes/join.tsx` | Where a `gs://play/<host>:<port>` link lands. Shows what is there; joins nothing on its own |

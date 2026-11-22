@@ -234,7 +234,7 @@ export const LIBRARY: NavNode = {
             // a game's Manage view, not in Settings.
             id: 'my-apps',
             to: '/my-apps',
-            label: 'Apps',
+            label: 'My apps',
             icon: FiGrid,
             description: 'Your games: install folders and Find my games.',
         },
@@ -286,7 +286,7 @@ export const SETTINGS: NavNode = {
     to: '/settings',
     label: 'Settings',
     icon: FiSettings,
-    description: 'The app, your account, games and plugins.',
+    description: 'The app, your account, downloads and plugins.',
 }
 
 /** Top to bottom, as the rail draws them. */

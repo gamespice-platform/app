@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import type { DetectedGameT } from '~/lib/ipc/schemas'
-import { buildManageRows, slugOf, unmatchedCount } from '~/lib/app-manage/rows'
+import {
+    buildManageRows,
+    sameDir,
+    slugOf,
+    unmatchedCount,
+    unplacedDetected,
+    unsupportedDetected,
+} from '~/lib/app-manage/rows'
 
 const game = (id: number, name: string, url: string | null = name) => ({
     id,
@@ -18,6 +25,7 @@ const found = (slug: string | null, path = '/g'): DetectedGameT => ({
     launchUri: null,
     sizeBytes: null,
     slug,
+    appId: null,
     alreadySet: false,
     replaces: null,
 })
@@ -93,5 +101,68 @@ describe('buildManageRows', () => {
 describe('unmatchedCount', () => {
     it('counts results with no slug', () => {
         expect(unmatchedCount([found(null), found('a'), found(null)])).toBe(2)
+    })
+})
+
+describe('scan results the catalogue facet cannot place', () => {
+    const catalogue = [game(1, 'Zed')]
+    const withId = (slug: string | null, appId: number | null, name = 'Found'): DetectedGameT => ({
+        ...found(slug),
+        appId,
+        name,
+    })
+
+    it('matches by appId even when the catalogue url differs from the slug', () => {
+        const rows = buildManageRows({
+            catalogue: [game(1, 'Zed', 'zed-site')],
+            gameDirs: {},
+            sandboxAppIds: [],
+            detected: [withId('zed', 1)],
+        })
+
+        expect(rows[0]).toMatchObject({ appId: 1, status: 'detected' })
+        expect(rows[0]!.detected).toHaveLength(1)
+    })
+
+    it('adds a row for an appId the catalogue does not list, named from the scan', () => {
+        const rows = buildManageRows({
+            catalogue,
+            gameDirs: {},
+            sandboxAppIds: [],
+            detected: [withId('other', 99, 'Other Game')],
+        })
+
+        expect(rows.find((r) => r.appId === 99)).toMatchObject({
+            name: 'Other Game',
+            status: 'detected',
+        })
+    })
+
+    it('falls back to the slug when Rust sent no id', () => {
+        const rows = buildManageRows({
+            catalogue,
+            gameDirs: {},
+            sandboxAppIds: [],
+            detected: [withId('zed', null)],
+        })
+
+        expect(rows[0]!.status).toBe('detected')
+    })
+
+    it('lists a slugged result with no id and no catalogue match as unplaced', () => {
+        const detected = [withId('zed', null), withId('ghost', null), withId(null, null)]
+
+        expect(unplacedDetected({ catalogue, detected }).map((d) => d.slug)).toEqual(['ghost'])
+        expect(unsupportedDetected(detected)).toHaveLength(1)
+        expect(unmatchedCount(detected)).toBe(1)
+    })
+})
+
+describe('sameDir', () => {
+    it('ignores a trailing slash, slash direction and drive-letter case', () => {
+        expect(sameDir('/a/b/', '/a/b')).toBe(true)
+        expect(sameDir('C:\\Games\\X\\', 'c:/Games/X')).toBe(true)
+        expect(sameDir('/a/b', '/a/c')).toBe(false)
+        expect(sameDir(null, '/a')).toBe(false)
     })
 })

@@ -117,7 +117,7 @@ pub fn target_dir(sandbox: &Sandbox, settings: &AppSettings) -> AppResult<PathBu
         .or_else(|| settings.game_dirs.get(&sandbox.app_id.to_string()).cloned())
         .ok_or_else(|| {
             AppError::invalid(
-                "This sandbox has no game folder yet. Set one in Settings → Games, or give the \
+                "This sandbox has no game folder yet. Set one in Library → My apps, or give the \
                  sandbox its own folder.",
             )
         })?;

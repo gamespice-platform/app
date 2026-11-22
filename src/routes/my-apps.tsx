@@ -18,7 +18,9 @@ import type { DetectedGameT } from '~/lib/ipc/schemas'
 import { useSettings } from '~/lib/settings/provider'
 import {
     buildManageRows,
-    unmatchedCount,
+    sameDir,
+    unplacedDetected,
+    unsupportedDetected,
     type ManageRow,
 } from '~/lib/app-manage/rows'
 import { GameIcon } from '~/components/game-icon'
@@ -27,9 +29,9 @@ import { useFolderPicker } from '~/components/folder-picker'
 import { useDialog } from '~/components/use-dialog'
 
 /**
- * **Library -> Apps**: the games on this device and where each one lives.
+ * **Library -> My apps**: the games on this device and where each one lives.
  *
- * This is where the per-game settings used to be, in Settings -> Games. They
+ * This is where the per-game settings used to be, in Settings -> Games (now gone). They
  * moved because "where is this game installed" is something you do while
  * looking at the game, not in a global settings list of every game that has
  * content.
@@ -79,6 +81,16 @@ export default function MyAppsRoute() {
         [catalogue.data, gameDirs, sandboxRows, found, search]
     )
 
+    const unplaced = useMemo(
+        () =>
+            unplacedDetected({
+                catalogue: catalogue.data?.apps ?? [],
+                detected: found ?? [],
+            }),
+        [catalogue.data, found]
+    )
+    const unsupported = useMemo(() => unsupportedDetected(found ?? []), [found])
+
     if (!app) return <Skeleton className="m-3 h-40 w-full" />
 
     const scan = async () => {
@@ -95,12 +107,12 @@ export default function MyAppsRoute() {
     }
 
     const managed = rows.find((r) => r.appId === managing) ?? null
-    const matched = (found ?? []).filter((g) => g.slug).length
+    const matched = (found ?? []).length - unplaced.length - unsupported.length
 
     return (
         <div className="flex flex-col gap-3 p-3">
             <header>
-                <h1 className="text-lg font-bold">Apps</h1>
+                <h1 className="text-lg font-bold">My apps</h1>
                 <p className="text-xs text-muted">
                     Your games and where they are installed. Choose Manage to set
                     a game&rsquo;s install folder.
@@ -133,13 +145,51 @@ export default function MyAppsRoute() {
             {found !== null && (
                 <p className="text-xs text-muted">
                     {matched} game{matched === 1 ? '' : 's'} the app can manage,{' '}
-                    {unmatchedCount(found)} other
-                    {unmatchedCount(found) === 1 ? '' : 's'} found. Nothing is
-                    changed until you apply a result in Manage.
+                    {unplaced.length + unsupported.length} other
+                    {unplaced.length + unsupported.length === 1 ? '' : 's'} found.
+                    Nothing is changed until you apply a result in Manage.
                 </p>
             )}
 
+            {unplaced.length > 0 && (
+                <UnplacedGroup
+                    games={unplaced}
+                    onApplied={() => {
+                        void reloadApp()
+                        void scan()
+                    }}
+                />
+            )}
+
+            {unsupported.length > 0 && (
+                <details className="rounded-xl border border-border p-3 text-xs">
+                    <summary className="cursor-pointer text-muted">
+                        {unsupported.length} found game
+                        {unsupported.length === 1 ? '' : 's'} the app has no rules for
+                    </summary>
+                    <ul className="mt-2 flex flex-col gap-1.5">
+                        {unsupported.map((g) => (
+                            <li key={`${g.source}:${g.path}`} className="min-w-0">
+                                <p className="truncate">
+                                    {g.name}
+                                    <span className="ml-2 rounded bg-surface-tertiary px-1.5 py-0.5 text-[0.6rem] uppercase text-muted">
+                                        {g.source}
+                                    </span>
+                                </p>
+                                <p className="selectable truncate text-muted">{g.path}</p>
+                            </li>
+                        ))}
+                    </ul>
+                </details>
+            )}
+
             {error && <ErrorNote message={error} />}
+
+            {sandboxes.isError && (
+                <ErrorNote
+                    message={`Sandboxes could not be loaded, so games with a sandbox may be listed as not installed: ${messageOf(sandboxes.error)}`}
+                />
+            )}
 
             {catalogue.isPending && <Skeleton className="h-40 w-full" />}
 
@@ -160,7 +210,9 @@ export default function MyAppsRoute() {
 
             {catalogue.isSuccess && rows.length < 1 && (
                 <p className="rounded-xl border border-border p-6 text-center text-sm text-muted">
-                    No games match.
+                    {search.trim()
+                        ? 'No games match.'
+                        : 'The game list is empty.'}
                 </p>
             )}
 
@@ -208,10 +260,14 @@ export default function MyAppsRoute() {
                     row={managed}
                     scanning={scanning}
                     scanned={found !== null}
+                    scanError={error}
                     onScan={() => void scan()}
                     onApplied={() => {
                         void reloadApp()
                         setError(null)
+                        // Re-read the scan so "Replaces" and "In use" follow
+                        // what is now set, not what was set when it ran.
+                        if (found !== null) void scan()
                     }}
                     onClose={() => setManaging(null)}
                 />
@@ -230,6 +286,60 @@ function ErrorNote({ message }: { message: string }) {
 }
 
 /**
+ * Scan results the app has a rule for but the site has no game for. "Use this"
+ * is offered anyway so the person gets Rust's own explanation, not silence.
+ */
+function UnplacedGroup({
+    games,
+    onApplied,
+}: {
+    games: DetectedGameT[]
+    onApplied: () => void
+}) {
+    const [error, setError] = useState<string | null>(null)
+
+    const use = async (game: DetectedGameT) => {
+        if (!game.slug) return
+
+        setError(null)
+
+        try {
+            await ipc.detectApply(game.slug, game.path)
+            onApplied()
+        } catch (err) {
+            setError(isIpcError(err) ? err.message : 'That folder cannot be used.')
+        }
+    }
+
+    return (
+        <section className="flex flex-col gap-2 rounded-xl border border-border p-3">
+            <h2 className="text-xs font-semibold">
+                Found, but the site has no matching game
+            </h2>
+            {error && <ErrorNote message={error} />}
+            {games.map((game) => (
+                <div
+                    key={`${game.source}:${game.path}`}
+                    className="flex items-center justify-between gap-3"
+                >
+                    <div className="min-w-0">
+                        <p className="truncate text-sm">{game.name}</p>
+                        <p className="selectable truncate text-xs text-muted">{game.path}</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => void use(game)}
+                        className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs hover:border-accent"
+                    >
+                        Use this
+                    </button>
+                </div>
+            ))}
+        </section>
+    )
+}
+
+/**
  * One game's settings.
  *
  * Rust's refusal is shown, not swallowed: "nothing happened when I chose a
@@ -241,6 +351,7 @@ function ManageDialog({
     row,
     scanning,
     scanned,
+    scanError,
     onScan,
     onApplied,
     onClose,
@@ -248,6 +359,7 @@ function ManageDialog({
     row: ManageRow
     scanning: boolean
     scanned: boolean
+    scanError: string | null
     onScan: () => void
     onApplied: () => void
     onClose: () => void
@@ -256,7 +368,6 @@ function ManageDialog({
     const { setGameDir } = useSettings()
     const { pick, element: picker } = useFolderPicker()
     const [error, setError] = useState<string | null>(null)
-    const [applied, setApplied] = useState<Set<string>>(new Set())
 
     const guard = async (write: () => Promise<void>) => {
         setError(null)
@@ -288,7 +399,6 @@ function ManageDialog({
 
         await guard(async () => {
             await ipc.detectApply(slug, game.path)
-            setApplied((was) => new Set(was).add(game.path))
         })
     }
 
@@ -303,6 +413,7 @@ function ManageDialog({
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Manage ${row.name}`}
+                style={{ paddingBottom: 'calc(1rem + var(--safe-bottom))' }}
                 className="flex max-h-[90vh] w-full max-w-lg flex-col gap-4 overflow-y-auto rounded-t-xl border border-border bg-surface p-4 focus:outline-none md:rounded-xl"
             >
                 <div className="flex items-center justify-between gap-3">
@@ -324,6 +435,7 @@ function ManageDialog({
                 </div>
 
                 {error && <ErrorNote message={error} />}
+                {scanError && <ErrorNote message={scanError} />}
 
                 <section className="flex flex-col gap-2">
                     <div>
@@ -392,7 +504,17 @@ function ManageDialog({
                         </p>
                     )}
 
-                    {row.detected.map((game) => (
+                    {row.detected.map((game) => {
+                        // Judged from the folder set NOW, so it cannot go
+                        // stale after an apply; Rust's own comparison (symlinks)
+                        // counts once a fresh scan has landed.
+                        const inUse =
+                            sameDir(row.dir, game.path) ||
+                            (!scanning && row.dir !== null && game.alreadySet)
+                        const replaces =
+                            !inUse && row.dir !== null ? row.dir : null
+
+                        return (
                         <div
                             key={`${game.source}:${game.path}`}
                             className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"
@@ -407,16 +529,14 @@ function ManageDialog({
                                 <p className="selectable truncate text-xs text-muted">
                                     {game.path}
                                 </p>
-                                {game.replaces && (
+                                {replaces && (
                                     <p className="truncate text-[0.7rem] text-warning">
-                                        Replaces {game.replaces}
+                                        Replaces {replaces}
                                     </p>
                                 )}
                             </div>
 
-                            {game.alreadySet ||
-                            applied.has(game.path) ||
-                            row.dir === game.path ? (
+                            {inUse ? (
                                 <span className="flex shrink-0 items-center gap-1 text-xs text-success">
                                     <FiCheck className="size-3.5" />
                                     In use
@@ -431,7 +551,8 @@ function ManageDialog({
                                 </button>
                             )}
                         </div>
-                    ))}
+                        )
+                    })}
                 </section>
 
                 <Link

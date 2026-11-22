@@ -656,7 +656,7 @@ impl LibraryDb {
             .any(|dir| canon::canonicalize_or_keep(dir).starts_with(&root))
         {
             return Err(AppError::invalid(
-                "A game is installed in this store. Move or reset its install folder (Settings > Games) first.",
+                "A game is installed in this store. Move or reset its install folder (Library → My apps) first.",
             ));
         }
 

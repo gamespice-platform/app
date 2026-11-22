@@ -42,6 +42,11 @@ use crate::state::AppState;
 pub struct Candidate {
     #[serde(flatten)]
     pub game: DetectedGame,
+    /// The site's id for the matched game, when the slug resolves to one.
+    ///
+    /// The same lookup `detect_apply` uses, so a result with an id is one
+    /// "Use this" can apply, and one with a slug but no id is one it cannot.
+    pub app_id: Option<i64>,
     /// Is this folder already configured for its game?
     pub already_set: bool,
     /// Would applying it replace a different folder?
@@ -81,17 +86,24 @@ pub async fn detect_games(app: AppHandle, state: State<'_, AppState>) -> AppResu
 }
 
 fn annotate(game: DetectedGame, settings: &AppSettings, state: &AppState) -> Candidate {
-    let configured = game
+    let app_id = game
         .slug
         .as_deref()
-        .and_then(|slug| app_id_for(slug, state))
-        .and_then(|id| settings.game_dirs.get(&id.to_string()).cloned());
+        .and_then(|slug| app_id_for(slug, state));
+
+    candidate(game, app_id, settings)
+}
+
+/// The pure half of [`annotate`]: everything but the id lookup.
+fn candidate(game: DetectedGame, app_id: Option<i64>, settings: &AppSettings) -> Candidate {
+    let configured = app_id.and_then(|id| settings.game_dirs.get(&id.to_string()).cloned());
 
     let already_set = configured
         .as_deref()
         .is_some_and(|current| same_folder(current, &game.path));
 
     Candidate {
+        app_id,
         already_set,
         replaces: configured.filter(|_| !already_set),
         game,
@@ -493,4 +505,50 @@ fn urlencode(raw: &str) -> String {
     }
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn found(slug: Option<&str>, path: &str) -> DetectedGame {
+        DetectedGame {
+            source: "steam".into(),
+            name: "G".into(),
+            path: path.into(),
+            launcher_id: None,
+            launch_uri: None,
+            size_bytes: None,
+            slug: slug.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn candidate_carries_the_resolved_app_id() {
+        let settings = AppSettings::default();
+
+        let hit = candidate(found(Some("gtav"), "/g"), Some(7), &settings);
+        assert_eq!(hit.app_id, Some(7));
+
+        let miss = candidate(found(Some("gtav"), "/g"), None, &settings);
+        assert_eq!(miss.app_id, None);
+        assert!(!miss.already_set);
+
+        let json = serde_json::to_value(&hit).unwrap();
+        assert_eq!(json["appId"], 7);
+    }
+
+    #[test]
+    fn already_set_ignores_a_trailing_slash() {
+        let mut settings = AppSettings::default();
+        settings.game_dirs.insert("7".into(), "/games/a/".into());
+
+        let same = candidate(found(Some("a"), "/games/a"), Some(7), &settings);
+        assert!(same.already_set);
+        assert_eq!(same.replaces, None);
+
+        let other = candidate(found(Some("a"), "/games/b"), Some(7), &settings);
+        assert!(!other.already_set);
+        assert_eq!(other.replaces.as_deref(), Some("/games/a/"));
+    }
 }

@@ -1017,6 +1017,12 @@ export const DetectedGameSchema = z.object({
     sizeBytes: z.number().nullable(),
     /** The TMC game this was matched to, when a hint matched. */
     slug: z.string().nullable(),
+    /**
+     * The site's id for that game, resolved by Rust the way "Use this" will
+     * resolve it. Null with a slug set means the app has a rule for the game
+     * and the site's catalogue has no row for it.
+     */
+    appId: z.number().int().nullable().default(null),
     alreadySet: z.boolean(),
     replaces: z.string().nullable(),
 })
