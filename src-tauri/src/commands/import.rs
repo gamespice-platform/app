@@ -114,6 +114,44 @@ pub struct ImportReport {
     pub failed: Vec<String>,
     /// Sandboxes the new mods were added to, so the UI can offer a deploy.
     pub sandbox_id: Option<i64>,
+    /// The modpacks among `imported`, with what is left to fetch.
+    pub packs: Vec<PackInfo>,
+}
+
+/// A recognised modpack, as the import dialog shows it.
+///
+/// The webview names the mod by id and calls `local_pack_download` and
+/// `local_pack_finalize`; it never sees a URL or a path.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackInfo {
+    pub mod_id: i64,
+    pub kind: modpack::PackKind,
+    pub name: String,
+    pub version: Option<String>,
+    pub game_version: Option<String>,
+    pub loader: Option<String>,
+    /// Listed downloads waiting to be queued.
+    pub files: usize,
+    pub skipped_server_only: usize,
+    /// CurseForge `projectID/fileID` pairs the app cannot resolve to a URL.
+    pub unresolved: Vec<String>,
+}
+
+impl PackInfo {
+    fn of(mod_id: i64, pack: &modpack::PackManifest) -> Self {
+        Self {
+            mod_id,
+            kind: pack.kind,
+            name: pack.name.clone(),
+            version: pack.version.clone(),
+            game_version: pack.game_version.clone(),
+            loader: pack.loader.clone(),
+            files: pack.files.len(),
+            skipped_server_only: pack.skipped_server_only,
+            unresolved: pack.unresolved.clone(),
+        }
+    }
 }
 
 // ------------------------------------------------------------------- Dropping
@@ -324,7 +362,11 @@ pub fn import_paths(
             origin,
             over,
         ) {
-            Ok(row) => {
+            Ok((row, pack)) => {
+                if let Some(pack) = pack {
+                    report.packs.push(pack);
+                }
+
                 if let Some(sandbox) = &sandbox {
                     if let Err(e) = state.library.sandbox_add_local(sandbox.id, &row) {
                         report.failed.push(format!("{}: {}", row.name, e));
@@ -358,7 +400,7 @@ fn import_one(
     slug: Option<&str>,
     origin: Origin,
     over: Option<&ImportOverride>,
-) -> AppResult<LocalMod> {
+) -> AppResult<(LocalMod, Option<PackInfo>)> {
     let prepared = store::prepare(store_root, path, opts)?;
 
     let source = prepared.metadata.as_ref().and_then(|m| {
@@ -440,10 +482,14 @@ fn import_one(
         )
     );
 
-    state
+    let pack = prepared.pack.as_ref().map(|p| PackInfo::of(id, p));
+
+    let row = state
         .library
         .local_get(id)?
-        .ok_or_else(|| AppError::internal("the imported mod vanished"))
+        .ok_or_else(|| AppError::internal("the imported mod vanished"))?;
+
+    Ok((row, pack))
 }
 
 // -------------------------------------------------------------- Local mod rows
@@ -830,6 +876,8 @@ pub fn batch_from_drop(state: &AppState, paths: Vec<PathBuf>) -> DropBatch {
                 is_dir,
                 bytes: meta.filter(|m| m.is_file()).map(|m| m.len()).unwrap_or(0),
                 is_archive: lower.ends_with(".zip")
+                    || lower.ends_with(".7z")
+                    || lower.ends_with(".mrpack")
                     || lower.ends_with(".tar")
                     || lower.ends_with(".tar.gz")
                     || lower.ends_with(".tgz"),
