@@ -56,7 +56,7 @@ I intend on reviewing code, testing, and editing documentation regularly. If you
 One line, no root, no package manager, just `curl` and `sh`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gamespice-platform/app/main/scripts/install.sh | sh
+curl -fsSL https://gamespice.net/install.sh | sh
 ```
 
 The script verifies the download against the release's checksums, installs into `~/.local`, and registers the launcher entry and the `gs://` scheme. Undo it with `… | sh -s -- --uninstall`.

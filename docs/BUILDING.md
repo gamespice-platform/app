@@ -129,17 +129,9 @@ Moved to [`RELEASING.md`](RELEASING.md): the signing keypair (the public half is
 **Linux**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gamespice-platform/app/main/scripts/install.sh | sh
+curl -fsSL https://gamespice.net/install.sh | sh
 ```
 
-Downloads the AppImage for the running architecture, verifies it against the release's `checksums.txt`, and registers a launcher entry, an icon and the `gs://` scheme. No root — everything lands under `~/.local` unless it is run as root, in which case `/usr/local`. It does not call `sudo` for you.
-
-```bash
-… | sh -s -- --uninstall           # removes exactly what it wrote
-… | sh -s -- --version v0.1.0      # a specific release
-GS_APPIMAGE=./GameSpice-App_0.1.0_amd64.AppImage sh scripts/install.sh   # a build you made
-```
-
-Where libfuse2 is absent the AppImage is unpacked into `~/.local/lib/gamespice-app` and `~/.local/bin/gamespice-app` becomes a symlink to its `AppRun` — same files, no mount.
+Detects the distribution and package manager, downloads the AppImage for the running architecture, verifies it against the release's `checksums.txt`, and installs it under `~/.local` where the app's updater can replace it, with the launcher entry, the hicolor icon set and the `gs://` scheme. It never runs `sudo` unasked. Everything about it, including `--uninstall`, `--dry-run`, `--channel beta` and the no-FUSE case, is in [install-linux.md](install-linux.md). `GS_APPIMAGE=./GameSpice-App_0.1.0_amd64.AppImage sh scripts/install.sh` installs a build you made.
 
 **Windows** — the `-setup.exe`, or the `.msi` for deployment. Both register `gs://`; the MSI is per-machine and needs elevation.

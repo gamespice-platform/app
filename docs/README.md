@@ -7,6 +7,7 @@ The index. `CLAUDE.md` in the repository root is the always-loaded summary; this
 | File | Read it when |
 | --- | --- |
 | [development.md](development.md) | running, checking or building anything; pointing a build at the dev site; building on Linux without root; what CI runs; `audit:rust` |
+| [install-linux.md](install-linux.md) | the Linux one-line installer: detection, prerequisites, where it installs, updates, icons, flags, tests |
 | [BUILDING.md](BUILDING.md) | producing an artifact for a platform, including the whole Windows build from Linux |
 | [avatar.md](avatar.md) | the avatar studio: the shared editor, its IPC, the model-bytes command, the `blob:` CSP allowance |
 | [RELEASING.md](RELEASING.md) | cutting a release: the tag, the secrets, the bucket, the updater keypair |

@@ -651,6 +651,16 @@ jobs:
               with:
                   node-version: 22
 
+            # The Linux installer and its icon set ride along with every
+            # release, so `releases/latest/download/install.sh` is a stable
+            # URL and the installer can fetch the GameSpice icon at every
+            # hicolor size without unpacking the AppImage. Added before the
+            # checksums so both are listed in checksums.txt.
+            - name: Linux installer assets
+              run: |
+                  cp scripts/install.sh artifacts/install.sh
+                  tar -C packaging/linux/icons -czf artifacts/GameSpice-App-icons.tar.gz hicolor
+
             # checksums.txt is not decoration: `scripts/install.sh` REFUSES to
             # install without it, so a release published without this step is a
             # release the one-line installer will not touch.

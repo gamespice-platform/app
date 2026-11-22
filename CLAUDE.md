@@ -31,6 +31,7 @@ The official **The Modding Community** app: Rust + Tauri 2 + React 19, shipping 
 | [docs/rcon.md](docs/rcon.md) | RCON |
 | [docs/deep-links.md](docs/deep-links.md) | `gs://` |
 | [docs/development.md](docs/development.md) | commands, the dev site, Linux without root, CI, `audit:rust` |
+| [docs/install-linux.md](docs/install-linux.md) | `scripts/install.sh`, the Linux one-liner, its flags and tests |
 | [docs/BUILDING.md](docs/BUILDING.md) | producing a platform artifact |
 | [docs/RELEASING.md](docs/RELEASING.md) | cutting a release |
 | [docs/extending.md](docs/extending.md) | adding a content kind, query protocol, game, mod manager, deployment strategy or step type |

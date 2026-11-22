@@ -94,13 +94,13 @@ The MSI registers `gs://` in `HKLM` itself, because a per-machine install is the
 
 ### The one-line installer
 
-`scripts/install.sh` is what `curl … | sh` runs, so it is written as a document somebody reads before piping it: POSIX `sh`, no `sudo`, `~/.local` unless run as root, and `--uninstall` removes exactly what it wrote.
+`scripts/install.sh` is what `curl … | sh` runs, so it is written as a document somebody reads before piping it: POSIX `sh`, one `main` call at the end, no silent `sudo`, `~/.local` unless run as root, and `--uninstall` removes exactly what its manifest lists. The user-facing description, flags and distribution table are in [install-linux.md](install-linux.md); `scripts/install.test.sh` is its harness.
 
-**The checksum is required, not advisory.** It reads `checksums.txt` from the release and refuses to install without it — which makes the `publish` job's `sha256sum` step load-bearing: a release cut by hand without one is a release the installer will not touch.
+**The checksum is required, not advisory.** It reads `checksums.txt` from the release and refuses to install without it, which makes the `publish` job's `sha256sum` step load-bearing: a release cut by hand without one is a release the installer will not touch. The release workflow also attaches `install.sh` itself and `GameSpice-App-icons.tar.gz` (built from `packaging/linux/icons/hicolor`), both listed in `checksums.txt`.
 
-It resolves the latest version from the **redirect** on `/releases/latest` rather than the GitHub API, which is rate-limited per IP at sixty an hour and would be spent by whoever shares the NAT.
+It resolves the latest version from the **redirect** on `/releases/latest` rather than the GitHub API, which is rate-limited per IP at sixty an hour and would be spent by whoever shares the NAT. The beta channel reads `releases.atom` for the same reason.
 
-Where **libfuse2** is missing — Debian 13, Ubuntu 24.04 — the AppImage is unpacked into `~/.local/lib/gamespice-app` and `bin/gamespice-app` becomes a symlink to its `AppRun`. The same problem hits the BUILD side, where linuxdeploy and appimagetool are themselves AppImages: `APPIMAGE_EXTRACT_AND_RUN=1` is what both honour, and Tauri reports its absence as the unhelpful `failed to run linuxdeploy` — as it does the missing `librsvg2-dev` the GTK plugin needs. `build-linux.sh` checks for both by name.
+Where **libfuse2** is missing (Debian 13, Ubuntu 24.04) the AppImage stays a real file under `~/.local/lib/gamespice-app` and `bin/gamespice-app` is a wrapper that sets `APPIMAGE_EXTRACT_AND_RUN=1`, so the updater still replaces a genuine AppImage. The same problem hits the BUILD side, where linuxdeploy and appimagetool are themselves AppImages: `APPIMAGE_EXTRACT_AND_RUN=1` is what both honour, and Tauri reports its absence as the unhelpful `failed to run linuxdeploy`, as it does the missing `librsvg2-dev` the GTK plugin needs. `build-linux.sh` checks for both by name.
 
 ## Working here
 
