@@ -1,5 +1,5 @@
 {
     "_comment": "The tmc-cli commit bundled into the app as the Console's `tmc` (src-tauri/binaries/tmc-<triple>, built by scripts/build-tmc-cli.sh, shipped as a Tauri sidecar). A full commit SHA or a tag: a release rebuilds exactly this. Bump it in the same pull request as any app change that needs a newer CLI.",
     "repo": "modcommunity/tmc-cli",
-    "ref": "ba23ce77ccf5ee1d5bbe7b4879635ae27a95c39b"
+    "ref": "0939cef5776fef5d080f4e505c15ebfbefaaeed7"
 }
