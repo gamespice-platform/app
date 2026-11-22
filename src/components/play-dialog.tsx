@@ -24,6 +24,7 @@ import { LiveLatency } from '~/components/server-live'
 import { requestFor, useLiveServer } from '~/lib/hooks/use-live-query'
 import { useDialog } from '~/components/use-dialog'
 import { quickAction } from '~/lib/quick-start'
+import { getConnectNoAsk, setConnectNoAsk } from '~/lib/connect-preference'
 import { installPercent } from '~/lib/install-progress'
 import type {
     AppSummaryT,
@@ -682,8 +683,12 @@ export default function PlayDialog({
         }
     }, [sandboxId, onClose])
 
+    const [noAsk, setNoAsk] = useState(() => getConnectNoAsk(target.appId))
+
     const connect = useCallback(async () => {
         if (!server) return
+
+        setConnectNoAsk(target.appId, noAsk)
 
         setBusy(true)
         setError(null)
@@ -699,7 +704,28 @@ export default function PlayDialog({
         } finally {
             setBusy(false)
         }
-    }, [server, onClose])
+    }, [server, onClose, target.appId, noAsk])
+
+    /*
+     * An external game whose owner ticked "never ask me again": a quick Join
+     * (left-click, the monitor's Join) connects straight away. The server
+     * page's Play button leaves `quickStart` unset, so it still shows the
+     * dialog, with the box ticked, which is where it is turned back off.
+     */
+    const noAskStarted = useRef(false)
+
+    useEffect(() => {
+        if (
+            noAskStarted.current ||
+            !target.quickStart ||
+            mode !== 'connect' ||
+            !getConnectNoAsk(target.appId)
+        )
+            return
+
+        noAskStarted.current = true
+        void connect()
+    }, [mode, target.quickStart, target.appId, connect])
 
     const [auto, setAuto] = useState(!!target.quickStart)
     const [autoNote, setAutoNote] = useState<string | null>(null)
@@ -1057,7 +1083,18 @@ export default function PlayDialog({
                                     icon={FiExternalLink}
                                     title="Connect with the game client"
                                     body="Hands the server's address to the copy already installed on this machine, through its own launcher."
-                                />
+                                >
+                                    <label className="flex items-center gap-2 text-[11px] text-muted">
+                                        <input
+                                            type="checkbox"
+                                            checked={noAsk}
+                                            onChange={(e) =>
+                                                setNoAsk(e.target.checked)
+                                            }
+                                        />
+                                        Never ask me again for this game
+                                    </label>
+                                </ModeCard>
                             )}
 
                             {(webClosed || desktopClosed) && (

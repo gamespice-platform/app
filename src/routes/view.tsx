@@ -179,6 +179,34 @@ export default function ViewRoute() {
         staleTime: 60 * 1000,
     })
 
+    /*
+     * The monitor window's Join: `?join=1` starts the same quick launch the
+     * server list's Join does, instead of leaving the player to press Play on
+     * the page. Once per arrival; the query is dropped so a refresh or back
+     * does not launch again.
+     */
+    const joinRequested = search.get('join') === '1'
+    const joinData = detail.data
+    useEffect(() => {
+        if (!joinRequested || !joinData) return
+        const sm = joinData.summary
+
+        if (sm.kind === 'server' && sm.app)
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the route's `?join=1`, which is external state
+            setPlayTarget({
+                appId: sm.app.id,
+                fallback: {
+                    name: sm.app.name,
+                    icon: sm.app.icon,
+                    slug: sm.app.url,
+                },
+                server: sm,
+                quickStart: true,
+            })
+
+        void navigate(location.pathname, { replace: true })
+    }, [joinRequested, joinData, navigate, location.pathname])
+
     if (!kind)
         return <Centered>That is not a content type this app knows about.</Centered>
 

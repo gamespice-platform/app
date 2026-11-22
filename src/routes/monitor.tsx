@@ -516,8 +516,8 @@ function Header({
                 {summary?.server?.connectUrl && (
                     <button
                         type="button"
-                        onClick={() => void openServerPage(summary)}
-                        title="Opens the server page in the main window, where Join runs the launch checks"
+                        onClick={() => void openServerPage(summary, true)}
+                        title="Join this server from the main window"
                         className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
                         <FiPlay className="size-3.5" /> Join
@@ -554,8 +554,8 @@ function Fact({ label, value }: { label: string; value: string }) {
  * both off to it rather than duplicating them. A hash link opens the page in
  * this window's own router instead when there is no main window to ask.
  */
-async function openServerPage(summary: ContentSummaryT) {
-    const hash = `#/view/server/${summary.id}`
+async function openServerPage(summary: ContentSummaryT, join = false) {
+    const hash = `#/view/server/${summary.id}${join ? '?join=1' : ''}`
 
     if ('__TAURI_INTERNALS__' in window) {
         try {
@@ -761,7 +761,7 @@ function GraphArea({
                             t0={t0}
                             t1={t1}
                             color={tone.stroke}
-                            hoverAt={hoverAt}
+                                            hoverAt={hoverAt}
                             onHover={onHover}
                             floor={50}
                             unit="ms"
