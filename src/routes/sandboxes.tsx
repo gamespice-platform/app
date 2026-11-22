@@ -75,14 +75,14 @@ const STRATEGY_LABELS: Record<string, string> = {
     direct: 'Copy into the game folder',
     hardlink: 'Hard links',
     symlink: 'Symbolic links',
-    usvfs: 'Virtual filesystem',
+    usvfs: 'Virtual filesystem (experimental)',
 }
 
 const STRATEGY_HINTS: Record<string, string> = {
     direct: 'Modifies the game. Displaced files are backed up and restored.',
     hardlink: 'Free, invisible to the game. Same drive only.',
     symlink: 'Free, crosses drives. Needs Developer Mode on Windows.',
-    usvfs: 'The game folder is never touched. Windows only.',
+    usvfs: 'The game folder is never touched. Windows only, experimental: not yet proven on a real launch.',
 }
 
 export default function SandboxesRoute() {

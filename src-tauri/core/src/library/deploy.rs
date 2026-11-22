@@ -519,6 +519,17 @@ pub fn deploy_sandbox(
                     }
                 )));
             }
+
+            // Injecting a DLL into a game is exactly what kernel anti-cheat
+            // exists to stop, so this strategy is refused outright for such a
+            // game, never merely warned about.
+            if spec.deploy.kernel_anti_cheat() && sandbox.strategy == Strategy::Usvfs {
+                return Err(AppError::invalid(format!(
+                    "{} uses kernel-level anti-cheat, which treats the virtual filesystem's \
+                     injected DLL as an attack. Use Direct.",
+                    sandbox.app_name.as_deref().unwrap_or("This game")
+                )));
+            }
         }
     }
 
@@ -805,6 +816,15 @@ pub fn strategies_for(
                     sandbox.app_name.as_deref().unwrap_or("This game")
                 ));
             } else if spec.deploy.kernel_anti_cheat()
+                && Strategy::parse(&report.strategy) == Some(Strategy::Usvfs)
+            {
+                report.available = false;
+                report.reason = Some(format!(
+                    "{} uses kernel-level anti-cheat, which treats an injected DLL as an \
+                     attack. Use Direct.",
+                    sandbox.app_name.as_deref().unwrap_or("This game")
+                ));
+            } else if spec.deploy.kernel_anti_cheat()
                 && Strategy::parse(&report.strategy).is_some_and(|s| !s.modifies_game_files())
             {
                 /*
@@ -999,5 +1019,76 @@ mod tests {
         assert_eq!(mods.len(), 1);
         assert_eq!(mods[0].key, staged);
         assert_ne!(mods[0].key, unstaged);
+    }
+
+    /// Injecting a DLL is what kernel anti-cheat exists to stop: the virtual
+    /// filesystem is refused for such a game, and shown disabled in the picker.
+    #[test]
+    fn kernel_anti_cheat_refuses_the_virtual_filesystem() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let plugin_root = tmp.path().join("plugins");
+        let own = tmp.path().join("own");
+
+        std::fs::create_dir_all(&own).expect("mkdir");
+        std::fs::create_dir_all(plugin_root.join("app/minecraft")).expect("mkdir");
+        std::fs::write(
+            plugin_root.join("app/minecraft/sandbox.json"),
+            r#"{
+                "manifestVersion": 1,
+                "sandbox": {
+                    "deploy": {
+                        "antiCheat": "kernel",
+                        "defaultStrategy": "direct",
+                        "supportedStrategies": ["direct", "usvfs"]
+                    }
+                }
+            }"#,
+        )
+        .expect("write");
+
+        let db = LibraryDb::open_memory().expect("db");
+
+        let mut new = new_sandbox();
+        new.strategy = Strategy::Usvfs;
+        new.game_dir = Some(own.display().to_string());
+
+        let id = db.sandbox_create(&new).expect("create");
+        let sandbox = db.sandbox_get(id).expect("get").expect("present");
+
+        let audit = Audit::new(tmp.path().join("audit.jsonl"));
+        let roots = JailRoots {
+            data: tmp.path().join("data"),
+            cache: tmp.path().join("cache"),
+        };
+        let http = crate::http::client();
+        let plugins = AppPlugins::load(&plugin_root);
+        let settings = AppSettings::default();
+
+        let ctx = SandboxCtx {
+            plugins: &plugins,
+            roots: &roots,
+            settings: &settings,
+            http: &http,
+            audit: &audit,
+            exec_roots: &crate::detect::DetectRoots::default(),
+            downloads: None,
+            staging_root: &tmp.path().join("staging"),
+            backup_root: &tmp.path().join("backups"),
+            local_root: &tmp.path().join("local-mods"),
+        };
+
+        let err = deploy_sandbox(&db, &sandbox, &ctx, true).expect_err("must refuse");
+
+        assert!(err.to_string().contains("anti-cheat"), "{err}");
+
+        let listed = strategies_for(&sandbox, &ctx).expect("listed");
+
+        let usvfs = listed
+            .iter()
+            .find(|r| Strategy::parse(&r.strategy) == Some(Strategy::Usvfs))
+            .expect("usvfs is listed");
+
+        assert!(!usvfs.available);
+        assert!(usvfs.reason.as_deref().unwrap_or("").contains("anti-cheat"));
     }
 }

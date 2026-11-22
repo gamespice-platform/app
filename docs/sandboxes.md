@@ -67,11 +67,13 @@ Splitting them is what makes the whole feature work:
 | `direct` | modified | a full copy | never; it is the fallback |
 | `hardlink` | link pointers | nothing | staging is on another drive |
 | `symlink` | link pointers | nothing | Windows without Developer Mode |
-| `usvfs` | untouched | nothing | not Windows, or not built with `usvfs-hooks` |
+| `usvfs` (EXPERIMENTAL) | untouched | nothing | not Windows, not built with `usvfs-hooks`, or the game has kernel anti-cheat |
 
 #### USVFS: the one that deploys nothing
 
-The user-space virtual filesystem approach, in `src-tauri/usvfs/` (`tmc-usvfs`): the mods stay in staging and the game is *told* they are there, by a DLL injected before its entry point runs that patches `CreateFileW` and `GetFileAttributesW` in its import table and answers them from a merged in-memory tree.
+**EXPERIMENTAL.** Minecraft Java lists it as a supported strategy (`plugins/app/minecraft/sandbox.json`) but the default stays `direct`. It has never been run on Windows by its authors; see the table below for what is tested.
+
+The user-space virtual filesystem approach, in `src-tauri/usvfs/` (`tmc-usvfs`): the mods stay in staging and the game is *told* they are there, by a DLL injected before its entry point runs that patches the file calls in its import table (`CreateFileW`, `GetFileAttributesW`/`ExW`, `FindFirstFileW`/`ExW`, `FindNextFileW`, `FindClose`) and answers them from a merged in-memory tree. Directory listings are merged with the real folder, so a launcher that enumerates `mods/` sees the staged jars. The process-creation calls (`CreateProcessW`, `CreateProcessAsUserW`) are hooked too: a child of the game is created suspended, gets the same DLL and the same tree, then resumes, so a wrapper that spawns the real `java.exe` stays virtual. Only children this process just created are ever injected, never an arbitrary pid; 32-bit children are skipped.
 
 ```
   app                              game process
@@ -93,7 +95,7 @@ The user-space virtual filesystem approach, in `src-tauri/usvfs/` (`tmc-usvfs`):
 
 **The revision is a content hash, not a counter or a clock.** The injected DLL compares it to notice that a blob it already read has changed; a counter would also tick for a redeploy producing an identical tree.
 
-**It is gated twice, at deploy and at launch** (`deploy::usvfs_unavailable`, `spawn::launch_with_vfs`), on Windows AND on `tmc-core`'s `usvfs-hooks` feature, which is **off**. The two are halves of one decision: a build with only one on could publish a tree no launch would carry, or inject with nothing to inject. The refusals are separate strings because they are separate facts — "this is Windows-only" can never change for a Mac user, and "this build has it off" can.
+**It is gated twice, at deploy and at launch** (`deploy::usvfs_unavailable`, `spawn::launch_with_vfs`), on Windows AND on the `usvfs-hooks` feature, which the app crate now enables **by default** (`tmc-core` itself keeps it off so its own tests do not need the Windows crate's extras; a build without it refuses a virtual deploy with "not included in this build"). The two are halves of one decision: a build with only one on could publish a tree no launch would carry, or inject with nothing to inject. The refusals are separate strings because they are separate facts — "this is Windows-only" can never change for a Mac user, and "this build has it off" can.
 
 Why the gate exists at all is a confidence split, stated in `usvfs/src/lib.rs`:
 
@@ -101,12 +103,16 @@ Why the gate exists at all is a confidence split, stated in `usvfs/src/lib.rs`:
 | --- | --- |
 | `tree` — the merged view, resolution, listings, case rules | **Tested**, on every platform |
 | `shm` — publishing and reading the blob atomically | **Tested**, including every malformed input |
-| `hooks` — IAT patching, the redirecting `CreateFileW` | **Type-checked against `x86_64-pc-windows-gnu`. Never run against a game.** |
+| `env` — rebuilding a child's environment block | **Tested**, on every platform |
+| `tree` listings — merging real and virtual directory entries | **Tested**, on every platform |
+| `hooks` — IAT patching, `CreateFileW`, the attribute and `Find*` calls, `CreateProcess*` propagation | **Type-checked against `x86_64-pc-windows-gnu` and clippy-clean. Never run against a game.** |
 | `inject` — suspended launch, remote `LoadLibrary` | **Type-checked.** Argument quoting and environment building are tested; the launch is not |
 
 `cargo check -p tmc-usvfs --target x86_64-pc-windows-gnu` is how that type-checking happens and it is worth keeping working — it has found real bugs reading missed, such as `IMAGE_NT_HEADERS64` living in `Diagnostics::Debug` while being gated behind the `Win32_System_SystemInformation` feature. `tmc-core` cannot be cross-checked that cheaply (bundled SQLite needs a C cross-compiler, which only the `cargo-xwin` toolchain in [BUILDING.md](BUILDING.md) supplies), which is exactly why the injector is its own dependency-light crate.
 
-**What it cannot do, even when it works:** calls through `GetProcAddress` are not redirected (the pointer never came from an import table), direct `ntdll` syscalls are not redirected, writes are not redirected, and every kernel-level anti-cheat treats injection as an attack — correctly. A game declaring `antiCheat: "kernel"` in its `sandbox.json` is refused this strategy before it reaches the engine.
+**What it cannot do, even when it works:** calls through `GetProcAddress` are not redirected (the pointer never came from an import table), direct `ntdll` syscalls are not redirected, writes are not redirected (no copy-on-write: a mod that rewrites its own jar writes into the real folder), `CreateProcessA`/`CreateProcessWithLogonW`/`CreateProcessWithTokenW` are not hooked, and every kernel-level anti-cheat treats injection as an attack — correctly. A game declaring `antiCheat: "kernel"` in its `sandbox.json` is refused this strategy at deploy (`library::deploy::deploy_sandbox`) and shown disabled in the picker (`strategies_for`).
+
+**The DLL ships beside the exe.** `src-tauri/tauri.windows.conf.json` (merged on Windows builds only) builds `tmc-usvfs` explicitly, because a dependency's `cdylib` is not produced as a side effect of building the app, and bundles `target/release/tmc_usvfs.dll` as a resource next to the exe, which is where `spawn` looks for it. This bundling is configured but has not been exercised on Windows; a cross-triple `--target` build puts the DLL under `target/<triple>/release/` and the resource path would need to follow.
 
 **A URI launch rule and a virtual deploy are refused together.** A game started through `steam://` is started by Steam, and there is no process of ours to inject into; the alternative starts the game with none of the sandbox's mods and reports success, which is the hardest kind of bug to diagnose because the folder is stock and there is nothing to find.
 

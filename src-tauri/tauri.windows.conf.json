@@ -1,0 +1,11 @@
+{
+    "build": {
+        "beforeDevCommand": "cargo build --manifest-path src-tauri/Cargo.toml -p tmc-usvfs && npm run dev",
+        "beforeBuildCommand": "npm run build && cargo build --release --manifest-path src-tauri/Cargo.toml -p tmc-usvfs"
+    },
+    "bundle": {
+        "resources": {
+            "target/release/tmc_usvfs.dll": "tmc_usvfs.dll"
+        }
+    }
+}

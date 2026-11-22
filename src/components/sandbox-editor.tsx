@@ -51,7 +51,7 @@ const STRATEGY_LABELS: Record<string, string> = {
     direct: 'Copy into the game folder',
     hardlink: 'Hard links',
     symlink: 'Symbolic links',
-    usvfs: 'Virtual filesystem',
+    usvfs: 'Virtual filesystem (experimental)',
 }
 
 export default function SandboxEditor({

@@ -10,7 +10,7 @@
 //! | [`Strategy::Direct`] | modified | a full copy | never; it is the fallback |
 //! | [`Strategy::Hardlink`] | link pointers | nothing | staging is on another drive |
 //! | [`Strategy::Symlink`] | link pointers | nothing | Windows without Developer Mode |
-//! | [`Strategy::Usvfs`] | untouched | nothing | not Windows, or not built with `usvfs-hooks` |
+//! | [`Strategy::Usvfs`] | untouched | nothing | not Windows, or built without `usvfs-hooks` (EXPERIMENTAL) |
 //!
 //! USVFS
 //! -----
@@ -31,7 +31,8 @@
 //!     strategy left behind, which is the one file operation a virtual deploy
 //!     performs.
 //!
-//! It is gated behind the `usvfs-hooks` feature and Windows. See
+//! It is gated behind the `usvfs-hooks` feature (on by default) and Windows, and
+//! is EXPERIMENTAL: the hook half has never run against a game. See
 //! [`usvfs_unavailable`] for what each refusal means, and `tmc-usvfs`'s own
 //! header for why the gate exists at all.
 //!
@@ -205,7 +206,7 @@ pub fn available_strategies(staging: &Path, target: &Path) -> Vec<StrategyReport
 ///     equivalent that does not mean `DYLD_INSERT_LIBRARIES` or `LD_PRELOAD`
 ///     into a game — a different technique with different failure modes, not a
 ///     port of this one.
-///   * **Not built with `usvfs-hooks`.** The build the user is running chose
+///   * **Built without `usvfs-hooks`.** The build the user is running chose
 ///     not to ship injection. Saying "not available in this build" rather than
 ///     "not supported" is the honest version: another build of the same app on
 ///     the same machine could do it.
@@ -219,7 +220,7 @@ pub fn usvfs_unavailable() -> Option<&'static str> {
 
     if !cfg!(feature = "usvfs-hooks") {
         return Some(
-            "Virtual-filesystem deployment is turned off in this build of the app. Use hard links \
+            "Virtual-filesystem deployment is not included in this build of the app. Use hard links \
              or symbolic links instead.",
         );
     }

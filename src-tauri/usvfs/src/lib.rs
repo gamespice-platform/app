@@ -20,27 +20,39 @@
 //! HOW FINISHED THIS IS
 //! --------------------
 //! Two halves, at very different levels of confidence, and it matters which is
-//! which:
+//! which. This strategy is **EXPERIMENTAL**: on by default in the build
+//! (`usvfs-hooks`), offered for Minecraft, but never the default strategy.
 //!
 //! | Half | State |
 //! | --- | --- |
-//! | [`tree`] — the merged view, resolution, listings, case rules | **Tested.** Runs and is exercised on every platform |
-//! | [`shm`] — publishing and reading the blob, atomically | **Tested.** Including every malformed input |
-//! | [`hooks`] — IAT patching, the redirecting `CreateFileW` | **Type-checked against the Windows target. Never run against a game.** |
-//! | [`inject`] — suspended launch, remote `LoadLibrary` | **Type-checked. Argument quoting and environment building are tested; the launch itself is not.** |
+//! | [`tree`] - the merged view, resolution, listings, case rules | **Tested.** Runs on every platform, including the directory-listing merge |
+//! | [`shm`] - publishing and reading the blob, atomically | **Tested.** Including every malformed input |
+//! | [`env`] - rebuilding a child's environment block | **Tested.** Pure, on every platform |
+//! | [`hooks`] - IAT patching, `CreateFileW`, attribute queries, `FindFirstFile`/`FindNextFile`, `CreateProcess` | **Type-checked and clippy-clean against the Windows target. Never run against a game.** |
+//! | [`inject`] - suspended launch, remote `LoadLibrary` | **Type-checked. Argument quoting and environment building are tested; the launch itself is not.** |
 //!
-//! That is why `Strategy::Usvfs` refuses at deploy time — and at LAUNCH time,
-//! in `gamespice-app`'s `spawn` module — unless the app is built with the
-//! `usvfs-hooks` feature, which is **off by default**. The brain is real and
-//! tested; the two hundred lines that reach into somebody else's process have
-//! been read carefully and never executed, and shipping those on by default
-//! would be asking users to find out.
+//! The hooks were written and checked on Linux with a cross-compiling target.
+//! Nobody has yet watched them run in a Windows process, so the first real
+//! launch is the first test. That is why the strategy is labelled experimental
+//! and why `direct` stays the default.
 //!
-//! The gate is checked in both places on purpose. They are the two halves of
-//! the same decision, and a build where only one of them was on could publish
-//! a tree no launch would carry, or inject with nothing to inject.
+//! The `usvfs-hooks` feature is on by default. Without it (or off Windows)
+//! `Strategy::Usvfs` refuses at deploy time and at launch time, in
+//! `gamespice-app`'s `spawn` module. The gate is checked in both places on
+//! purpose: a build where only one was on could publish a tree no launch would
+//! carry, or inject with nothing to inject.
 //!
-//! WHAT IT CANNOT DO, EVEN WHEN IT WORKS
+//! CHILD PROCESSES
+//! ---------------
+//! `CreateProcessW` and `CreateProcessAsUserW` are hooked so a launcher's
+//! helper processes and a wrapper's JVM are hooked too. The DLL is only ever
+//! injected into a process the hooked process just created itself, suspended,
+//! through the handle `CreateProcess` returned: there is no path that takes an
+//! arbitrary process id. 32-bit children are skipped (a 64-bit DLL cannot load
+//! there). `CreateProcessA`, `CreateProcessWithLogonW` and
+//! `CreateProcessWithTokenW` are not hooked.
+//!
+//! //! WHAT IT CANNOT DO, EVEN WHEN IT WORKS
 //! -------------------------------------
 //!   * **Calls through `GetProcAddress` are not redirected**, because the
 //!     pointer never came from an import table.
@@ -52,9 +64,16 @@
 //!   * **Writes are not redirected.** A game creating a file in a virtualised
 //!     directory writes it to the real one — see [`hooks`] for why that is a
 //!     decision rather than a gap.
+//!   * **Staged files are not copy-on-write.** A game that opens a virtual file
+//!     for writing writes to the staged file itself.
+//!   * **Virtual-only directories report zero timestamps**, and 8.3 short names
+//!     are empty for virtual entries.
+//!   * **Only the first 1024 loaded modules are patched**, and only imports by
+//!     name from kernel32, kernelbase, advapi32 and `api-ms-win-*`.
 //!
 //! [`Strategy::Usvfs`]: https://docs.rs/tmc-core/latest/tmc_core/deploy/enum.Strategy.html
 
+pub mod env;
 pub mod shm;
 pub mod tree;
 

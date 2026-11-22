@@ -23,12 +23,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [features]
-default = []
+default = ["usvfs-hooks"]
 
 # Virtual-filesystem deployment. Forwards to `tmc-core`'s gate of the same name
 # — the two halves are the deploy and the launch, and a build where only one of
 # them is on could deploy a tree no launch would ever carry, or launch with an
-# injector and nothing to inject. See `usvfs/src/lib.rs` for why this is off.
+# injector and nothing to inject. ON by default; the strategy is still labelled
+# experimental (see `usvfs/src/lib.rs`). `--no-default-features` builds without it.
 usvfs-hooks = ["tmc-core/usvfs-hooks"]
 
 [dependencies]

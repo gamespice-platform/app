@@ -32,6 +32,10 @@
 //! nothing about it can attach to something already running — which is the
 //! shape that would make it an injection tool rather than a launcher.
 //!
+//! The hooked game process reuses the same injection (`inject`, crate-private)
+//! for ITS children, in `hooks::children`: again only a process that call just
+//! created, suspended, through the handle it returned.
+//!
 //! ANTI-CHEAT
 //! ----------
 //! Every kernel-level anti-cheat treats this as an attack, correctly. A game
@@ -158,7 +162,7 @@ pub fn launch(spec: &LaunchSpec<'_>) -> std::io::Result<Injected> {
 }
 
 /// Get the DLL into the (suspended) child.
-fn inject(process: HANDLE, dll: &Path) -> std::io::Result<()> {
+pub(crate) fn inject(process: HANDLE, dll: &Path) -> std::io::Result<()> {
     let path = wide(dll.as_os_str());
     let bytes = path.len() * std::mem::size_of::<u16>();
 

@@ -27,6 +27,14 @@
 //! because that is what gets opened and Windows is the only platform this runs
 //! on where the difference does not matter.
 //!
+//! LISTINGS
+//! --------
+//! [`VirtualTree::children_absolute`] says what a directory gains,
+//! [`wildcard_match`] applies a `FindFirstFile` pattern the way Windows does,
+//! and [`merge_listing`] folds the two together with the real directory's own
+//! entries — all pure, so the hook half only has to turn the answer into
+//! `WIN32_FIND_DATAW` records.
+//!
 //! WHAT IS NOT HERE
 //! ----------------
 //! Writes. A game that creates a file inside a virtualised directory writes it
@@ -201,6 +209,59 @@ impl VirtualTree {
         })
     }
 
+    /// Is this absolute path a directory the tree CREATES — one that exists
+    /// only because a mod ships something under it?
+    ///
+    /// True for the root and for every ancestor of a mapping. Whether the real
+    /// directory also exists is the caller's question; this says only that the
+    /// tree vouches for it, which is what lets `GetFileAttributesW` answer
+    /// "directory" for a `mods` folder nobody has made yet.
+    pub fn is_virtual_dir_absolute(&self, path: &str) -> bool {
+        self.touches(path)
+    }
+
+    /// What an absolute directory gains, with what each name is.
+    ///
+    /// A name that has children of its own is a directory; one that is a
+    /// mapping is a file carrying its real path. A name that is both (a file
+    /// staged as `a` and another staged as `a/b`) is a directory, since the
+    /// deeper entry cannot exist otherwise.
+    pub fn children_absolute(&self, dir: &str) -> Vec<VirtualChild> {
+        let Some(relative) = self.relative_of(dir) else {
+            return Vec::new();
+        };
+
+        let base = clean_relative_dir(&relative);
+
+        self.extra_entries(&base)
+            .iter()
+            .map(|name| {
+                let child = if base.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{base}/{name}")
+                };
+
+                let key = child.to_ascii_lowercase();
+
+                let kind = if self.dirs.contains_key(&key) {
+                    ChildKind::Dir
+                } else if let Some(mapping) = self.files.get(&key) {
+                    ChildKind::File {
+                        real_path: mapping.real_path.clone(),
+                    }
+                } else {
+                    ChildKind::Dir
+                };
+
+                VirtualChild {
+                    name: name.clone(),
+                    kind,
+                }
+            })
+            .collect()
+    }
+
     /// Every mapping, for tests and for the report.
     pub fn mappings(&self) -> impl Iterator<Item = &Mapping> {
         self.files.values()
@@ -241,6 +302,189 @@ impl VirtualTree {
 
         Some(path[start..].to_string())
     }
+}
+
+/// One name a virtual directory gains.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VirtualChild {
+    /// Original case, as staged.
+    pub name: String,
+    pub kind: ChildKind,
+}
+
+/// What a [`VirtualChild`] is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChildKind {
+    /// A mapped file, with the real path to read it from.
+    File { real_path: String },
+    /// A directory the tree adds entries under.
+    Dir,
+}
+
+/// One entry of the real directory, as far as merging cares.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RealEntry {
+    pub name: String,
+    pub is_dir: bool,
+}
+
+/// Where one line of a merged listing comes from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Source {
+    /// The real directory's entry at this index of the slice passed in.
+    Real(usize),
+    /// A virtual file; read its metadata from this real path.
+    VirtualFile(String),
+    /// A virtual directory with no real counterpart.
+    VirtualDir,
+}
+
+/// One line of a merged listing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergedEntry {
+    pub name: String,
+    pub source: Source,
+}
+
+/// Split a path at its last separator: `("C:\\g\\mods", "*.jar")`.
+///
+/// Both separators count, because a game mixes them. `None` when there is no
+/// separator or nothing after it — `FindFirstFile` on `dir\` is an error, not
+/// a listing, so the hook must not invent one.
+pub fn split_last_component(path: &str) -> Option<(&str, &str)> {
+    let at = path.rfind(['\\', '/'])?;
+    let (dir, rest) = path.split_at(at);
+    let name = &rest[1..];
+
+    if name.is_empty() {
+        return None;
+    }
+
+    Some((dir, name))
+}
+
+/// Can [`wildcard_match`] answer this pattern faithfully?
+///
+/// The DOS wildcards (`<`, `>`, `"`) are an NTFS-only extension of the
+/// `FindFirstFile` syntax that nothing in the JDK or a mod loader emits. A
+/// pattern using them is passed to the real API unmerged rather than
+/// approximated.
+pub fn pattern_supported(pattern: &str) -> bool {
+    !pattern.contains(['<', '>', '"'])
+}
+
+/// `FindFirstFile`'s pattern matching: `*` any run, `?` any one character,
+/// case-insensitive, and `*.*` meaning everything (Windows treats it as `*`,
+/// so `README` matches it despite having no dot).
+pub fn wildcard_match(pattern: &str, name: &str) -> bool {
+    let pattern = if pattern == "*.*" { "*" } else { pattern };
+
+    let pattern: Vec<char> = pattern.chars().flat_map(char::to_lowercase).collect();
+    let name: Vec<char> = name.chars().flat_map(char::to_lowercase).collect();
+
+    let (mut p, mut n) = (0usize, 0usize);
+    let mut star: Option<(usize, usize)> = None;
+
+    while n < name.len() {
+        if p < pattern.len() && (pattern[p] == '?' || pattern[p] == name[n]) {
+            p += 1;
+            n += 1;
+        } else if p < pattern.len() && pattern[p] == '*' {
+            star = Some((p, n));
+            p += 1;
+        } else if let Some((star_p, star_n)) = star {
+            // Backtrack: let the last `*` swallow one more character.
+            p = star_p + 1;
+            n = star_n + 1;
+            star = Some((star_p, star_n + 1));
+        } else {
+            return false;
+        }
+    }
+
+    while p < pattern.len() && pattern[p] == '*' {
+        p += 1;
+    }
+
+    p == pattern.len()
+}
+
+/// Fold a directory's virtual entries into its real ones.
+///
+/// Rules, which are the whole behaviour:
+///   * only names matching `pattern` appear (real `.` and `..` included, as
+///     the real API returns them);
+///   * names compare case-insensitively;
+///   * a virtual FILE replaces a real entry of the same name — it is what an
+///     open of that path resolves to, so the listing must agree with it;
+///   * a virtual DIRECTORY never replaces a real directory (the real entry
+///     keeps its own metadata, and its contents merge when that directory is
+///     listed in turn), but it does replace a real file of that name;
+///   * real entries keep their order, virtual-only entries follow in name
+///     order, and nothing appears twice.
+pub fn merge_listing(
+    real: &[RealEntry],
+    virtual_children: &[VirtualChild],
+    pattern: &str,
+) -> Vec<MergedEntry> {
+    let mut out: Vec<MergedEntry> = Vec::new();
+    let mut seen: BTreeMap<String, usize> = BTreeMap::new();
+
+    for (index, entry) in real.iter().enumerate() {
+        if !wildcard_match(pattern, &entry.name) {
+            continue;
+        }
+
+        // A real directory listing never repeats a name, but a buggy filter
+        // driver might; first wins.
+        if seen.contains_key(&entry.name.to_lowercase()) {
+            continue;
+        }
+
+        seen.insert(entry.name.to_lowercase(), out.len());
+
+        out.push(MergedEntry {
+            name: entry.name.clone(),
+            source: Source::Real(index),
+        });
+    }
+
+    for child in virtual_children {
+        if !wildcard_match(pattern, &child.name) {
+            continue;
+        }
+
+        let key = child.name.to_lowercase();
+
+        let merged = MergedEntry {
+            name: child.name.clone(),
+            source: match &child.kind {
+                ChildKind::File { real_path } => Source::VirtualFile(real_path.clone()),
+                ChildKind::Dir => Source::VirtualDir,
+            },
+        };
+
+        match seen.get(&key).copied() {
+            Some(position) => {
+                let real_is_dir = match &out[position].source {
+                    Source::Real(index) => real[*index].is_dir,
+                    _ => false,
+                };
+
+                let keep_real = matches!(child.kind, ChildKind::Dir) && real_is_dir;
+
+                if !keep_real {
+                    out[position] = merged;
+                }
+            }
+            None => {
+                seen.insert(key, out.len());
+                out.push(merged);
+            }
+        }
+    }
+
+    out
 }
 
 /// `\` → `/`, and collapse repeats.
@@ -538,5 +782,205 @@ mod tests {
             serde_json::to_string(&a).expect("a"),
             serde_json::to_string(&b).expect("b")
         );
+    }
+
+    // ---------------------------------------------------------- listings
+
+    fn mods_tree() -> VirtualTree {
+        let mut tree = VirtualTree::new("C:/Games/MC");
+
+        tree.insert("mods/Cool.jar", "D:/staging/a/mods/Cool.jar");
+        tree.insert("mods/sub/inner.jar", "D:/staging/a/mods/sub/inner.jar");
+        tree.insert("config/x.toml", "D:/staging/a/config/x.toml");
+
+        tree
+    }
+
+    fn names(merged: &[MergedEntry]) -> Vec<&str> {
+        merged.iter().map(|m| m.name.as_str()).collect()
+    }
+
+    fn file(name: &str) -> RealEntry {
+        RealEntry {
+            name: name.into(),
+            is_dir: false,
+        }
+    }
+
+    fn dir(name: &str) -> RealEntry {
+        RealEntry {
+            name: name.into(),
+            is_dir: true,
+        }
+    }
+
+    #[test]
+    fn children_say_what_is_a_file_and_what_is_a_directory() {
+        let tree = mods_tree();
+        let children = tree.children_absolute("C:\\Games\\MC\\mods");
+
+        assert_eq!(children.len(), 2);
+
+        assert!(children.iter().any(|c| c.name == "Cool.jar"
+            && c.kind
+                == ChildKind::File {
+                    real_path: "D:/staging/a/mods/Cool.jar".into()
+                }));
+        assert!(children
+            .iter()
+            .any(|c| c.name == "sub" && c.kind == ChildKind::Dir));
+
+        // The root gains the two top-level directories.
+        let root = tree.children_absolute("c:/games/mc");
+        assert_eq!(root.len(), 2);
+        assert!(root.iter().all(|c| c.kind == ChildKind::Dir));
+
+        // Outside the root, and a directory the tree adds nothing to.
+        assert!(tree.children_absolute("C:/Windows").is_empty());
+        assert!(tree.children_absolute("C:/Games/MC/saves").is_empty());
+    }
+
+    #[test]
+    fn a_directory_exists_virtually_when_a_mod_ships_something_under_it() {
+        let tree = mods_tree();
+
+        assert!(tree.is_virtual_dir_absolute("C:\\Games\\MC\\MODS\\sub"));
+        assert!(tree.is_virtual_dir_absolute("C:/Games/MC"));
+
+        // A file is not a directory; neither is something unmapped.
+        assert!(!tree.is_virtual_dir_absolute("C:/Games/MC/mods/Cool.jar"));
+        assert!(!tree.is_virtual_dir_absolute("C:/Games/MC/saves"));
+    }
+
+    #[test]
+    fn a_path_splits_at_its_last_separator_of_either_kind() {
+        assert_eq!(
+            split_last_component("C:\\g\\mods\\*.jar"),
+            Some(("C:\\g\\mods", "*.jar"))
+        );
+        assert_eq!(
+            split_last_component("C:/g\\mods/a.jar"),
+            Some(("C:/g\\mods", "a.jar"))
+        );
+
+        // No separator, or nothing after it: not a search.
+        assert_eq!(split_last_component("mods"), None);
+        assert_eq!(split_last_component("C:\\g\\mods\\"), None);
+    }
+
+    #[test]
+    fn wildcards_follow_findfirstfile() {
+        assert!(wildcard_match("*", "anything.jar"));
+        assert!(wildcard_match("*.jar", "Cool.JAR"));
+        assert!(!wildcard_match("*.jar", "cool.zip"));
+        assert!(wildcard_match("c?ol.jar", "COOL.jar"));
+        assert!(!wildcard_match("c?ol.jar", "col.jar"));
+        assert!(wildcard_match("*o*l*", "cool"));
+        assert!(!wildcard_match("*o*l*x", "cool"));
+        assert!(wildcard_match("exact.txt", "Exact.TXT"));
+        assert!(!wildcard_match("exact.txt", "exact.txt2"));
+
+        // `*.*` means everything, dot or not.
+        assert!(wildcard_match("*.*", "README"));
+        assert!(wildcard_match("*", ".."));
+
+        // Backtracking over a repeated prefix.
+        assert!(wildcard_match("*ab", "aab"));
+        assert!(wildcard_match("a*a*b", "aaab"));
+
+        assert!(pattern_supported("*.jar"));
+        assert!(!pattern_supported("<.jar"));
+    }
+
+    #[test]
+    fn virtual_entries_join_the_real_ones() {
+        let tree = mods_tree();
+        let children = tree.children_absolute("C:/Games/MC/mods");
+
+        let real = [dir("."), dir(".."), file("local.jar")];
+
+        let merged = merge_listing(&real, &children, "*");
+
+        assert_eq!(names(&merged), [".", "..", "local.jar", "Cool.jar", "sub"]);
+        assert_eq!(merged[2].source, Source::Real(2));
+        assert_eq!(
+            merged[3].source,
+            Source::VirtualFile("D:/staging/a/mods/Cool.jar".into())
+        );
+        assert_eq!(merged[4].source, Source::VirtualDir);
+    }
+
+    #[test]
+    fn a_virtual_file_replaces_a_real_one_of_the_same_name_ignoring_case() {
+        let tree = mods_tree();
+        let children = tree.children_absolute("C:/Games/MC/mods");
+
+        let real = [file("cool.JAR")];
+        let merged = merge_listing(&real, &children, "*");
+
+        // One entry, not two, and it is the virtual one.
+        assert_eq!(
+            merged
+                .iter()
+                .filter(|m| m.name.eq_ignore_ascii_case("cool.jar"))
+                .count(),
+            1
+        );
+        assert!(matches!(merged[0].source, Source::VirtualFile(_)));
+    }
+
+    #[test]
+    fn a_virtual_directory_never_hides_a_real_one() {
+        let tree = mods_tree();
+        let children = tree.children_absolute("C:/Games/MC/mods");
+
+        let real = [dir("SUB")];
+        let merged = merge_listing(&real, &children, "sub");
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].source, Source::Real(0));
+
+        // But it does replace a real FILE of that name.
+        let merged = merge_listing(&[file("sub")], &children, "sub");
+        assert_eq!(merged[0].source, Source::VirtualDir);
+    }
+
+    #[test]
+    fn the_pattern_filters_both_halves() {
+        let tree = mods_tree();
+        let children = tree.children_absolute("C:/Games/MC/mods");
+
+        let real = [file("a.jar"), file("b.txt")];
+
+        let merged = merge_listing(&real, &children, "*.jar");
+        assert_eq!(names(&merged), ["a.jar", "Cool.jar"]);
+
+        // An exact name is a one-line listing: how `FindFirstFile` doubles as
+        // a stat.
+        let merged = merge_listing(&real, &children, "cool.jar");
+        assert_eq!(names(&merged), ["Cool.jar"]);
+
+        let merged = merge_listing(&real, &children, "missing.jar");
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn a_directory_that_exists_only_virtually_lists_without_any_real_entries() {
+        let tree = mods_tree();
+        let children = tree.children_absolute("C:/Games/MC/config");
+
+        let merged = merge_listing(&[], &children, "*");
+
+        assert_eq!(names(&merged), ["x.toml"]);
+    }
+
+    #[test]
+    fn a_subdirectory_lists_its_own_level_only() {
+        let tree = mods_tree();
+        let children = tree.children_absolute("C:/Games/MC/mods/sub");
+
+        let merged = merge_listing(&[], &children, "*");
+
+        assert_eq!(names(&merged), ["inner.jar"]);
     }
 }
