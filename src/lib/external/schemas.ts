@@ -208,3 +208,24 @@ export const SchemeReportSchema = z.object({
     scheme: z.string(),
     status: SchemeStatusSchema,
 })
+
+/** Where a provider's credential comes from. Never the credential itself. */
+export const CredentialSourceSchema = z.enum(['user', 'site', 'none'])
+export const CredentialBackendSchema = z.enum(['keychain', 'encryptedFile', 'memory'])
+
+export const ProviderCredentialSchema = z.object({
+    provider: ProviderIdSchema,
+    label: z.string(),
+    configured: z.boolean(),
+    source: CredentialSourceSchema,
+    acceptsUserKey: z.boolean(),
+    note: z.string(),
+})
+
+export const CredentialReportSchema = z.object({
+    backend: CredentialBackendSchema,
+    /** True when the OS keychain is not in use (encrypted-file mode). */
+    fallback: z.boolean(),
+    providers: z.array(ProviderCredentialSchema),
+})
+export type CredentialReportT = z.infer<typeof CredentialReportSchema>

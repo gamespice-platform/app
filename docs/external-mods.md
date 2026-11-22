@@ -30,11 +30,55 @@ sha1 and md5 are not computed; a file with only those is verified by size.
 
 ## IPC
 
-`external_parse`, `external_resolve`, `external_install`, `external_remove`, `external_inspect_path` (a vault token, never a path), `external_scheme_status`, `external_scheme_set`. Typed in `src/lib/external/`.
+`external_parse`, `external_resolve`, `external_install`, `external_remove`, `external_inspect_path` (a vault token, never a path), `external_scheme_status`, `external_scheme_set`, and the credential commands below. Typed in `src/lib/external/`.
+
+## Credentials
+
+Two kinds, never mixed:
+
+- **Our keys (CurseForge, mod.io)** live in the TMC AdminCP and are used by the site. They are never in the app. The app asks the site for metadata and a download URL; the file itself is fetched straight from the provider CDN.
+- **The user's own keys (Nexus Mods API key)** are stored in the OS keychain (`keyring`, feature `os-keyring`). With no usable keychain (a Linux box with no Secret Service) they go to an encrypted file in the data dir (XChaCha20-Poly1305, key from a random key file mixed with the machine id) and the app is told it is in fallback mode. A value is read back after every write, so a keychain that accepts and forgets is caught. Keys are never in settings JSON, logs or an IPC answer. Bring-your-own CurseForge and mod.io keys are refused for now.
+
+IPC (none returns a secret; each answers with the same report):
+
+- `external_credential_status` returns `{backend: keychain|encryptedFile|memory, fallback, providers: [{provider, label, configured, source: user|site|none, acceptsUserKey, note}]}`.
+- `external_credential_set(provider, value)` stores the user's key.
+- `external_credential_clear(provider)` forgets it.
+
+Nexus: the key goes in the `apikey` header. A premium account gets a download link directly. A free account is only given one with the `key` and `expires` from an `nxm://` link ("Download with manager"); without them the answer is "open the page". Those two values and `user_id` are used once and are stripped from the link remembered for the mod.
+
+## Site endpoint contract (for website-city)
+
+Both under `/api/app/v1`, with the user's TMC bearer token (the same auth as every other app call). A signed-out user, a 404 (not deployed yet) or any error means "no keyed provider is on"; the app never guesses. The answer is cached for 5 minutes (30 seconds after a failure).
+
+`GET /external/providers`
+
+```json
+{"providers": {"curseforge": true, "modio": false}}
+```
+
+A provider is on only when the AdminCP has a key for it and the admin switched it on. Absent means off. The app ignores unknown fields.
+
+`GET /external/resolve?provider=curseforge&project=<id or slug>&version=<file id>&game=<slug>&class=<kind>`
+
+`version`, `game` and `class` are optional; without `version` the site picks the newest file. The answer is the app's `Resolved` object, camelCase, already mapped by the site:
+
+```json
+{"provider": "curseforge", "projectId": "238222", "versionId": "4455",
+ "title": "Jade", "version": "1.2", "author": "someone",
+ "game": {"game": "minecraft", "loaders": ["forge"], "gameVersions": ["1.20.1"]},
+ "files": [{"url": "https://edge.forgecdn.net/...", "name": "jade-1.2.jar",
+            "size": 123456, "hashes": {"sha1": "..."}, "primary": true}],
+ "deps": [], "pageUrl": "https://www.curseforge.com/...",
+ "manualOnly": null, "licence": null}
+```
+
+Rules the app enforces on the answer: `provider` matches the request; every file URL is `https`; there is at least one file unless `manualOnly` is set. Set `manualOnly` to the project page when the author has turned third-party distribution off. The file URL must not carry our API key (it is fetched from the CDN on the user's machine). Errors use the normal app envelope; a 4xx message is shown to the user.
 
 ## Known limits
 
-- `ProviderAvailability` is a stub (`TODO(site)`): the site has no endpoint yet. `from_json` documents the expected shape.
-- `DownloadManager` has its own hard 32 GiB per-file ceiling, so "unlimited" means up to that.
+- Nothing deployed yet answers the two endpoints above, so CurseForge and mod.io report "not enabled" until website-city ships them. All app code is tested against a mock site.
+- `external_max_download_mb = 0` is unlimited. The ceiling is carried per request (`tmc.max_bytes`); a request that carries none keeps the 32 GiB default.
 - macOS cannot read or reassign link handlers from here; scheme status is `unknown` there. Linux needs the desktop file to declare the scheme MIME type.
 - Needs-selection installs (no metadata found) return the file tree but the selected-files install is not wired yet.
+- The encrypted-file backend has a passphrase mode in core only; no screen asks for one yet.

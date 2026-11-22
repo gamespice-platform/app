@@ -3,6 +3,8 @@ The GameSpice App's releases, newest first. A version here is the one in `packag
 ## Unreleased
 
 - New: backend for mods from other sites (no screens yet). Paste or drop a Modrinth, Thunderstore or GitHub link or a direct .zip/.jar and the core resolves, downloads, verifies (sha512 or sha256 where the site publishes one) and adds it as a library mod; CurseForge, Nexus and mod.io are recognised but stay off until the TMC AdminCP enables them. Links opened from the OS (nxm, curseforge, modrinth, ror2mm, prismlauncher) only ever show a confirm step. New setting `externalMaxDownloadMb` (0, the default, is unlimited).
+- New: CurseForge and mod.io links resolve through the TMC site, which holds our API keys, so no key is ever in the app; they stay off until the site enables them. Nexus Mods uses your own API key, kept in the OS keychain (an encrypted file with a notice when there is none) and never shown back. Free Nexus accounts install from "Download with manager" links.
+- Fixed: setting the download limit to 0 now really means unlimited (there was a hidden 32 GiB cap).
 
 ## 0.5.15
 

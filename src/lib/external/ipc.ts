@@ -3,9 +3,11 @@ import { z } from 'zod'
 import { call } from '~/lib/ipc'
 
 import {
+    CredentialReportSchema,
     InspectReportSchema,
     InstallReportSchema,
     ParsedExternalSchema,
+    type ProviderIdT,
     ResolvedExternalSchema,
     SchemeReportSchema,
 } from './schemas'
@@ -15,7 +17,7 @@ import {
  * `inspectPath` takes the vault token minted when the user dropped the file.
  */
 export const externalIpc = {
-    /** Recognise a pasted link. Local, no network. */
+    /** Recognise a pasted link. The link is parsed locally; only the provider on/off answer may come from the site. */
     parse: (text: string) => call('external_parse', ParsedExternalSchema, { text }),
 
     /** Look the link up at its provider and suggest a game or sandbox. */
@@ -46,6 +48,16 @@ export const externalIpc = {
 
     inspectPath: (token: string, appId?: number) =>
         call('external_inspect_path', InspectReportSchema, { token, appId }),
+
+    /** Which providers work and where each credential lives. No secrets. */
+    credentialStatus: () => call('external_credential_status', CredentialReportSchema),
+
+    /** Store the user's own key (Nexus). Write-only: nothing reads it back. */
+    credentialSet: (provider: ProviderIdT, value: string) =>
+        call('external_credential_set', CredentialReportSchema, { provider, value }),
+
+    credentialClear: (provider: ProviderIdT) =>
+        call('external_credential_clear', CredentialReportSchema, { provider }),
 
     schemeStatus: () => call('external_scheme_status', z.array(SchemeReportSchema)),
 

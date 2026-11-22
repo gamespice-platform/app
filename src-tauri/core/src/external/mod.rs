@@ -27,6 +27,7 @@
 //! The entry point for `tmc mods add <url>` is [`install::add`]; see
 //! `docs/external-mods.md`.
 
+pub mod credentials;
 pub mod install;
 pub mod matching;
 pub mod meta;
@@ -35,15 +36,35 @@ pub mod pending;
 pub mod provider;
 pub mod providers;
 pub mod scheme;
+pub mod site;
 pub mod store;
 pub mod tree;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 pub use parse::{parse_input, ParseError};
 pub use provider::{ModProvider, ProviderAvailability, Registry};
+
+/// What the providers need from the outside: the TMC site (which proxies our
+/// CurseForge / mod.io keys) and the user's own stored credentials.
+#[derive(Clone)]
+pub struct Services {
+    pub site: Arc<dyn site::SiteApi>,
+    pub credentials: Arc<dyn credentials::CredentialLookup>,
+}
+
+impl Services {
+    /// No site, no credentials: parsing, and the providers needing neither.
+    pub fn none() -> Self {
+        Self {
+            site: Arc::new(site::NoSite),
+            credentials: Arc::new(credentials::NoCredentials),
+        }
+    }
+}
 
 /// The `User-Agent` every request to a provider carries. Modrinth requires an
 /// identifying one; the others are owed the same courtesy.

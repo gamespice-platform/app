@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
     AddOutcomeSchema,
+    CredentialReportSchema,
     InspectionSchema,
     ParsedExternalSchema,
     PendingSchema,
@@ -75,5 +76,24 @@ describe('external schemas match the Rust serde output', () => {
             }).state
         ).toBe('registered')
         expect(SchemeStatusSchema.parse({ state: 'free' }).state).toBe('free')
+    })
+
+    it('parses the credential report, which carries no secret field', () => {
+        const v = CredentialReportSchema.parse({
+            backend: 'encryptedFile',
+            fallback: true,
+            providers: [
+                {
+                    provider: 'nexus',
+                    label: 'Nexus Mods',
+                    configured: true,
+                    source: 'user',
+                    acceptsUserKey: true,
+                    note: 'Using the key stored on this computer.',
+                },
+            ],
+        })
+        expect(v.fallback).toBe(true)
+        expect(Object.keys(v.providers[0] ?? {})).not.toContain('value')
     })
 })

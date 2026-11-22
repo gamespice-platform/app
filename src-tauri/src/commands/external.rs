@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use tmc_core::error::{AppError, AppResult};
+use tmc_core::external::credentials::{self, CredentialLookup, CredentialReport};
 use tmc_core::external::install::{self, AddOutcome, InstallEnv, Target};
 use tmc_core::external::matching::{self, Candidate, GameRef, SandboxRef};
 use tmc_core::external::meta::{self, Inspection};
@@ -18,7 +19,8 @@ use tmc_core::external::provider::{HttpFetch, ResolveCtx};
 use tmc_core::external::scheme::{self, Os, SchemeStatus, SystemRunner};
 use tmc_core::external::tree::Source;
 use tmc_core::external::{
-    parse_input, CredentialState, ExternalRef, ProviderAvailability, ProviderId, Registry, Resolved,
+    parse_input, CredentialState, ExternalRef, ProviderAvailability, ProviderId, Registry,
+    Resolved, Services,
 };
 
 use crate::state::AppState;
@@ -26,10 +28,16 @@ use crate::state::AppState;
 /// This app's desktop file / executable name, to recognise its own handler.
 const OWN: &str = "tmc";
 
-fn availability() -> ProviderAvailability {
-    // TODO(site): fetch from the site once an endpoint exists; see
-    // docs/external-mods.md. Until then every keyed provider is off.
-    ProviderAvailability::disabled()
+/// What the site says is switched on. Cached; "not enabled" when the site
+/// cannot be asked (signed out, offline, endpoint not deployed).
+async fn availability(state: &AppState) -> ProviderAvailability {
+    state.availability.get(state.api.as_ref()).await
+}
+
+fn registry(state: &AppState) -> Registry {
+    let site: std::sync::Arc<dyn tmc_core::external::site::SiteApi> = state.api.clone();
+    let credentials: std::sync::Arc<dyn CredentialLookup> = state.credentials.clone();
+    Registry::with_services(&Services { site, credentials })
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -47,12 +55,13 @@ pub struct ParsedExternal {
     pub provider: ProviderState,
 }
 
-/// Recognise a pasted link. Pure; no network.
+/// Recognise a pasted link. The link itself is parsed offline; only the
+/// "is this provider on" answer may come from the (cached) site check.
 #[tauri::command]
-pub fn external_parse(text: String) -> AppResult<ParsedExternal> {
+pub async fn external_parse(state: State<'_, AppState>, text: String) -> AppResult<ParsedExternal> {
     let reference = parse_input(&text).map_err(|e| AppError::invalid(e.to_string()))?;
-    let registry = Registry::standard();
-    let avail = availability();
+    let registry = registry(&state);
+    let avail = availability(&state).await;
     let state = registry
         .get(reference.provider)
         .map(|p| p.credential_state(&avail))
@@ -85,11 +94,12 @@ pub async fn external_resolve(
     game_version: Option<String>,
 ) -> AppResult<ResolvedExternal> {
     let r = parse_input(&text).map_err(|e| AppError::invalid(e.to_string()))?;
-    let registry = Registry::standard();
+    let registry = registry(&state);
+    let avail = availability(&state).await;
     let provider = registry
         .get(r.provider)
         .ok_or_else(|| AppError::invalid("no provider handles that link"))?;
-    if let CredentialState::NotConfigured { reason } = provider.credential_state(&availability()) {
+    if let CredentialState::NotConfigured { reason } = provider.credential_state(&avail) {
         return Err(AppError::invalid(reason));
     }
     let resolved = provider
@@ -196,8 +206,8 @@ pub async fn external_install(
     let outcome = install::add(
         &request.text,
         &HttpFetch::new(),
-        &Registry::standard(),
-        &availability(),
+        &registry(&state),
+        &availability(&state).await,
         &ResolveCtx {
             loader: request.loader,
             game_version: request.game_version,
@@ -334,4 +344,50 @@ pub fn external_scheme_set(
         scheme::unset(&SystemRunner, os, &scheme, OWN)?
     };
     Ok(SchemeReport { scheme, status })
+}
+
+/// Which providers can be used, and where each one's credential lives. Reports
+/// "configured" or not; no command returns a secret.
+#[tauri::command]
+pub async fn external_credential_status(state: State<'_, AppState>) -> AppResult<CredentialReport> {
+    let avail = availability(&state).await;
+    Ok(credentials::report(&state.credentials, &avail))
+}
+
+/// Store the user's key for a provider. The value is written to the keychain
+/// (or the encrypted file when there is none) and is never echoed or logged.
+#[tauri::command]
+pub async fn external_credential_set(
+    state: State<'_, AppState>,
+    provider: ProviderId,
+    value: String,
+) -> AppResult<CredentialReport> {
+    let mode = state.credentials.set(provider, &value)?;
+    tmc_core::audit!(
+        state.audit,
+        Info,
+        App,
+        "external.credential.set",
+        format!("{} key stored ({:?})", provider.label(), mode.backend)
+    );
+    let avail = availability(&state).await;
+    Ok(credentials::report(&state.credentials, &avail))
+}
+
+/// Forget the user's key for a provider.
+#[tauri::command]
+pub async fn external_credential_clear(
+    state: State<'_, AppState>,
+    provider: ProviderId,
+) -> AppResult<CredentialReport> {
+    state.credentials.clear(provider)?;
+    tmc_core::audit!(
+        state.audit,
+        Info,
+        App,
+        "external.credential.clear",
+        format!("{} key removed", provider.label())
+    );
+    let avail = availability(&state).await;
+    Ok(credentials::report(&state.credentials, &avail))
 }

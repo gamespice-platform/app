@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256, Sha512};
 use super::provider::{Fetch, ProviderAvailability, Registry, ResolveCtx};
 use super::store::{self, ExternalRow};
 use super::{parse_input, ExternalSource, Hashes, ProviderId, RemoteFile, Resolved};
-use crate::download::{DownloadManager, DownloadRequest};
+use crate::download::{DownloadManager, DownloadRequest, META_MAX_BYTES};
 use crate::error::{AppError, AppResult};
 use crate::library::LibraryDb;
 use crate::local::store as lstore;
@@ -163,7 +163,9 @@ pub async fn download(
             size_hint: file.size,
             priority: 0,
             limit_bps: None,
-            meta: Default::default(),
+            // 0 is "unlimited" all the way down: without this the queue's own
+            // 32 GiB default would still apply under a cap of 0.
+            meta: [(META_MAX_BYTES.to_string(), cap.to_string())].into(),
         })
         .await?;
         verify_file(&dest, file.size, &file.hashes, cap)
@@ -305,6 +307,29 @@ pub enum AddOutcome {
     },
 }
 
+/// The link as it is remembered: the one-time `key`, `expires` and `user_id`
+/// an `nxm://` link carries are a download grant, not part of the mod's
+/// identity, so they never reach the database or an update check.
+pub(crate) fn stored_url(raw: &str) -> String {
+    let Ok(mut u) = url::Url::parse(raw) else {
+        return raw.to_string();
+    };
+    if u.query().is_none() {
+        return raw.to_string();
+    }
+    let keep: Vec<(String, String)> = u
+        .query_pairs()
+        .filter(|(k, _)| !matches!(k.as_ref(), "key" | "expires" | "user_id"))
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    if keep.is_empty() {
+        u.set_query(None);
+    } else {
+        u.query_pairs_mut().clear().extend_pairs(keep);
+    }
+    u.to_string()
+}
+
 /// THE ENTRY POINT for `tmc mods add <url>` and for a paste or drop in the app:
 /// text in, installed mod (or an honest "open the page" / "not available") out.
 ///
@@ -352,7 +377,8 @@ pub async fn add(
         .clone();
     let cap = cap_bytes(max_download_mb);
     let (path, verified) = download(dm, work_root, &resolved, &file, cap).await?;
-    let installed = install_downloaded(env, &resolved, &r.url, &path, verified, target);
+    let installed =
+        install_downloaded(env, &resolved, &stored_url(&r.url), &path, verified, target);
     if let Some(dir) = path.parent() {
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -362,6 +388,19 @@ pub async fn add(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_nxm_grant_is_not_remembered() {
+        assert_eq!(
+            stored_url("https://www.nexusmods.com/skyrim/mods/1?key=abc&expires=9&user_id=3"),
+            "https://www.nexusmods.com/skyrim/mods/1"
+        );
+        assert_eq!(
+            stored_url("https://example.com/a?x=1&key=k"),
+            "https://example.com/a?x=1"
+        );
+        assert_eq!(stored_url("not a url"), "not a url");
+    }
     use crate::external::tree::testutil::write_zip;
     use crate::external::GameHint;
     use sha2::Digest;
