@@ -1,0 +1,9 @@
+{
+    "manifestVersion": 1,
+    "label": "Silent Hill 2 Remake",
+    "description": "Starts the game's own launcher executable from the game folder.",
+    "permissions": {},
+    "launch": {
+        "exec": "SHProto.exe"
+    }
+}

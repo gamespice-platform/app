@@ -1,0 +1,59 @@
+{
+    "manifestVersion": 1,
+    "label": "X4: Foundations sandboxes",
+    "description": "How X4: Foundations sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "extensions"
+                }
+            ],
+            "notes": [
+                "Extensions are switched on in the game's Extensions menu; the folder being present only makes them available.",
+                "Settings and saves are in Documents/Egosoft/X4.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "392160"
+            ],
+            "names": [
+                "X4: Foundations"
+            ],
+            "markers": [
+                "x4.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

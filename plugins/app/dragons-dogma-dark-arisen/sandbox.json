@@ -1,0 +1,63 @@
+{
+    "manifestVersion": 1,
+    "label": "Dragon's Dogma: Dark Arisen sandboxes",
+    "description": "How Dragon's Dogma: Dark Arisen sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "nativePC"
+                }
+            ],
+            "notes": [
+                "Mods replace files of the same name under nativePC, so two mods touching one .arc are a conflict and the later one wins. Keep the original files backed up - the sandbox's backup store does this for deployed mods.",
+                "Many mods need the ModLoader/DDDA Mod Manager tooling that is installed separately; this app only places the files.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "367500"
+            ],
+            "gogProductIds": [
+                "1242384383"
+            ],
+            "names": [
+                "Dragon's Dogma: Dark Arisen"
+            ],
+            "markers": [
+                "DDDA.exe",
+                "nativePC"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

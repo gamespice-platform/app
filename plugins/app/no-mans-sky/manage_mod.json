@@ -1,0 +1,64 @@
+{
+    "manifestVersion": 1,
+    "label": "No Man's Sky mod file (.pak, .mbin)",
+    "description": "Mods are .pak files (or an extracted PCBANKS tree) in GAMEDATA/MODS.",
+    "match": {
+        "extensions": [
+            "pak",
+            "mbin"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "GAMEDATA/MODS",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "GAMEDATA/MODS"
+                }
+            },
+            {
+                "action": "move",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "GAMEDATA/MODS/{fileName}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "GAMEDATA/MODS/{fileName}"
+                }
+            }
+        ]
+    }
+}

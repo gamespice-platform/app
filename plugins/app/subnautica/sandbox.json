@@ -1,0 +1,66 @@
+{
+    "manifestVersion": 1,
+    "label": "Subnautica sandboxes",
+    "description": "How Subnautica sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "loader_plugin",
+                    "relPath": "BepInEx/plugins"
+                }
+            ],
+            "notes": [
+                "BepInEx itself is not a mod and is not installed here; unpack the Subnautica BepInEx pack into the game folder once.",
+                "Older mods target QModManager and live in QMods. Current mods use BepInEx; the two should not be mixed in one install.",
+                "Saves are in the SNAppData/SavedGames folder inside the game directory.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "264710"
+            ],
+            "epicAppNames": [
+                "Jaguar"
+            ],
+            "names": [
+                "Subnautica"
+            ],
+            "markers": [
+                "Subnautica.exe",
+                "Subnautica_Data"
+            ]
+        },
+        "presets": [
+            {
+                "id": "bepinex",
+                "label": "BepInEx",
+                "description": "The usual setup: mods loaded by the loader at startup.",
+                "environment": "client",
+                "loader": "bepinex"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

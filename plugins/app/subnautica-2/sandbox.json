@@ -1,0 +1,72 @@
+{
+    "manifestVersion": 1,
+    "label": "Subnautica 2 sandboxes",
+    "description": "How Subnautica 2 sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "pak_mod",
+                    "relPath": "Subnautica2/Content/Paks/~mods"
+                },
+                {
+                    "type": "logic_mod",
+                    "relPath": "Subnautica2/Content/Paks/LogicMods"
+                },
+                {
+                    "type": "ue4ss_mod",
+                    "relPath": "Subnautica2/Binaries/Win64/ue4ss/Mods"
+                }
+            ],
+            "notes": [
+                "Pak mods go in Subnautica2/Content/Paks/~mods; Blueprint 'LogicMods' paks go in Subnautica2/Content/Paks/LogicMods.",
+                "Anything beyond plain pak replacement needs UE4SS, which is not a mod and which this app does not install. Unpack it into the game's Win64 binaries folder once; its Lua mods then deploy under its Mods folder.",
+                "Early-access game: paths come from a third-party Vortex extension and may move between builds.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "1962700"
+            ],
+            "epicAppNames": [
+                "22bfc34d90b64054809542014fc9eb32"
+            ],
+            "names": [
+                "Subnautica 2"
+            ],
+            "markers": [
+                "Subnautica2.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

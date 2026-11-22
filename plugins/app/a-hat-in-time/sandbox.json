@@ -1,0 +1,59 @@
+{
+    "manifestVersion": 1,
+    "label": "A Hat in Time sandboxes",
+    "description": "How A Hat in Time sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "HatInTimeGame/Mods"
+                }
+            ],
+            "notes": [
+                "Mods live in HatInTimeGame/Mods, one folder each. The shipped ModManager.exe in Binaries is the game's own tool for creating them.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "253230"
+            ],
+            "names": [
+                "A Hat in Time"
+            ],
+            "markers": [
+                "HatInTimeGame.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

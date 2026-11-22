@@ -1,0 +1,168 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "gale-melonloader",
+        "label": "Gale (MelonLoader)",
+        "homepage": "https://github.com/Kesomannen/gale",
+        "notes": [
+            "Reads Gale's profile folders: <data dir>/com.kesomannen.gale/<game>/profiles/<profile>. Nothing is moved.",
+            "Gale names each game folder with its own slug (an explicit one, or the kebab-cased game name), so a few folder names here are derived and worth checking on your machine.",
+            "One descriptor id per mod loader, because a descriptor has a single in-profile mods path.",
+            "Descriptor for games that use MelonLoader: its mods live in Mods inside each profile."
+        ],
+        "roots": [
+            {
+                "platform": "windows",
+                "base": "appData",
+                "path": "com.kesomannen.gale"
+            },
+            {
+                "platform": "linux",
+                "base": "localData",
+                "path": "com.kesomannen.gale"
+            },
+            {
+                "platform": "macos",
+                "base": "config",
+                "path": "com.kesomannen.gale"
+            }
+        ],
+        "layout": {
+            "modsPath": "{game}/profiles/*/Mods",
+            "entry": "directory",
+            "ignore": [
+                "_state",
+                "MMHOOK"
+            ]
+        },
+        "games": [
+            {
+                "dir": "an-unfinished-game",
+                "slug": "an-unfinished-game",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "backpack-hero",
+                "slug": "backpack-hero",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "beetleball",
+                "slug": "beetleball",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "big-ambitions",
+                "slug": "big-ambitions",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "bloons-td-6",
+                "slug": "bloons-td-6",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "bonelab",
+                "slug": "bonelab",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "boneworks",
+                "slug": "boneworks",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "cursed-words",
+                "slug": "cursed-words",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "ducks-can-drive",
+                "slug": "ducks-can-drive",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "gang-beasts",
+                "slug": "gang-beasts",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "gorilla-tag",
+                "slug": "gorilla-tag",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "hard-bullet",
+                "slug": "hard-bullet",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "inside-the-backrooms",
+                "slug": "inside-the-backrooms",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "jump-space",
+                "slug": "jump-space",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "labyrinthine",
+                "slug": "labyrinthine",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "mimesis",
+                "slug": "mimesis",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "painting-vr",
+                "slug": "painting-vr",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "patch-quest",
+                "slug": "patch-quest",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "pit-of-goblin",
+                "slug": "pit-of-goblin",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "puttler",
+                "slug": "puttler",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "rumble",
+                "slug": "rumble",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "sledding-game",
+                "slug": "sledding-game",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "vellum",
+                "slug": "vellum",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "vigil",
+                "slug": "vigil",
+                "relPath": "Mods"
+            }
+        ],
+        "metadata": {
+            "file": "manifest.json",
+            "name": "/name",
+            "version": "/version_number",
+            "author": "/author",
+            "website": "/website_url"
+        }
+    }
+}

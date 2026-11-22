@@ -1,0 +1,65 @@
+{
+    "manifestVersion": 1,
+    "label": "Blade & Sorcery mod archive (.zip)",
+    "description": "Mods are folders under StreamingAssets/Mods, each with its own manifest.json. Archives are unpacked flat, so each zip must already contain the mod folder.",
+    "match": {
+        "extensions": [
+            "zip",
+            "7z",
+            "rar"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "BladeAndSorcery_Data/StreamingAssets/Mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "BladeAndSorcery_Data/StreamingAssets/Mods"
+                }
+            },
+            {
+                "action": "extract",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "BladeAndSorcery_Data/StreamingAssets/Mods"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}"
+                }
+            }
+        ]
+    }
+}

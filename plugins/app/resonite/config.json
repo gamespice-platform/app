@@ -1,0 +1,20 @@
+{
+    "manifestVersion": 1,
+    "label": "Resonite settings files",
+    "description": "Where BepInEx keeps the settings each mod writes on first run.",
+    "config": {
+        "locations": [
+            {
+                "label": "Mod settings",
+                "root": "gameDir",
+                "path": "BepInEx/config",
+                "extensions": [
+                    "cfg",
+                    "json",
+                    "toml"
+                ],
+                "recursive": true
+            }
+        ]
+    }
+}

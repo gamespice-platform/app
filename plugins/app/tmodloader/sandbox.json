@@ -1,0 +1,67 @@
+{
+    "manifestVersion": 1,
+    "label": "tModLoader sandboxes",
+    "description": "How tModLoader sandboxes deploy, and how to find the game on this machine.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "direct",
+            "supportedStrategies": [
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "Mods"
+                }
+            ],
+            "notes": [
+                "Point this sandbox at the Terraria/tModLoader folder in your documents (Windows) or ~/.local/share (Linux), not at the Steam install.",
+                "Mods are .tmod files in Mods; enable them in the in-game Mods menu."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "1281930"
+            ],
+            "names": [
+                "tModLoader"
+            ],
+            "markers": [
+                "Mods",
+                "enabled.json"
+            ],
+            "paths": {
+                "windows": [
+                    "~/Documents/My Games/Terraria/tModLoader"
+                ],
+                "linux": [
+                    "~/.local/share/Terraria/tModLoader"
+                ],
+                "macos": [
+                    "~/Library/Application Support/Terraria/tModLoader"
+                ]
+            }
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text"
+            }
+        ]
+    }
+}

@@ -1,0 +1,65 @@
+{
+    "manifestVersion": 1,
+    "label": "Starsector mod archive (.zip)",
+    "description": "Each mod is a folder under mods with a mod_info.json; the launcher lists whatever it finds there.",
+    "match": {
+        "extensions": [
+            "zip",
+            "7z",
+            "rar"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "mods"
+                }
+            },
+            {
+                "action": "extract",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "mods"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}"
+                }
+            }
+        ]
+    }
+}

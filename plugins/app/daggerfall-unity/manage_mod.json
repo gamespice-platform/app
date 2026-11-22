@@ -1,0 +1,63 @@
+{
+    "manifestVersion": 1,
+    "label": "Daggerfall Unity mod file (.dfmod)",
+    "description": "A .dfmod package, in StreamingAssets/Mods where the game scans for them.",
+    "match": {
+        "extensions": [
+            "dfmod"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "DaggerfallUnity_Data/StreamingAssets/Mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "DaggerfallUnity_Data/StreamingAssets/Mods"
+                }
+            },
+            {
+                "action": "move",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "DaggerfallUnity_Data/StreamingAssets/Mods/{fileName}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "DaggerfallUnity_Data/StreamingAssets/Mods/{fileName}"
+                }
+            }
+        ]
+    }
+}

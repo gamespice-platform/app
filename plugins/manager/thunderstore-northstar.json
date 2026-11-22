@@ -1,0 +1,41 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "thunderstore-northstar",
+        "label": "Thunderstore Mod Manager (Northstar)",
+        "homepage": "https://www.overwolf.com/app/Thunderstore-Thunderstore_Mod_Manager",
+        "notes": [
+            "The Overwolf build of r2modman. Same profile layout, different folder - both are listed separately because a machine can have both.",
+            "Nothing is moved: the mods stay in Thunderstore Mod Manager and this app takes a copy.",
+            "Descriptor for games that use Northstar: its mods live in R2Northstar/mods inside each profile."
+        ],
+        "roots": [
+            {
+                "base": "config",
+                "path": "Thunderstore Mod Manager/DataFolder"
+            }
+        ],
+        "layout": {
+            "modsPath": "{game}/profiles/*/R2Northstar/mods",
+            "entry": "directory",
+            "ignore": [
+                "_state",
+                "MMHOOK"
+            ]
+        },
+        "games": [
+            {
+                "dir": "Titanfall2",
+                "slug": "northstar",
+                "relPath": "R2Northstar/mods"
+            }
+        ],
+        "metadata": {
+            "file": "manifest.json",
+            "name": "/name",
+            "version": "/version_number",
+            "author": "/author",
+            "website": "/website_url"
+        }
+    }
+}

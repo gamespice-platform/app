@@ -1,0 +1,81 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "thunderstore-shim",
+        "label": "Thunderstore Mod Manager (UE4SS shimloader)",
+        "homepage": "https://www.overwolf.com/app/Thunderstore-Thunderstore_Mod_Manager",
+        "notes": [
+            "The Overwolf build of r2modman. Same profile layout, different folder - both are listed separately because a machine can have both.",
+            "Nothing is moved: the mods stay in Thunderstore Mod Manager and this app takes a copy.",
+            "Descriptor for games that use UE4SS shimloader: its mods live in shimloader/mod inside each profile."
+        ],
+        "roots": [
+            {
+                "base": "config",
+                "path": "Thunderstore Mod Manager/DataFolder"
+            }
+        ],
+        "layout": {
+            "modsPath": "{game}/profiles/*/shimloader/mod",
+            "entry": "directory",
+            "ignore": [
+                "_state",
+                "MMHOOK"
+            ]
+        },
+        "games": [
+            {
+                "dir": "Astroneer",
+                "slug": "astroneer",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "GrainRot",
+                "slug": "grain-rot",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "MecchaChameleon",
+                "slug": "meccha-chameleon",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "Minos",
+                "slug": "minos",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "Palworld",
+                "slug": "palworld",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "Panicore",
+                "slug": "panicore",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "RvThereYet",
+                "slug": "rv-there-yet",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "SoulcaliburVi",
+                "slug": "soulcalibur-vi",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "Windrose",
+                "slug": "windrose",
+                "relPath": "shimloader/mod"
+            }
+        ],
+        "metadata": {
+            "file": "manifest.json",
+            "name": "/name",
+            "version": "/version_number",
+            "author": "/author",
+            "website": "/website_url"
+        }
+    }
+}

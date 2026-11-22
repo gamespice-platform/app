@@ -1,0 +1,1017 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "gale",
+        "label": "Gale",
+        "homepage": "https://github.com/Kesomannen/gale",
+        "notes": [
+            "Reads Gale's profile folders: <data dir>/com.kesomannen.gale/<game>/profiles/<profile>. Nothing is moved.",
+            "Gale names each game folder with its own slug (an explicit one, or the kebab-cased game name), so a few folder names here are derived and worth checking on your machine.",
+            "One descriptor id per mod loader, because a descriptor has a single in-profile mods path."
+        ],
+        "roots": [
+            {
+                "platform": "windows",
+                "base": "appData",
+                "path": "com.kesomannen.gale"
+            },
+            {
+                "platform": "linux",
+                "base": "localData",
+                "path": "com.kesomannen.gale"
+            },
+            {
+                "platform": "macos",
+                "base": "config",
+                "path": "com.kesomannen.gale"
+            }
+        ],
+        "layout": {
+            "modsPath": "{game}/profiles/*/BepInEx/plugins",
+            "entry": "directory",
+            "ignore": [
+                "_state",
+                "MMHOOK"
+            ]
+        },
+        "games": [
+            {
+                "dir": "20-minutes-till-dawn",
+                "slug": "20-minutes-till-dawn",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "9-kings",
+                "slug": "9-kings",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "a-gentlemens-dispute",
+                "slug": "a-gentlemens-dispute",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "across-the-obelisk",
+                "slug": "across-the-obelisk",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "aeruta",
+                "slug": "aeruta",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "against",
+                "slug": "against",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "against-the-storm",
+                "slug": "against-the-storm",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "ale-and-tale-tavern",
+                "slug": "ale-and-tale-tavern",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "aloft",
+                "slug": "aloft",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "among-us",
+                "slug": "among-us",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "aneurism-iv",
+                "slug": "aneurism-iv",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "another-crabs-treasure",
+                "slug": "another-crabs-treasure",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "arcus-chroma",
+                "slug": "arcus-chroma",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "aska",
+                "slug": "aska",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "atlyss",
+                "slug": "atlyss",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "atomicrops",
+                "slug": "atomicrops",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "atrio-the-dark-wild",
+                "slug": "atrio-the-dark-wild",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "back-to-the-dawn",
+                "slug": "back-to-the-dawn",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "bad-north",
+                "slug": "bad-north",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "below-the-stone",
+                "slug": "below-the-stone",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "betrayal-beach",
+                "slug": "betrayal-beach",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "big-walk",
+                "slug": "big-walk",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "bomb-rush-cyberfunk",
+                "slug": "bomb-rush-cyberfunk",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "bopl-battle",
+                "slug": "bopl-battle",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "burglin-gnomes",
+                "slug": "burglin-gnomes",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "carrier-deck",
+                "slug": "carrier-deck",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "cats-are-liquid",
+                "slug": "cats-are-liquid",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "chrono-ark",
+                "slug": "chrono-ark",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "cities-skylines-ii",
+                "slug": "cities-skylines-ii",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "clover-pit",
+                "slug": "clover-pit",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "content-warning",
+                "slug": "content-warning",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "core-keeper",
+                "slug": "core-keeper",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "crab-game",
+                "slug": "crab-game",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "crashout-crew",
+                "slug": "crashout-crew",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "crawlspace",
+                "slug": "crawlspace",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "crawlspace-2",
+                "slug": "crawlspace-2",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "crime-simulator",
+                "slug": "crime-simulator",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "cryo",
+                "slug": "cryo",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "cult-of-the-lamb",
+                "slug": "cult-of-the-lamb",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "cuphead",
+                "slug": "cuphead",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "deadly-delivery",
+                "slug": "deadly-delivery",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "deep-rock-galactic-survivor",
+                "slug": "deep-rock-galactic-survivor",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "depo",
+                "slug": "depo",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "disco-elysium",
+                "slug": "disco-elysium",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "distance",
+                "slug": "distance",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "dredge",
+                "slug": "dredge",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "dusk",
+                "slug": "dusk",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "dyson-sphere-program",
+                "slug": "dyson-sphere-program",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "easy-delivery-co",
+                "slug": "easy-delivery-co",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "ena-dream-bbq",
+                "slug": "ena-dream-bbq",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "enter-the-gungeon",
+                "slug": "enter-the-gungeon",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "erenshor",
+                "slug": "erenshor",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "factory-planner",
+                "slug": "factory-planner",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "five-nights-at-freddys-into-the-pit",
+                "slug": "five-nights-at-freddys-into-the-pit",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "football-manager-26",
+                "slug": "football-manager-26",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "for-the-king",
+                "slug": "for-the-king",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "gamble-with-your-friends",
+                "slug": "gamble-with-your-friends",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "garfield-kart-furious-racing",
+                "slug": "garfield-kart-furious-racing",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "gatekeeper",
+                "slug": "gatekeeper",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "gladio-mori",
+                "slug": "gladio-mori",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "gloomwood",
+                "slug": "gloomwood",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "goblin-cleanup",
+                "slug": "goblin-cleanup",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "goodbye-volcano-high",
+                "slug": "goodbye-volcano-high",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "gorebox",
+                "slug": "gorebox",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "granny-chapter-two",
+                "slug": "granny-chapter-two",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "graveyard-keeper-2",
+                "slug": "graveyard-keeper-2",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "green-hell-vr",
+                "slug": "green-hell-vr",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "grey-hack",
+                "slug": "grey-hack",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "gtfo",
+                "slug": "gtfo",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "guilty-as-sock",
+                "slug": "guilty-as-sock",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "h3vr",
+                "slug": "h3vr",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "hard-time-3",
+                "slug": "hard-time-3",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "hot-lava",
+                "slug": "hot-lava",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "hotds",
+                "slug": "hotds",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "house-of-legacy",
+                "slug": "house-of-legacy",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "how-to-fish",
+                "slug": "how-to-fish",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "human-fall-flat",
+                "slug": "human-fall-flat",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "i-am-your-beast",
+                "slug": "i-am-your-beast",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "in-falsus",
+                "slug": "in-falsus",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "inferno-protocol",
+                "slug": "inferno-protocol",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "inscryption",
+                "slug": "inscryption",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "jump-scare-mansion",
+                "slug": "jump-scare-mansion",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "last-train-outta-wormtown",
+                "slug": "last-train-outta-wormtown",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "lens-island",
+                "slug": "lens-island",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "lethal-company",
+                "slug": "lethal-company",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "lethal-league-blaze",
+                "slug": "lethal-league-blaze",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "logic-world",
+                "slug": "logic-world",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "lost-skies",
+                "slug": "lost-skies",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "lost-skies-ic",
+                "slug": "lost-skies-ic",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "lycans",
+                "slug": "lycans",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "mage-arena",
+                "slug": "mage-arena",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "magicite",
+                "slug": "magicite",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "magicraft",
+                "slug": "magicraft",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "malteses-fluffy-onsen",
+                "slug": "malteses-fluffy-onsen",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "mechanica",
+                "slug": "mechanica",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "meeple-station",
+                "slug": "meeple-station",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "megabonk",
+                "slug": "megabonk",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "mine-mogul",
+                "slug": "mine-mogul",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "miside",
+                "slug": "miside",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "monster-train-2",
+                "slug": "monster-train-2",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "muck",
+                "slug": "muck",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "my-dream-setup",
+                "slug": "my-dream-setup",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "mycopunk",
+                "slug": "mycopunk",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "nasb",
+                "slug": "nasb",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "nearly-dead",
+                "slug": "nearly-dead",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "necropolis",
+                "slug": "necropolis",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "nine-sols",
+                "slug": "nine-sols",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "nivalis-nights",
+                "slug": "nivalis-nights",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "odd-remedy",
+                "slug": "odd-remedy",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "old-market-simulator",
+                "slug": "old-market-simulator",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "on-together",
+                "slug": "on-together",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "ostranauts",
+                "slug": "ostranauts",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "outward",
+                "slug": "outward",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "paper-animal-adventure",
+                "slug": "paper-animal-adventure",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "paquerette-down-the-bunburrows",
+                "slug": "paquerette-down-the-bunburrows",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "patapon-1-2-replay",
+                "slug": "patapon-1-2-replay",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "peak",
+                "slug": "peak",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "peaks-of-yore",
+                "slug": "peaks-of-yore",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "peglin",
+                "slug": "peglin",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "pigface",
+                "slug": "pigface",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "pikuniku",
+                "slug": "pikuniku",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "plasma",
+                "slug": "plasma",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "potion-craft",
+                "slug": "potion-craft",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "project-arrhythmia",
+                "slug": "project-arrhythmia",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "pulsar-lost-colony",
+                "slug": "pulsar-lost-colony",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "ravenfield",
+                "slug": "ravenfield",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "receiver-2",
+                "slug": "receiver-2",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "repo",
+                "slug": "repo",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "resonite",
+                "slug": "resonite",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "return-of-the-obra-dinn",
+                "slug": "return-of-the-obra-dinn",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "rhythm-doctor",
+                "slug": "rhythm-doctor",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "riskofrain2",
+                "slug": "riskofrain2",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "rogue-genesia",
+                "slug": "rogue-genesia",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "rogue-tower",
+                "slug": "rogue-tower",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "rounds",
+                "slug": "rounds",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "sailwind",
+                "slug": "sailwind",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "screw-drivers",
+                "slug": "screw-drivers",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "sfoy",
+                "slug": "survival-fountain-of-youth",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "shadows-of-doubt",
+                "slug": "shadows-of-doubt",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "shadows-over-loathing",
+                "slug": "shadows-over-loathing",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "shapez-2",
+                "slug": "shapez-2",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "shift-at-midnight",
+                "slug": "shift-at-midnight",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "skul-the-hero-slayer",
+                "slug": "skul-the-hero-slayer",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "slipstream-rogue-space",
+                "slug": "slipstream-rogue-space",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "smushi-come-home",
+                "slug": "smushi-come-home",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "songs-of-conquest",
+                "slug": "songs-of-conquest",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "sons-of-the-forest",
+                "slug": "sotf",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "stacklands",
+                "slug": "stacklands",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "starsand",
+                "slug": "starsand",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "stolen-realm",
+                "slug": "stolen-realm",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "stonewards",
+                "slug": "stonewards",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "straftat",
+                "slug": "straftat",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "subterranauts",
+                "slug": "subterranauts",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "subterror",
+                "slug": "subterror",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "sulfur",
+                "slug": "sulfur",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "sun-haven",
+                "slug": "sun-haven",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "sunkenland",
+                "slug": "sunkenland",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "super-battle-golf",
+                "slug": "super-battle-golf",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "super-fantasy-kingdom",
+                "slug": "super-fantasy-kingdom",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "super-psycho-baseball",
+                "slug": "super-psycho-baseball",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "supermarket-together",
+                "slug": "supermarket-together",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "talespire",
+                "slug": "talespire",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "tank-team",
+                "slug": "tank-team",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "tcg-card-shop-simulator",
+                "slug": "tcg-card-shop-simulator",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "techtonica",
+                "slug": "techtonica",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "the-farmer-was-replaced",
+                "slug": "the-farmer-was-replaced",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "the-ouroboros-king",
+                "slug": "the-ouroboros-king",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "the-planet-crafter",
+                "slug": "the-planet-crafter",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "the-spell-brigade",
+                "slug": "the-spell-brigade",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "thronefall",
+                "slug": "thronefall",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "timberborn",
+                "slug": "timberborn",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "totally-accurate-battle-simulator",
+                "slug": "totally-accurate-battle-simulator",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "touhou-lost-branch-of-legend",
+                "slug": "touhou-lost-branch-of-legend",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "trombone-champ",
+                "slug": "trombone-champ",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "ultimate-chicken-horse",
+                "slug": "ultimate-chicken-horse",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "ultrakill",
+                "slug": "ultrakill",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "unfair-flips",
+                "slug": "unfair-flips",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "v-rising",
+                "slug": "vrising",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "valheim",
+                "slug": "valheim",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "vertigo-2",
+                "slug": "vertigo-2",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "very-very-valet",
+                "slug": "very-very-valet",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "void-crew",
+                "slug": "void-crew",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "vtol-vr",
+                "slug": "vtol-vr",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "we-love-katamari-reroll-royal-reverie",
+                "slug": "we-love-katamari-reroll-royal-reverie",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "west-of-loathing",
+                "slug": "west-of-loathing",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "white-knuckle",
+                "slug": "white-knuckle",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "wildfrost",
+                "slug": "wildfrost",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "wizard-of-legend",
+                "slug": "wizard-of-legend",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "wizard-with-a-gun",
+                "slug": "wizard-with-a-gun",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "wobbly-life",
+                "slug": "wobbly-life",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "word-play",
+                "slug": "word-play",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "wrestling-empire",
+                "slug": "wrestling-empire",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "yapyap",
+                "slug": "yapyap",
+                "relPath": "BepInEx/plugins"
+            },
+            {
+                "dir": "zort",
+                "slug": "zort",
+                "relPath": "BepInEx/plugins"
+            }
+        ],
+        "metadata": {
+            "file": "manifest.json",
+            "name": "/name",
+            "version": "/version_number",
+            "author": "/author",
+            "website": "/website_url"
+        }
+    }
+}

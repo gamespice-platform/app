@@ -1,0 +1,63 @@
+{
+    "manifestVersion": 1,
+    "label": "Final Fantasy VII Remake mod file (.pak)",
+    "description": "Unreal .pak files in a ~mods folder inside End/Content/Paks.",
+    "match": {
+        "extensions": [
+            "pak"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "End/Content/Paks/~mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "End/Content/Paks/~mods"
+                }
+            },
+            {
+                "action": "move",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "End/Content/Paks/~mods/{fileName}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "End/Content/Paks/~mods/{fileName}"
+                }
+            }
+        ]
+    }
+}

@@ -1,0 +1,63 @@
+{
+    "manifestVersion": 1,
+    "label": "Silent Hill 2 Remake mod file (.pak)",
+    "description": "Unreal .pak files in a ~mod folder inside SHProto/Content/Paks.",
+    "match": {
+        "extensions": [
+            "pak"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "SHProto/Content/Paks/~mod",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "SHProto/Content/Paks/~mod"
+                }
+            },
+            {
+                "action": "move",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "SHProto/Content/Paks/~mod/{fileName}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "SHProto/Content/Paks/~mod/{fileName}"
+                }
+            }
+        ]
+    }
+}

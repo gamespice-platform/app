@@ -1,0 +1,59 @@
+{
+    "manifestVersion": 1,
+    "label": "Nehrim: At Fate's Edge sandboxes",
+    "description": "How Nehrim: At Fate's Edge sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "plugin",
+                    "relPath": "Data"
+                }
+            ],
+            "notes": [
+                "Nehrim is a total conversion that needs Oblivion installed alongside it; mods go in Nehrim's Data folder, not Oblivion's.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "1014940"
+            ],
+            "names": [
+                "Nehrim: At Fate's Edge"
+            ],
+            "markers": [
+                "NehrimLauncher.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

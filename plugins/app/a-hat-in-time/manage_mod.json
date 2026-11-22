@@ -1,0 +1,57 @@
+{
+    "manifestVersion": 1,
+    "label": "A Hat in Time mod (zip/7z)",
+    "description": "Unpacked into a folder of its own under HatInTimeGame/Mods, one folder per mod.",
+    "match": {
+        "extensions": [
+            "zip",
+            "7z"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "HatInTimeGame/Mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "extract",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "HatInTimeGame/Mods/{itemId}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "HatInTimeGame/Mods/{itemId}"
+                }
+            }
+        ]
+    }
+}

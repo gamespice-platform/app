@@ -1,0 +1,57 @@
+{
+    "manifestVersion": 1,
+    "label": "Cities: Skylines mod (.zip)",
+    "description": "Unpacked into a folder of its own under Addons/Mods in the game's local data folder (not the install). The game loads every subfolder there as one mod.",
+    "match": {
+        "extensions": [
+            "zip",
+            "7z"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "Addons/Mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "extract",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "Addons/Mods/{itemId}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "Addons/Mods/{itemId}"
+                }
+            }
+        ]
+    }
+}

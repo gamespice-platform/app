@@ -1,0 +1,60 @@
+{
+    "manifestVersion": 1,
+    "label": "Kenshi sandboxes",
+    "description": "How Kenshi sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "mods"
+                }
+            ],
+            "notes": [
+                "Each mod is a folder under mods whose .mod file carries the same name. Kenshi reads the enabled list from data/mods.cfg, which this app does not write; enable the mod in the launcher once. The Steam build is kenshi_x64.exe and the GOG build kenshi_GOG_x64.exe.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "233860"
+            ],
+            "names": [
+                "Kenshi"
+            ],
+            "markers": [
+                "kenshi_x64.exe",
+                "kenshi_GOG_x64.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

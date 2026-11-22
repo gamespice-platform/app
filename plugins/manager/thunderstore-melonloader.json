@@ -1,0 +1,226 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "thunderstore-melonloader",
+        "label": "Thunderstore Mod Manager (MelonLoader)",
+        "homepage": "https://www.overwolf.com/app/Thunderstore-Thunderstore_Mod_Manager",
+        "notes": [
+            "The Overwolf build of r2modman. Same profile layout, different folder - both are listed separately because a machine can have both.",
+            "Nothing is moved: the mods stay in Thunderstore Mod Manager and this app takes a copy.",
+            "Descriptor for games that use MelonLoader: its mods live in Mods inside each profile."
+        ],
+        "roots": [
+            {
+                "base": "config",
+                "path": "Thunderstore Mod Manager/DataFolder"
+            }
+        ],
+        "layout": {
+            "modsPath": "{game}/profiles/*/Mods",
+            "entry": "directory",
+            "ignore": [
+                "_state",
+                "MMHOOK"
+            ]
+        },
+        "games": [
+            {
+                "dir": "AnUnfinishedGame",
+                "slug": "an-unfinished-game",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "AngryBirdsVrIsleOfPigs",
+                "slug": "angry-birds-vr-isle-of-pigs",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "BONELAB",
+                "slug": "bonelab",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "BONEWORKS",
+                "slug": "boneworks",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "BabySteps",
+                "slug": "baby-steps",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "BackpackHero",
+                "slug": "backpack-hero",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "Beetleball",
+                "slug": "beetleball",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "BetonBrutal",
+                "slug": "beton-brutal",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "BigAmbitions",
+                "slug": "big-ambitions",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "BloonsTD6",
+                "slug": "bloons-td-6",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "BrutalistickVr",
+                "slug": "brutalistick-vr",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "Cairn",
+                "slug": "cairn",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "CastNChill",
+                "slug": "cast-n-chill",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "Cryo",
+                "slug": "cryo",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "CursedWords",
+                "slug": "cursed-words",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "DaleAndDawson",
+                "slug": "dale-dawson-stationery-supplies",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "DucksCanDrive",
+                "slug": "ducks-can-drive",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "ForsakenFrontiers",
+                "slug": "forsaken-frontiers",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "Frukt",
+                "slug": "frukt",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "GangBeasts",
+                "slug": "gang-beasts",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "GorillaTag",
+                "slug": "gorilla-tag",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "HardBullet",
+                "slug": "hard-bullet",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "HomeSafetyHotline",
+                "slug": "home-safety-hotline",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "InsideTheBackrooms",
+                "slug": "inside-the-backrooms",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "IronNestHeavyTurretSimulator",
+                "slug": "iron-nest",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "JumpSpace",
+                "slug": "jump-space",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "Labyrinthine",
+                "slug": "labyrinthine",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "Mimesis",
+                "slug": "mimesis",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "Offscreen",
+                "slug": "offscreen",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "PaintingVr",
+                "slug": "painting-vr",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "PatchQuest",
+                "slug": "patch-quest",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "PitOfGoblin",
+                "slug": "pit-of-goblin",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "Puttler",
+                "slug": "puttler",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "RUMBLE",
+                "slug": "rumble",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "SleddingGame",
+                "slug": "sledding-game",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "SuperhotVr",
+                "slug": "superhot-vr",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "Vellum",
+                "slug": "vellum",
+                "relPath": "Mods"
+            },
+            {
+                "dir": "Vigil",
+                "slug": "vigil",
+                "relPath": "Mods"
+            }
+        ],
+        "metadata": {
+            "file": "manifest.json",
+            "name": "/name",
+            "version": "/version_number",
+            "author": "/author",
+            "website": "/website_url"
+        }
+    }
+}

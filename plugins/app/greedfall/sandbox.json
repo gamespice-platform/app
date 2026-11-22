@@ -1,0 +1,59 @@
+{
+    "manifestVersion": 1,
+    "label": "GreedFall sandboxes",
+    "description": "How GreedFall sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "datalocal"
+                }
+            ],
+            "notes": [
+                "The game reads loose overrides from datalocal. A mod's files must be newer than the shipped data to win; the deploy touches their timestamps in some managers, and this app does not.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "606880"
+            ],
+            "names": [
+                "GreedFall"
+            ],
+            "markers": [
+                "GreedFall.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

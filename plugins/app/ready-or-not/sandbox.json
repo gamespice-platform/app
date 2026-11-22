@@ -1,0 +1,60 @@
+{
+    "manifestVersion": 1,
+    "label": "Ready or Not sandboxes",
+    "description": "How Ready or Not sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "archive",
+                    "relPath": "ReadyOrNot/Content/Paks/~mods"
+                }
+            ],
+            "notes": [
+                "The ~mods folder is created on first deploy. Files load alphabetically, so a numeric prefix on the file name is how load order is chosen.",
+                "Saves are in AppData/Local/ReadyOrNot/Saved/SaveGames.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "1144200"
+            ],
+            "names": [
+                "Ready or Not"
+            ],
+            "markers": [
+                "ReadyOrNot.exe",
+                "ReadyOrNot/Content/Paks"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

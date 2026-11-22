@@ -1,0 +1,65 @@
+{
+    "manifestVersion": 1,
+    "label": "Final Fantasy VII Rebirth mod file (.pak, .ucas, .utoc)",
+    "description": "Unreal .pak files (with .ucas/.utoc companions) in a ~Mods folder inside End/Content/Paks.",
+    "match": {
+        "extensions": [
+            "pak",
+            "ucas",
+            "utoc"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "End/Content/Paks/~Mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "End/Content/Paks/~Mods"
+                }
+            },
+            {
+                "action": "move",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "End/Content/Paks/~Mods/{fileName}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "End/Content/Paks/~Mods/{fileName}"
+                }
+            }
+        ]
+    }
+}

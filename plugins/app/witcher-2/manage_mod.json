@@ -1,0 +1,65 @@
+{
+    "manifestVersion": 1,
+    "label": "The Witcher 2: Assassins of Kings mod file",
+    "description": "A loose override file straight into CookedPC, where the engine reads cooked content from.",
+    "match": {
+        "extensions": [
+            "dzip",
+            "bin",
+            "dll"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "CookedPC",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "CookedPC"
+                }
+            },
+            {
+                "action": "move",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "CookedPC/{fileName}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "CookedPC/{fileName}"
+                }
+            }
+        ]
+    }
+}

@@ -1,0 +1,65 @@
+{
+    "manifestVersion": 1,
+    "label": "Sekiro: Shadows Die Twice mod archive (.zip)",
+    "description": "Mod Engine loads loose game files from a mods folder beside sekiro.exe. Archives are unpacked flat so the mod's own folder layout (chr, parts, msg...) is preserved.",
+    "match": {
+        "extensions": [
+            "zip",
+            "7z",
+            "rar"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "mods"
+                }
+            },
+            {
+                "action": "extract",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "mods"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}"
+                }
+            }
+        ]
+    }
+}

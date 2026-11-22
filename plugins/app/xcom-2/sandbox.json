@@ -1,0 +1,69 @@
+{
+    "manifestVersion": 1,
+    "label": "XCOM 2 sandboxes",
+    "description": "How XCOM 2 sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "XComGame/Mods"
+                },
+                {
+                    "type": "wotc_mod",
+                    "relPath": "XCom2-WarOfTheChosen/XComGame/Mods"
+                }
+            ],
+            "notes": [
+                "Each mod is a folder ending in a .XComMod file. War of the Chosen keeps its own copy of the game under XCom2-WarOfTheChosen, with its own Mods folder (the second target); this rule installs into the base one. Steam Workshop subscriptions are Steam's business and are not touched.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "268500",
+                "593380"
+            ],
+            "gogProductIds": [
+                "1482002159",
+                "1414942413"
+            ],
+            "names": [
+                "XCOM 2",
+                "XCOM 2: War of the Chosen"
+            ],
+            "markers": [
+                "XCom2.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

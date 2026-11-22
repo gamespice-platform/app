@@ -6,6 +6,7 @@ This app is not the first mod manager, and the comments throughout it name the o
 
 - **Protocol and file-format behaviour** is fact about somebody else's wire format or on-disk layout, and the comments name the authority that settled it — `spy`'s scanner for query ports, `go-a2s` for split-reply framing, each game's own modding documentation for where its mods go. A format is not authorship, and getting it wrong is a bug in this app.
 - **Folder layouts in `plugins/manager/`** are the documented defaults each manager publishes for its own users. They are data in this repository because they belong to those projects and change on their schedule — a corrected descriptor is a JSON edit, not a patch to Rust.
+- **Per-game rules** (`plugins/app/`) and the extra manager descriptors were drafted from the game lists of Vortex, Mod Organizer 2's basic_games, r2modman and Gale and the launchers' folder layouts: the facts (path, Steam id, marker, loader), not their code. [`CREDITS.md`](../CREDITS.md) names each project with the license read from its own LICENSE file.
 - **Nothing is vendored.** No third-party source is copied into this tree, and nothing here is a derivative work of another manager. Dependencies are declared in `package.json` and the `Cargo.toml`s, under their own licences.
 
 If a comparison in a comment ever reads as a claim on somebody else's work rather than a note about why this code looks the way it does, rewrite it. The projects named here are the reason a lot of this was tractable, and the attribution is meant to say so.

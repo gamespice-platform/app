@@ -1,0 +1,66 @@
+{
+    "manifestVersion": 1,
+    "label": "Bloodstained: Ritual of the Night sandboxes",
+    "description": "How Bloodstained: Ritual of the Night sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "pak_mod",
+                    "relPath": "BloodstainedRotN/Content/Paks/~mods"
+                },
+                {
+                    "type": "logic_mod",
+                    "relPath": "BloodstainedRotN/Content/Paks/LogicMods"
+                }
+            ],
+            "notes": [
+                "Pak mods go in BloodstainedRotN/Content/Paks/~mods, which the game scans after its own paks.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "692850"
+            ],
+            "epicAppNames": [
+                "a2ac59c83b704e40b4ab3a9e963fef52"
+            ],
+            "names": [
+                "Bloodstained: Ritual of the Night"
+            ],
+            "markers": [
+                "BloodstainedROTN.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

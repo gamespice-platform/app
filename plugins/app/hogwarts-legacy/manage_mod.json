@@ -1,0 +1,65 @@
+{
+    "manifestVersion": 1,
+    "label": "Hogwarts Legacy pak mod (.pak)",
+    "description": "A .pak (with its .utoc/.ucas siblings, when present) straight into Phoenix/Content/Paks/~mods. Unreal loads every pak in a folder starting with a tilde after the shipped ones, so it is the conventional place for replacement mods.",
+    "match": {
+        "extensions": [
+            "pak",
+            "utoc",
+            "ucas"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "Phoenix/Content/Paks/~mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "Phoenix/Content/Paks/~mods"
+                }
+            },
+            {
+                "action": "move",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "Phoenix/Content/Paks/~mods/{fileName}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "Phoenix/Content/Paks/~mods/{fileName}"
+                }
+            }
+        ]
+    }
+}

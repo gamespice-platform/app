@@ -1,0 +1,71 @@
+{
+    "manifestVersion": 1,
+    "label": "Hogwarts Legacy sandboxes",
+    "description": "How Hogwarts Legacy sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "pak_mod",
+                    "relPath": "Phoenix/Content/Paks/~mods"
+                },
+                {
+                    "type": "logic_mod",
+                    "relPath": "Phoenix/Content/Paks/LogicMods"
+                },
+                {
+                    "type": "ue4ss_mod",
+                    "relPath": "Phoenix/Binaries/Win64/Mods"
+                }
+            ],
+            "notes": [
+                "Pak mods go in Phoenix/Content/Paks/~mods; Blueprint 'LogicMods' paks go in Phoenix/Content/Paks/LogicMods.",
+                "Anything beyond plain pak replacement needs UE4SS, which is not a mod and which this app does not install. Unpack it into the game's Win64 binaries folder once; its Lua mods then deploy under its Mods folder.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "990080"
+            ],
+            "epicAppNames": [
+                "fa4240e57a3c46b39f169041b7811293"
+            ],
+            "names": [
+                "Hogwarts Legacy"
+            ],
+            "markers": [
+                "HogwartsLegacy.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

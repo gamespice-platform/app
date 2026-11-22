@@ -1,0 +1,64 @@
+{
+    "manifestVersion": 1,
+    "label": "Sid Meier's Civilization VI sandboxes",
+    "description": "How Sid Meier's Civilization VI sandboxes deploy, and how to find the game on this machine.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "direct",
+            "supportedStrategies": [
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "Mods"
+                }
+            ],
+            "notes": [
+                "Point this sandbox at the My Games/Sid Meier's Civilization VI folder in your documents, not at the Steam install.",
+                "Mods live in Mods, one folder each."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "289070"
+            ],
+            "names": [
+                "Sid Meier's Civilization VI"
+            ],
+            "markers": [
+                "Mods",
+                "AppOptions.txt"
+            ],
+            "paths": {
+                "windows": [
+                    "~/Documents/My Games/Sid Meier's Civilization VI"
+                ],
+                "linux": [
+                    "~/.local/share/aspyr-media/Sid Meier's Civilization VI/Sid Meier's Civilization VI"
+                ]
+            }
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text"
+            }
+        ]
+    }
+}

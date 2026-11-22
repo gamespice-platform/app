@@ -1,0 +1,60 @@
+{
+    "manifestVersion": 1,
+    "label": "The Witcher 2: Assassins of Kings sandboxes",
+    "description": "How The Witcher 2: Assassins of Kings sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "CookedPC"
+                }
+            ],
+            "notes": [
+                "The executable is in the bin folder. The game ships userContentManager.exe for managing its own user content.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "20920"
+            ],
+            "names": [
+                "The Witcher 2: Assassins of Kings Enhanced Edition",
+                "The Witcher 2"
+            ],
+            "markers": [
+                "witcher2.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

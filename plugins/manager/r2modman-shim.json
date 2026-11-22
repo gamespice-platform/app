@@ -1,0 +1,83 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "r2modman-shim",
+        "label": "r2modman (UE4SS shimloader)",
+        "homepage": "https://github.com/ebkr/r2modmanPlus",
+        "notes": [
+            "Reads r2modman's own profile folders. Nothing is moved or changed - the mods stay where r2modman put them and this app takes a copy.",
+            "Each r2modman profile is listed separately, so importing 'Default' and 'Hardcore' gives you two sets you can put in different sandboxes.",
+            "r2modman names its game folders itself (the internalFolderName in its ecosystem list). If a game is missing here, drop a corrected descriptor in the app's plugins/manager folder - the folder name is the only thing that needs to change.",
+            "One descriptor id per mod loader, because a descriptor has a single in-profile mods path.",
+            "Descriptor for games that use UE4SS shimloader: its mods live in shimloader/mod inside each profile."
+        ],
+        "roots": [
+            {
+                "base": "config",
+                "path": "r2modmanPlus-local"
+            }
+        ],
+        "layout": {
+            "modsPath": "{game}/profiles/*/shimloader/mod",
+            "entry": "directory",
+            "ignore": [
+                "_state",
+                "MMHOOK"
+            ]
+        },
+        "games": [
+            {
+                "dir": "Astroneer",
+                "slug": "astroneer",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "GrainRot",
+                "slug": "grain-rot",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "MecchaChameleon",
+                "slug": "meccha-chameleon",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "Minos",
+                "slug": "minos",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "Palworld",
+                "slug": "palworld",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "Panicore",
+                "slug": "panicore",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "RvThereYet",
+                "slug": "rv-there-yet",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "SoulcaliburVi",
+                "slug": "soulcalibur-vi",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "Windrose",
+                "slug": "windrose",
+                "relPath": "shimloader/mod"
+            }
+        ],
+        "metadata": {
+            "file": "manifest.json",
+            "name": "/name",
+            "version": "/version_number",
+            "author": "/author",
+            "website": "/website_url"
+        }
+    }
+}

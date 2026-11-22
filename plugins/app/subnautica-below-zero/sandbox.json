@@ -1,0 +1,65 @@
+{
+    "manifestVersion": 1,
+    "label": "Subnautica: Below Zero sandboxes",
+    "description": "How Subnautica: Below Zero sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "loader_plugin",
+                    "relPath": "BepInEx/plugins"
+                }
+            ],
+            "notes": [
+                "BepInEx itself is not a mod and is not installed here; unpack the Below Zero BepInEx pack into the game folder once.",
+                "Older mods target QModManager and live in QMods. Current mods use BepInEx; do not mix the two.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "848450"
+            ],
+            "epicAppNames": [
+                "foxglove"
+            ],
+            "names": [
+                "Subnautica: Below Zero"
+            ],
+            "markers": [
+                "SubnauticaZero.exe",
+                "SubnauticaZero_Data"
+            ]
+        },
+        "presets": [
+            {
+                "id": "bepinex",
+                "label": "BepInEx",
+                "description": "The usual setup: mods loaded by the loader at startup.",
+                "environment": "client",
+                "loader": "bepinex"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

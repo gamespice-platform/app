@@ -1,0 +1,62 @@
+{
+    "manifestVersion": 1,
+    "label": "Schedule I sandboxes",
+    "description": "How Schedule I sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "loader_mod",
+                    "relPath": "Mods"
+                }
+            ],
+            "notes": [
+                "MelonLoader is not a mod and is not installed here; install it into the game folder once. Mods go in the Mods folder it creates.",
+                "Some mods also need files in UserLibs or Plugins; those are not handled by this single-file rule.",
+                "Saves are in AppData/LocalLow/TVGS/Schedule I/Saves.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "3164500"
+            ],
+            "names": [
+                "Schedule I"
+            ],
+            "markers": [
+                "Schedule I.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "melonloader",
+                "label": "MelonLoader",
+                "description": "The usual setup: mods loaded by the loader at startup.",
+                "environment": "client",
+                "loader": "melonloader"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

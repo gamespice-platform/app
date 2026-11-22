@@ -1,0 +1,69 @@
+{
+    "manifestVersion": 1,
+    "label": "Untitled Goose Game sandboxes",
+    "description": "How Untitled Goose Game sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "loader_plugin",
+                    "relPath": "BepInEx/plugins"
+                },
+                {
+                    "type": "loader_patcher",
+                    "relPath": "BepInEx/patchers"
+                },
+                {
+                    "type": "loader_config",
+                    "relPath": "BepInEx/config"
+                }
+            ],
+            "notes": [
+                "BepInEx itself is not a mod and this app does not install it. Unpack it into the game folder once; the sandbox's plugins go under the BepInEx/plugins folder it creates.",
+                "BepInEx writes each plugin's settings into BepInEx/config on first run; those belong to the game folder rather than the sandbox.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "epicAppNames": [
+                "Flour"
+            ],
+            "names": [
+                "Untitled Goose Game"
+            ],
+            "markers": [
+                "Untitled.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "bepinex",
+                "label": "BepInEx",
+                "description": "Plugins loaded by BepInEx at startup.",
+                "environment": "client",
+                "loader": "bepinex"
+            },
+            {
+                "id": "vanilla",
+                "label": "Vanilla",
+                "description": "No loader. Nothing is deployed, which is how you check whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

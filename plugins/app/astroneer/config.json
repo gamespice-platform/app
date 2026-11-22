@@ -1,0 +1,21 @@
+{
+    "manifestVersion": 1,
+    "label": "Astroneer settings files",
+    "description": "Where shimloader keeps the settings each mod writes on first run.",
+    "config": {
+        "locations": [
+            {
+                "label": "Mod settings",
+                "root": "gameDir",
+                "path": "shimloader/cfg",
+                "extensions": [
+                    "json",
+                    "toml",
+                    "cfg",
+                    "ini"
+                ],
+                "recursive": true
+            }
+        ]
+    }
+}

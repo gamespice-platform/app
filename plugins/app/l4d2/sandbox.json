@@ -1,0 +1,58 @@
+{
+    "manifestVersion": 1,
+    "label": "Left 4 Dead 2 sandboxes",
+    "description": "How Left 4 Dead 2 sandboxes deploy, and how to find the game on this machine.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "addon",
+                    "relPath": "left4dead2/addons"
+                }
+            ],
+            "notes": [
+                "Add-ons live in left4dead2/addons as one .vpk each.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "550"
+            ],
+            "names": [
+                "Left 4 Dead 2"
+            ],
+            "markers": [
+                "left4dead2/gameinfo.txt",
+                "left4dead2.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text"
+            }
+        ]
+    }
+}

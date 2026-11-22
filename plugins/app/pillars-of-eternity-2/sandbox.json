@@ -1,0 +1,59 @@
+{
+    "manifestVersion": 1,
+    "label": "Pillars of Eternity II: Deadfire sandboxes",
+    "description": "How Pillars of Eternity II: Deadfire sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "override",
+                    "relPath": "PillarsOfEternityII_Data/override"
+                }
+            ],
+            "notes": [
+                "The Xbox/Microsoft Store build names this folder PillarsOfEternity2_Data instead. Mod manifests are also registered in a modconfig.json under the user's LocalLow folder, which this app does not write.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "560130"
+            ],
+            "names": [
+                "Pillars of Eternity II: Deadfire"
+            ],
+            "markers": [
+                "PillarsOfEternityII.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

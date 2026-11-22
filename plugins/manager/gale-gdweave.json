@@ -1,0 +1,53 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "gale-gdweave",
+        "label": "Gale (GDWeave)",
+        "homepage": "https://github.com/Kesomannen/gale",
+        "notes": [
+            "Reads Gale's profile folders: <data dir>/com.kesomannen.gale/<game>/profiles/<profile>. Nothing is moved.",
+            "Gale names each game folder with its own slug (an explicit one, or the kebab-cased game name), so a few folder names here are derived and worth checking on your machine.",
+            "One descriptor id per mod loader, because a descriptor has a single in-profile mods path.",
+            "Descriptor for games that use GDWeave: its mods live in GDWeave/mods inside each profile."
+        ],
+        "roots": [
+            {
+                "platform": "windows",
+                "base": "appData",
+                "path": "com.kesomannen.gale"
+            },
+            {
+                "platform": "linux",
+                "base": "localData",
+                "path": "com.kesomannen.gale"
+            },
+            {
+                "platform": "macos",
+                "base": "config",
+                "path": "com.kesomannen.gale"
+            }
+        ],
+        "layout": {
+            "modsPath": "{game}/profiles/*/GDWeave/mods",
+            "entry": "directory",
+            "ignore": [
+                "_state",
+                "MMHOOK"
+            ]
+        },
+        "games": [
+            {
+                "dir": "webfishing",
+                "slug": "webfishing",
+                "relPath": "GDWeave/mods"
+            }
+        ],
+        "metadata": {
+            "file": "manifest.json",
+            "name": "/name",
+            "version": "/version_number",
+            "author": "/author",
+            "website": "/website_url"
+        }
+    }
+}

@@ -1,0 +1,65 @@
+{
+    "manifestVersion": 1,
+    "label": "No Man's Sky mod archive (.zip)",
+    "description": "A packaged mod (.zip): unpacked into a folder of its own under GAMEDATA/MODS, so uninstalling is one directory removal rather than guessing which loose files came from which mod.",
+    "match": {
+        "extensions": [
+            "zip",
+            "7z",
+            "rar"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "GAMEDATA/MODS",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "GAMEDATA/MODS"
+                }
+            },
+            {
+                "action": "extract",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "GAMEDATA/MODS/{itemId}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "GAMEDATA/MODS/{itemId}"
+                }
+            }
+        ]
+    }
+}

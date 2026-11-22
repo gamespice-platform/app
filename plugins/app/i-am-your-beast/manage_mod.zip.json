@@ -1,0 +1,56 @@
+{
+    "manifestVersion": 1,
+    "label": "I Am Your Beast BepInEx package (.zip)",
+    "description": "A packaged mod: unpacked into a folder of its own under BepInEx/plugins, so uninstalling is one directory removal. Folder-per-mod is the layout r2modman and Gale both use.",
+    "match": {
+        "extensions": [
+            "zip"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "BepInEx/plugins",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "extract",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "BepInEx/plugins/{itemId}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "BepInEx/plugins/{itemId}"
+                }
+            }
+        ]
+    }
+}

@@ -1,0 +1,59 @@
+{
+    "manifestVersion": 1,
+    "label": "Final Fantasy VII Remake sandboxes",
+    "description": "How Final Fantasy VII Remake sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "archive",
+                    "relPath": "End/Content/Paks/~mods"
+                }
+            ],
+            "notes": [
+                "Files load alphabetically, so a numeric prefix on the file name chooses load order.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "1462040"
+            ],
+            "names": [
+                "Final Fantasy VII Remake"
+            ],
+            "markers": [
+                "ff7remake.exe",
+                "End"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

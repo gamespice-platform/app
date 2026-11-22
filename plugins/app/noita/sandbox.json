@@ -1,0 +1,58 @@
+{
+    "manifestVersion": 1,
+    "label": "Noita sandboxes",
+    "description": "How Noita sandboxes deploy, and how to find the game on this machine.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "mods"
+                }
+            ],
+            "notes": [
+                "Mods live in mods/, one folder each.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "881100"
+            ],
+            "names": [
+                "Noita"
+            ],
+            "markers": [
+                "noita.exe",
+                "Noita"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text"
+            }
+        ]
+    }
+}

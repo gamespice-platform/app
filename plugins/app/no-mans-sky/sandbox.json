@@ -1,0 +1,63 @@
+{
+    "manifestVersion": 1,
+    "label": "No Man's Sky sandboxes",
+    "description": "How No Man's Sky sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "GAMEDATA/MODS"
+                }
+            ],
+            "notes": [
+                "The MODS folder is created on first deploy. The game only reads mods when GAMEDATA/SETTINGS/GCMODSETTINGS.MXML lists them, and a stale list is the usual reason a mod does nothing.",
+                "Saves are in AppData/Roaming/HelloGames/NMS, outside the install.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "275850"
+            ],
+            "gogProductIds": [
+                "1446213994"
+            ],
+            "names": [
+                "No Man's Sky"
+            ],
+            "markers": [
+                "Binaries/NMS.exe",
+                "GAMEDATA"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

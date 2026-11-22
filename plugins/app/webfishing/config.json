@@ -1,0 +1,18 @@
+{
+    "manifestVersion": 1,
+    "label": "WEBFISHING settings files",
+    "description": "Where GDWeave keeps the settings each mod writes on first run.",
+    "config": {
+        "locations": [
+            {
+                "label": "Mod settings",
+                "root": "gameDir",
+                "path": "GDWeave/configs",
+                "extensions": [
+                    "json"
+                ],
+                "recursive": true
+            }
+        ]
+    }
+}

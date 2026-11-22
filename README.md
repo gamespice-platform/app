@@ -117,43 +117,443 @@ Adding a game is four small JSON files and no Rust; [`scripts/gen-app-rules.py`]
 Here's a full list of the games that the app currently *supports*. The **Mods land in** column is where the app will deploy mods for that game, and the "Tested" column indicates whether or not the deployment has been tested with that game.
 
 All games right now **haven't been tested**. We will be testing and verifying the deployment of mods for each game in the future.
+The tables below are written by [`scripts/gen-readme-games.py`](scripts/gen-readme-games.py) from the rules under `plugins/app/`; run it after adding a game.
+
+<!-- games:begin -->
+
+<details><summary><b>BepInEx</b> (268 games)</summary>
+
+| Game | Mods land in | Tested |
+| --- | --- | :-: |
+| 20 Minutes Till Dawn | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| 9 Kings | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| A Gentlemen's Dispute | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| A Little to the Left | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| A Webbing Journey | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Across the Obelisk | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Aeruta | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Afterbeat | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| AGAINST | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Against the Storm | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| AI LIMIT | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Airport Security Sucks! | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Ale & Tale Tavern | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Aloft | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Among Us | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Among Us 3D | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| ANEURISM IV | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Another Crab's Treasure | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Approximately Up | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Arcus Chroma | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| ASKA | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| ATLYSS | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Atomicrops | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Atrio: The Dark Wild | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Back to the Dawn | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Bad North | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Below the Stone | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Bendy and the Ink Machine | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Berry Bury Berry | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Betrayal Beach | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Big Walk | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Block Story | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Blue Prince | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Bomb Rush Cyberfunk | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| BOMBANANA! | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Book of Travels | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Bopl Battle | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Burglin' Gnomes | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Carrier Deck | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Cat Mail Co. | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Cats are Liquid - A Better Place | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Cave Crawlers | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Chill with You : Lo-Fi Story | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Chrono Ark | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Cities: Skylines II | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| CloverPit | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Content Warning | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Core Keeper | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Crab Game | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Crashout Crew | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Crawl | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Crawlspace | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Crawlspace 2 | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Crime Simulator | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Cult of PiN | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Cult of the Lamb | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Cuphead | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Darkwater | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Deadly Delivery | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Deep Rock Galactic: Survivor | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| DEPO : Death Epileptic Pixel Origins | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Dice Kingdoms | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Disco Elysium | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Distance | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| DREDGE | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| DUSK | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Dyson Sphere Program | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Easy Delivery Co | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Electoral Carnage | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| ENA: Dream BBQ | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Enter the Gungeon | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Erenshor | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Everything is Crab | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Factory Planner | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| FATE: Reawakened | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Five Nights at Freddy's: Into the Pit | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Football Manager 26 | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| For The King | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Frozen Ship | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Gamble With Your Friends | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Garfield Kart - Furious Racing | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Gatekeeper | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Getting Over It with Bennett Foddy | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Gladio Mori | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Gloomwood | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Goblin Buster: Incremental Tower Defense | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Goblin Cleanup | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Goodbye Volcano High | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| GoreBox | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Granny: Chapter Two | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Graveyard Keeper 2 | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Green Hell VR | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Grey Hack | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| GRIME | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| GTFO | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Guilty as Sock! | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Gunman Contracts - Stand Alone | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| H3VR | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Hard Time III | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Holdfast: Nations At War | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Hollow Knight: Silksong | `BepInEx/plugins/` | **No** |
+| Hot Lava | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| House of Legacy | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| House of the Dying Sun | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| How to Fish | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Human Fall Flat | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| I Am Your Beast | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| In Falsus | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Inferno Protocol | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Inscryption | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| IRONSTRIKE | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Island Market Simulator | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| KeyWe | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Last Pirates: Die Together | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Last Train Outta' Wormtown | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Lazy Witch's Factory | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Len's Island | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Lethal Company | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Lethal League Blaze | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Limitless Survivor | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Logic World | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Lootun | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Lost Skies | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Lost Skies Island Creator | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Lucky Shot | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| LumenTale: Memories of Trey | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Lycans | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Mage Arena | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Magicite | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Magicraft | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Make Way | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Maltese's Fluffy Onsen | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Mechanica | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Meeple Station | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Megabonk | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| MineMogul | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Minigunner | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| MiSide | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Modulus: Factory Automation | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Monster Train 2 | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Moonlighter | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Muck | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| My Dream Setup | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Mycopunk | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Nearly Dead | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Necropolis | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Nickelodeon All‑Star Brawl | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Nine Sols | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Nivalis Nights | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Nuclear Option | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Nucleares | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Odd Remedy | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Old Market Simulator | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| On-Together: Virtual Co-Working | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Ostranauts | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Outward | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| PAC-MAN WORLD Re-PAC | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Paper Animal Adventure | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Papers, Please | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Paquerette Down the Bunburrows | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Paralives | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| PATAPON 1+2 REPLAY | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| PEAK | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Peaks of Yore | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Peglin | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| PIGFACE | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Pikuniku | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Plasma | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Potion Craft | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Project Gorgon | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Pulsar: Lost Colony | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Pummel Party | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Pushing it! Together - Sisyphus Co-op | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| R.E.P.O. | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Raft | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Ravenfield | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Re:Legend | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Receiver 2 | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Resonite | `BepInEx/plugins/`, `Renderer/BepInEx/plugins/`, `BepInEx/config/` | **No** |
+| Return From Core | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Return of the Obra Dinn | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Rhythm Doctor | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Risk of Rain 2 | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Roadside Research | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Rogue : Genesia | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Rogue Tower | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Romestead | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| ROUNDS | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Sailwind | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Screw Drivers | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Shadows of Doubt | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Shadows Over Loathing | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Shapez 2 | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Shift At Midnight | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| SIDE EFFECTS | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Sineus Arena Survivors | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Skul: The Hero Slayer | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Slasher's Keep | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Slip & Skid | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Slipstream: Rogue Space | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Smushi Come Home | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Songs of Conquest | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Sons of the Forest | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Soulstone Survivors | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Space Cat Digger | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Spooky's Jump Scare Mansion: HD Renovation | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Stacklands | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Starsand | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Stick Fight: The Game | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Stolen Realm | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Stonewards | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| STRAFTAT | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Subnautica | `BepInEx/plugins/` | **No** |
+| Subnautica: Below Zero | `BepInEx/plugins/` | **No** |
+| Subterranauts | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Subterror | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| SULFUR | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Sun Haven | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Sunkenland | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Super Battle Golf | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Super Fantasy Kingdom | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Super Psycho Baseball | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Supermarket Together | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Survival: Fountain of Youth | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| TABS | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| TaleSpire | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Tank Team | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| TCG Card Shop Simulator | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Techtonica | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| The Farmer Was Replaced | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| The Lab | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| The Message from Deep Space | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| The Ouroboros King | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| The Planet Crafter | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| The Sexy Brutale | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| The Spell Brigade | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Thronefall | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Timberborn | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Tiny Rogues | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| TouhouLostBranchOfLegend | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Trash Day | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Trombone Champ | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Tunguska: The Visitation | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Ultimate Chicken Horse | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| ULTRAKILL | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Unfair Flips | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Untitled Goose Game | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| V Rising | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Valheim | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Vampire Crawlers | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Vertigo 2 | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Very Very Valet | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Void Crew | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Voodoo Fishin' | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| VTOL VR | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Waterpark Simulator | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| We Love Katamari REROLL+ Royal Reverie | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| West of Loathing | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Whisper of the House | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| White Knuckle | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Wildfrost | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Wizard of Legend | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Wizard With A Gun | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Wobbly Life | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Word Play | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Wrestling Empire | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| YAPYAP | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+| Zort | `BepInEx/plugins/`, `BepInEx/patchers/`, `BepInEx/config/` | **No** |
+
+</details>
+
+<details><summary><b>Loader and other plugin folders</b> (69 games)</summary>
+
+| Game | Mods land in | Tested |
+| --- | --- | :-: |
+| An Unfinished Game | `Mods/`, `UserData/` | **No** |
+| Angry Birds VR: Isle of Pigs | `Mods/`, `UserData/` | **No** |
+| Astroneer | `shimloader/mod/`, `shimloader/pak/`, `shimloader/cfg/` | **No** |
+| Baby Steps | `Mods/`, `UserData/` | **No** |
+| Backpack Hero | `Mods/`, `Plugins/`, `UserData/` | **No** |
+| Beetleball | `Mods/`, `UserData/` | **No** |
+| BETON BRUTAL | `Mods/`, `UserData/` | **No** |
+| Big Ambitions | `Mods/`, `UserData/` | **No** |
+| BloonsTD6 | `Mods/`, `UserData/` | **No** |
+| BONELAB | `Mods/`, `Plugins/`, `UserData/` | **No** |
+| BONEWORKS | `Mods/`, `Plugins/`, `UserData/` | **No** |
+| BRUTALISTICK VR | `Mods/`, `UserData/` | **No** |
+| Cairn | `Mods/`, `UserData/` | **No** |
+| Cast n Chill | `Mods/`, `UserData/` | **No** |
+| CRYO | `Mods/`, `UserData/` | **No** |
+| Cursed Words | `Mods/`, `UserData/` | **No** |
+| Dale & Dawson Stationery Supplies | `Mods/`, `UserData/` | **No** |
+| Ducks Can Drive | `Mods/`, `UserData/` | **No** |
+| Enderal: Forgotten Stories | `Data/`, `Data/`, `Data/SKSE/Plugins/` | **No** |
+| Enderal: Forgotten Stories (Special Edition) | `Data/`, `Data/`, `Data/SKSE/Plugins/` | **No** |
+| Fallout 3 | `Data/`, `Data/`, `Data/FOSE/Plugins/` | **No** |
+| Fallout 4 | `Data/`, `Data/`, `Data/F4SE/Plugins/` | **No** |
+| Fallout 4 VR | `Data/`, `Data/`, `Data/F4SE/Plugins/` | **No** |
+| Fallout: New Vegas | `Data/`, `Data/`, `Data/NVSE/Plugins/` | **No** |
+| Forsaken Frontiers | `Mods/`, `UserData/` | **No** |
+| FRUKT | `Mods/`, `UserData/` | **No** |
+| Gang Beasts | `Mods/`, `UserData/` | **No** |
+| Gorilla Tag | `Mods/`, `UserData/` | **No** |
+| Grain Rot | `shimloader/mod/`, `shimloader/pak/`, `shimloader/cfg/` | **No** |
+| Grand Theft Auto III | `modloader/`, game root | **No** |
+| Grand Theft Auto IV | game root, `scripts/` | **No** |
+| Grand Theft Auto: San Andreas | `modloader/`, game root | **No** |
+| Grand Theft Auto: Vice City | `modloader/`, game root | **No** |
+| Hades II | `ReturnOfModding/plugins/`, `ReturnOfModding/config/` | **No** |
+| Hard Bullet | `Mods/`, `Plugins/`, `UserData/` | **No** |
+| Home Safety Hotline | `Mods/`, `UserData/` | **No** |
+| Inside The Backrooms | `Mods/`, `UserData/` | **No** |
+| IRON NEST: Heavy Turret Simulator | `Mods/`, `UserData/` | **No** |
+| Jump Space | `Mods/`, `UserData/` | **No** |
+| Labyrinthine | `Mods/`, `UserData/` | **No** |
+| MECCHA CHAMELEON | `shimloader/mod/`, `shimloader/pak/`, `shimloader/cfg/` | **No** |
+| Mimesis | `Mods/`, `UserData/` | **No** |
+| Minecraft | `mods/`, `resourcepacks/`, `shaderpacks/` | **No** |
+| MINOS | `shimloader/mod/`, `shimloader/pak/`, `shimloader/cfg/` | **No** |
+| Nehrim: At Fate's Edge | `Data/` | **No** |
+| Offscreen | `Mods/`, `UserData/` | **No** |
+| Painting VR | `Mods/`, `UserData/` | **No** |
+| Panicore | `shimloader/mod/`, `shimloader/pak/`, `shimloader/cfg/` | **No** |
+| Patch Quest | `Mods/`, `Plugins/`, `UserData/` | **No** |
+| Pit of Goblin | `Mods/`, `UserData/` | **No** |
+| Puttler | `Mods/`, `UserData/` | **No** |
+| Risk of Rain Returns | `ReturnOfModding/plugins/`, `ReturnOfModding/config/` | **No** |
+| RUMBLE | `Mods/`, `Plugins/`, `UserData/` | **No** |
+| RV There Yet? | `shimloader/mod/`, `shimloader/pak/`, `shimloader/cfg/` | **No** |
+| Schedule I | `Mods/` | **No** |
+| Scrap Mechanic | `Rivet/Mods/` | **No** |
+| Sledding Game | `Mods/`, `UserData/` | **No** |
+| SOULCALIBUR VI | `shimloader/mod/`, `shimloader/pak/`, `shimloader/cfg/` | **No** |
+| Starfield | `Data/`, `Data/`, `Data/SFSE/Plugins/` | **No** |
+| SUPERHOT VR | `Mods/`, `UserData/` | **No** |
+| The Elder Scrolls III: Morrowind | `Data Files/`, `Data Files/` | **No** |
+| The Elder Scrolls IV: Oblivion | `Data/`, `Data/`, `Data/OBSE/Plugins/` | **No** |
+| The Elder Scrolls V: Skyrim | `Data/`, `Data/`, `Data/SKSE/Plugins/` | **No** |
+| The Elder Scrolls V: Skyrim Special Edition | `Data/`, `Data/`, `Data/SKSE/Plugins/` | **No** |
+| The Elder Scrolls V: Skyrim VR | `Data/`, `Data/`, `Data/SKSE/Plugins/` | **No** |
+| Vellum | `Mods/`, `UserData/` | **No** |
+| Vigil | `Mods/`, `UserData/` | **No** |
+| WEBFISHING | `GDWeave/mods/`, `GDWeave/configs/` | **No** |
+| Windrose | `shimloader/mod/`, `shimloader/pak/`, `shimloader/cfg/` | **No** |
+
+</details>
+
+<details><summary><b>Mod folders</b> (72 games)</summary>
 
 | Game | Mods land in | Tested |
 | --- | --- | :-: |
 | 7 Days to Die | `Mods/` | **No** |
+| A Hat in Time | `HatInTimeGame/Mods/` | **No** |
 | Baldur's Gate 3 | `Mods/` | **No** |
+| Barotrauma | `LocalMods/` | **No** |
+| Blade & Sorcery | `BladeAndSorcery_Data/StreamingAssets/Mods/` | **No** |
+| Bloodstained: Ritual of the Night | `BloodstainedRotN/Content/Paks/~mods/`, `BloodstainedRotN/Content/Paks/LogicMods/` | **No** |
+| Celeste | `Mods/` | **No** |
+| Cities: Skylines | `Addons/Mods/` | **No** |
+| Code Vein | `CodeVein/Content/Paks/~mods/`, `CodeVein/Content/Paks/LogicMods/` | **No** |
+| Conan Exiles | `ConanSandbox/Mods/` | **No** |
+| Crusader Kings II | `mod/` | **No** |
+| Crusader Kings III | `mod/` | **No** |
 | Cyberpunk 2077 | `archive/pc/mod/` | **No** |
-| Fallout 3 | `Data/` | **No** |
-| Fallout 4 | `Data/` | **No** |
-| Fallout: New Vegas | `Data/` | **No** |
-| Garry's Mod | `garrysmod/addons/` | **No** |
-| Grand Theft Auto III | `modloader/`, `CLEO/` | **No** |
-| Grand Theft Auto IV | game root, `scripts/` | **No** |
-| Grand Theft Auto V | game root, `scripts/` | **No** |
-| Grand Theft Auto: San Andreas | `modloader/`, `CLEO/` | **No** |
-| Grand Theft Auto: Vice City | `modloader/`, `CLEO/` | **No** |
+| Daggerfall Unity | `DaggerfallUnity_Data/StreamingAssets/Mods/` | **No** |
+| Darkest Dungeon | `mods/` | **No** |
+| Dispatch | `Dispatch/Content/Paks/~mods/` | **No** |
+| Dragon's Dogma: Dark Arisen | `nativePC/` | **No** |
+| ELEX | `data/packed/` | **No** |
+| Europa Universalis IV | `mod/` | **No** |
+| FANTASY LIFE i: The Girl Who Steals Time | `Game/Content/Paks/~mods/` | **No** |
+| Final Fantasy VII Rebirth | `End/Content/Paks/~Mods/` | **No** |
+| Final Fantasy VII Remake | `End/Content/Paks/~mods/` | **No** |
+| Garden Paws | `Mods/` | **No** |
+| Garry's Mod | `garrysmod/addons/`, `garrysmod/lua/autorun/`, `garrysmod/cache/workshop/` | **No** |
+| GreedFall | `datalocal/` | **No** |
+| Grim Dawn | `mods/` | **No** |
+| GTA V | `scripts/`, game root, `mods/` | **No** |
+| Hearts of Iron IV | `mod/` | **No** |
+| Hogwarts Legacy | `Phoenix/Content/Paks/~mods/`, `Phoenix/Content/Paks/LogicMods/`, `Phoenix/Binaries/Win64/Mods/` | **No** |
+| Imperator: Rome | `mod/` | **No** |
+| Kenshi | `mods/` | **No** |
 | Kerbal Space Program | `GameData/` | **No** |
-| Minecraft | `mods/`, `resourcepacks/`, `shaderpacks/` | **No** |
+| Kingdom Come: Deliverance | `Mods/` | **No** |
+| Kingdom Come: Deliverance II | `Mods/` | **No** |
+| Left 4 Dead 2 | `left4dead2/addons/` | **No** |
 | Mount & Blade II: Bannerlord | `Modules/` | **No** |
+| Mount & Blade: Warband | `Modules/` | **No** |
+| No Man's Sky | `GAMEDATA/MODS/` | **No** |
+| Noita | `mods/` | **No** |
+| Oblivion Remastered | `OblivionRemastered/Content/Paks/~mods/` | **No** |
+| Oxygen Not Included | `Mods/` | **No** |
 | Palworld | `Pal/Binaries/Win64/Mods/` | **No** |
+| Pathfinder: Kingmaker | `Mods/` | **No** |
+| Pathfinder: Wrath of the Righteous | `Mods/` | **No** |
+| Pillars of Eternity II: Deadfire | `PillarsOfEternityII_Data/override/` | **No** |
+| Ready or Not | `ReadyOrNot/Content/Paks/~mods/` | **No** |
 | RimWorld | `Mods/` | **No** |
-| Rust | `oxide/plugins/` | **No** |
-| Sons of the Forest | `BepInEx/plugins/` | **No** |
+| Rust server | `oxide/plugins/`, `oxide/config/`, `oxide/data/` | **No** |
+| Sekiro: Shadows Die Twice | `mods/` | **No** |
+| Sid Meier's Civilization VI | `Mods/` | **No** |
+| Silent Hill 2 Remake | `SHProto/Content/Paks/~mod/` | **No** |
+| Slay the Spire 2 | `mods/` | **No** |
+| Star Wars: Knights of the Old Republic | `Override/` | **No** |
+| Star Wars: Knights of the Old Republic II - The Sith Lords | `Override/` | **No** |
+| Starbound | `mods/` | **No** |
 | Stardew Valley | `Mods/` | **No** |
-| Starfield | `Data/` | **No** |
-| Team Fortress 2 | `tf/custom/` | **No** |
-| The Elder Scrolls III: Morrowind | `Data Files/` | **No** |
-| The Elder Scrolls IV: Oblivion | `Data/` | **No** |
-| The Elder Scrolls V: Skyrim | `Data/` | **No** |
-| The Elder Scrolls V: Skyrim Special Edition | `Data/` | **No** |
-| The Elder Scrolls V: Skyrim VR | `Data/` | **No** |
+| Starsector | `mods/` | **No** |
+| Stellaris | `mod/` | **No** |
+| Subnautica 2 | `Subnautica2/Content/Paks/~mods/`, `Subnautica2/Content/Paks/LogicMods/`, `Subnautica2/Binaries/Win64/ue4ss/Mods/` | **No** |
+| Team Fortress 2 | `tf/custom/`, `tf/cfg/`, `tf/addons/sourcemod/plugins/` | **No** |
 | The Sims 3 | `Mods/Packages/` | **No** |
 | The Sims 4 | `Mods/` | **No** |
+| The Witcher 2: Assassins of Kings | `CookedPC/` | **No** |
 | The Witcher 3: Wild Hunt | `Mods/` | **No** |
-| V Rising | `BepInEx/plugins/` | **No** |
-| Valheim | `BepInEx/plugins/` | **No** |
+| Titanfall 2 | `R2Northstar/mods/`, `R2Northstar/plugins/` | **No** |
+| tModLoader | `Mods/` | **No** |
+| Total War: Three Kingdoms | `data/` | **No** |
+| Vampire: The Masquerade - Bloodlines | `Vampire/` | **No** |
+| Victoria 3 | `mod/` | **No** |
+| X Rebirth | `extensions/` | **No** |
+| X4: Foundations | `extensions/` | **No** |
+| XCOM 2 | `XComGame/Mods/`, `XCom2-WarOfTheChosen/XComGame/Mods/` | **No** |
 
-Five of those need a word of warning before you point a sandbox at a folder:
+</details>
+
+<!-- games:end -->
+
+A few of those need a word of warning before you point a sandbox at a folder:
 
 - **The Sims 3, The Sims 4 and Baldur's Gate 3** read their mods out of your
   documents folder, not out of the install. Point those sandboxes at
@@ -181,7 +581,7 @@ the app is built around, and the list of things that look like holes and are
 deliberate (RCON reaching private addresses is the usual one).
 
 ## Licence
-[GPL-3.0-only](LICENSE). The game names, trademarks and mod-manager names used
+[GPL-3.0-only](LICENSE). The projects whose published folder layouts and game lists informed the rules are credited in [`CREDITS.md`](CREDITS.md). The game names, trademarks and mod-manager names used
 throughout are their respective owners'; they appear here to say which game a
 rule is for and which manager a folder layout belongs to, and nothing in this
 repository is a derivative work of any of them, see

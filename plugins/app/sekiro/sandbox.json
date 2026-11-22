@@ -1,0 +1,59 @@
+{
+    "manifestVersion": 1,
+    "label": "Sekiro: Shadows Die Twice sandboxes",
+    "description": "How Sekiro: Shadows Die Twice sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "mods"
+                }
+            ],
+            "notes": [
+                "Mod Engine is not a mod and is not installed here; install it into the game folder and point its modengine.ini at the mods folder.",
+                "Never connect to the online services with a modified install.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "814380"
+            ],
+            "names": [
+                "Sekiro: Shadows Die Twice"
+            ],
+            "markers": [
+                "sekiro.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

@@ -1,0 +1,59 @@
+{
+    "manifestVersion": 1,
+    "label": "Barotrauma sandboxes",
+    "description": "How Barotrauma sandboxes deploy, and how to find the game on this machine.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "LocalMods"
+                }
+            ],
+            "notes": [
+                "Mods live in LocalMods, one folder each; enable them from the game's Mods screen.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "602960"
+            ],
+            "names": [
+                "Barotrauma"
+            ],
+            "markers": [
+                "Barotrauma.exe",
+                "Barotrauma.dll",
+                "DedicatedServer.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text"
+            }
+        ]
+    }
+}

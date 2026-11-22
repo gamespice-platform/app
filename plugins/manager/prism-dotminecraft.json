@@ -1,0 +1,47 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "prism-dotminecraft",
+        "label": "Prism Launcher (.minecraft instances)",
+        "homepage": "https://prismlauncher.org/",
+        "notes": [
+            "Prism uses 'minecraft' for new instances and falls back to '.minecraft' for older or MultiMC-imported ones (MinecraftInstance::gameRoot)."
+        ],
+        "roots": [
+            {
+                "platform": "windows",
+                "base": "appData",
+                "path": "PrismLauncher"
+            },
+            {
+                "platform": "linux",
+                "base": "localData",
+                "path": "PrismLauncher"
+            },
+            {
+                "platform": "linux",
+                "base": "home",
+                "path": ".var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher"
+            },
+            {
+                "platform": "macos",
+                "base": "config",
+                "path": "PrismLauncher"
+            }
+        ],
+        "layout": {
+            "modsPath": "instances/*/.minecraft/mods",
+            "entry": "archive",
+            "ignore": [
+                "instgroups.json"
+            ]
+        },
+        "games": [
+            {
+                "dir": "minecraft",
+                "slug": "minecraft",
+                "relPath": "mods"
+            }
+        ]
+    }
+}

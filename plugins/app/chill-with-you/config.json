@@ -1,0 +1,22 @@
+{
+    "manifestVersion": 1,
+    "label": "Chill with You : Lo-Fi Story settings files",
+    "description": "Where BepInEx keeps the settings each mod writes on first run.",
+    "config": {
+        "locations": [
+            {
+                "label": "Mod settings",
+                "root": "gameDir",
+                "path": "BepInEx/config",
+                "extensions": [
+                    "cfg",
+                    "json",
+                    "yaml",
+                    "yml",
+                    "toml"
+                ],
+                "recursive": true
+            }
+        ]
+    }
+}

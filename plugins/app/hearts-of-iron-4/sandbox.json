@@ -1,0 +1,68 @@
+{
+    "manifestVersion": 1,
+    "label": "Hearts of Iron IV sandboxes",
+    "description": "How Hearts of Iron IV sandboxes deploy, and how to find the game on this machine.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "direct",
+            "supportedStrategies": [
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "mod"
+                }
+            ],
+            "notes": [
+                "Point this sandbox at the Paradox Interactive/Hearts of Iron IV folder in your documents, not at the Steam install. That is where mod/ and the .mod descriptors live.",
+                "Each mod is a folder in mod/ plus a .mod file of the same id. Enable and order mods in the game's launcher (playsets) or with Irony Mod Manager; this app places the files and does not edit the launcher's playset database.",
+                "Copying is the default here: the folder is in your documents and very often on a different drive from the app's staging folder, which is the one case a hard link cannot cross."
+            ]
+        },
+        "detect": {
+            "names": [
+                "Hearts of Iron IV",
+                "Hearts of Iron IV"
+            ],
+            "markers": [
+                "mod",
+                "settings.txt",
+                "pdx_settings",
+                "launcher-v2.sqlite"
+            ],
+            "paths": {
+                "windows": [
+                    "~/Documents/Paradox Interactive/Hearts of Iron IV"
+                ],
+                "macos": [
+                    "~/Documents/Paradox Interactive/Hearts of Iron IV"
+                ],
+                "linux": [
+                    "~/.local/share/Paradox Interactive/Hearts of Iron IV"
+                ]
+            }
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text"
+            }
+        ]
+    }
+}

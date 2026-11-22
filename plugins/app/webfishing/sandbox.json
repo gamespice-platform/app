@@ -1,0 +1,71 @@
+{
+    "manifestVersion": 1,
+    "label": "WEBFISHING sandboxes",
+    "description": "How WEBFISHING sandboxes deploy, and how to find the game on this machine.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "loader_mod",
+                    "relPath": "GDWeave/mods"
+                },
+                {
+                    "type": "loader_config",
+                    "relPath": "GDWeave/configs"
+                }
+            ],
+            "notes": [
+                "GDWeave is not installed by this app. Install it into the game folder once; each mod is a folder under GDWeave/mods.",
+                "Hard links are the default: the loader reads real files, the game folder and the staging folder are almost always the same drive, and nothing is copied twice when two sandboxes share a mod.",
+                "The loader writes each mod's settings into GDWeave/configs the first time it runs. Those files belong to the game folder rather than to the sandbox.",
+                "Anti-cheat: if the game ships an anti-cheat that blocks injected loaders, launch it in the mode that disables it before using a sandbox. This rule set was derived from the r2modman and Gale game lists and has not been checked against every title."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "3146520"
+            ],
+            "names": [
+                "WEBFISHING"
+            ],
+            "markers": [
+                "webfishing.exe"
+            ],
+            "paths": {
+                "windows": [
+                    "<programFiles>/Steam/steamapps/common/WEBFISHING"
+                ]
+            }
+        },
+        "presets": [
+            {
+                "id": "gdweave",
+                "label": "GDWeave",
+                "description": "The usual setup: mods loaded by the loader at startup.",
+                "environment": "client",
+                "loader": "gdweave"
+            },
+            {
+                "id": "vanilla",
+                "label": "Vanilla",
+                "description": "No loader. Nothing is deployed, which is how you check whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell.",
+                "type": "text"
+            }
+        ]
+    }
+}

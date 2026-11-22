@@ -1,0 +1,13 @@
+{
+    "manifestVersion": 1,
+    "label": "Starsector",
+    "description": "Starts the game's own executable from the game folder.",
+    "permissions": {},
+    "launch": {
+        "exec": "starsector.exe",
+        "execPlatform": {
+            "windows": "starsector.exe",
+            "linux": "starsector.sh"
+        }
+    }
+}

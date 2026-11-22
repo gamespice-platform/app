@@ -1,0 +1,58 @@
+{
+    "manifestVersion": 1,
+    "label": "Bloodstained: Ritual of the Night mod package (.zip)",
+    "description": "A packaged mod unpacked into a folder of its own under BloodstainedRotN/Content/Paks/~mods. Unreal scans that folder recursively, so a mod IS its folder, and uninstalling is one directory removal.",
+    "match": {
+        "extensions": [
+            "zip",
+            "7z",
+            "rar"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "BloodstainedRotN/Content/Paks/~mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "extract",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "BloodstainedRotN/Content/Paks/~mods/{itemId}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "BloodstainedRotN/Content/Paks/~mods/{itemId}"
+                }
+            }
+        ]
+    }
+}

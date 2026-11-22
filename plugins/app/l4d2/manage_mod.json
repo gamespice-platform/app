@@ -1,0 +1,63 @@
+{
+    "manifestVersion": 1,
+    "label": "Left 4 Dead 2 add-on (.vpk)",
+    "description": "A packed add-on into left4dead2/addons, which the game mounts every .vpk from at startup.",
+    "match": {
+        "extensions": [
+            "vpk"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "left4dead2/addons",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "left4dead2/addons"
+                }
+            },
+            {
+                "action": "move",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "left4dead2/addons/{fileName}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "left4dead2/addons/{fileName}"
+                }
+            }
+        ]
+    }
+}

@@ -1,0 +1,62 @@
+{
+    "manifestVersion": 1,
+    "label": "Vampire: The Masquerade - Bloodlines sandboxes",
+    "description": "How Vampire: The Masquerade - Bloodlines sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "Vampire"
+                }
+            ],
+            "notes": [
+                "Mods are files in the Vampire folder, which is the game's own mod directory. Total-conversion patches such as the Unofficial Patch also use an Unofficial_Patch folder in the game root.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "2600"
+            ],
+            "gogProductIds": [
+                "1207659240"
+            ],
+            "names": [
+                "Vampire: The Masquerade - Bloodlines"
+            ],
+            "markers": [
+                "Vampire.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

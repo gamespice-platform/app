@@ -1,0 +1,43 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "r2modman-gdweave",
+        "label": "r2modman (GDWeave)",
+        "homepage": "https://github.com/ebkr/r2modmanPlus",
+        "notes": [
+            "Reads r2modman's own profile folders. Nothing is moved or changed - the mods stay where r2modman put them and this app takes a copy.",
+            "Each r2modman profile is listed separately, so importing 'Default' and 'Hardcore' gives you two sets you can put in different sandboxes.",
+            "r2modman names its game folders itself (the internalFolderName in its ecosystem list). If a game is missing here, drop a corrected descriptor in the app's plugins/manager folder - the folder name is the only thing that needs to change.",
+            "One descriptor id per mod loader, because a descriptor has a single in-profile mods path.",
+            "Descriptor for games that use GDWeave: its mods live in GDWeave/mods inside each profile."
+        ],
+        "roots": [
+            {
+                "base": "config",
+                "path": "r2modmanPlus-local"
+            }
+        ],
+        "layout": {
+            "modsPath": "{game}/profiles/*/GDWeave/mods",
+            "entry": "directory",
+            "ignore": [
+                "_state",
+                "MMHOOK"
+            ]
+        },
+        "games": [
+            {
+                "dir": "WEBFISHING",
+                "slug": "webfishing",
+                "relPath": "GDWeave/mods"
+            }
+        ],
+        "metadata": {
+            "file": "manifest.json",
+            "name": "/name",
+            "version": "/version_number",
+            "author": "/author",
+            "website": "/website_url"
+        }
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "manifestVersion": 1,
+    "label": "Risk of Rain Returns settings files",
+    "description": "Where ReturnOfModding keeps the settings each mod writes on first run.",
+    "config": {
+        "locations": [
+            {
+                "label": "Mod settings",
+                "root": "gameDir",
+                "path": "ReturnOfModding/config",
+                "extensions": [
+                    "cfg",
+                    "json",
+                    "toml"
+                ],
+                "recursive": true
+            }
+        ]
+    }
+}

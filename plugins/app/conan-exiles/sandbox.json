@@ -1,0 +1,59 @@
+{
+    "manifestVersion": 1,
+    "label": "Conan Exiles sandboxes",
+    "description": "How Conan Exiles sandboxes deploy, and how to find the game on this machine. Paths: vortex.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "pak_mod",
+                    "relPath": "ConanSandbox/Mods"
+                }
+            ],
+            "notes": [
+                "Conan loads only the paks named in ConanSandbox/Mods/modlist.txt, one path per line. This app does not write it; add the mod's .pak there. BattlEye runs on official servers and rejects a modified client, so mods are for private or single-player use.",
+                "Hard links are the default: the game folder and the staging folder are almost always on one drive, and nothing is copied twice when two sandboxes share a mod."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "440900"
+            ],
+            "names": [
+                "Conan Exiles"
+            ],
+            "markers": [
+                "ConanSandbox.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "description": "Mods deployed into the game folder.",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed: the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

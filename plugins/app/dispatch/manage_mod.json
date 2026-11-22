@@ -1,0 +1,65 @@
+{
+    "manifestVersion": 1,
+    "label": "Dispatch mod file (.pak, .ucas, .utoc)",
+    "description": "Unreal .pak files (with their .ucas/.utoc companions) in a ~mods folder inside Content/Paks.",
+    "match": {
+        "extensions": [
+            "pak",
+            "ucas",
+            "utoc"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "Dispatch/Content/Paks/~mods",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "Dispatch/Content/Paks/~mods"
+                }
+            },
+            {
+                "action": "move",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "Dispatch/Content/Paks/~mods/{fileName}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "Dispatch/Content/Paks/~mods/{fileName}"
+                }
+            }
+        ]
+    }
+}

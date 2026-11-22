@@ -1,0 +1,67 @@
+{
+    "manifestVersion": 1,
+    "label": "Kingdom Come: Deliverance sandboxes",
+    "description": "How Kingdom Come: Deliverance sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "Mods"
+                }
+            ],
+            "notes": [
+                "The Mods folder does not exist in a fresh install; it is created on first deploy. Each mod is one folder with a mod.manifest.",
+                "The game only loads mods listed in Mods/mod_order.txt when that file exists - add the folder name there if a mod does not appear.",
+                "Saves are in Saved Games/kingdomcome/saves, outside the install.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "379430"
+            ],
+            "gogProductIds": [
+                "1719198803"
+            ],
+            "epicAppNames": [
+                "Eel"
+            ],
+            "names": [
+                "Kingdom Come: Deliverance"
+            ],
+            "markers": [
+                "bin/Win64/KingdomCome.exe",
+                "Data"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

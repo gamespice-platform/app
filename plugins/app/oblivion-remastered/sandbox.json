@@ -1,0 +1,61 @@
+{
+    "manifestVersion": 1,
+    "label": "Oblivion Remastered sandboxes",
+    "description": "How Oblivion Remastered sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "archive",
+                    "relPath": "OblivionRemastered/Content/Paks/~mods"
+                }
+            ],
+            "notes": [
+                "This is a different game from the original Oblivion and does not read the original's Data folder the same way.",
+                "UE4SS script mods go in OblivionRemastered/Binaries/Win64/ue4ss/Mods and OBSE64 plugins have their own folder; neither is handled by this rule.",
+                "Saves are in Documents/My Games/Oblivion Remastered/Saved/SaveGames.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "2623190"
+            ],
+            "names": [
+                "Oblivion Remastered"
+            ],
+            "markers": [
+                "OblivionRemastered.exe",
+                "OblivionRemastered"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

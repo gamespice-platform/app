@@ -1,0 +1,72 @@
+{
+    "manifestVersion": 1,
+    "label": "Victoria 3 mod (.zip)",
+    "description": "A mod unpacked into mod/<id> in the game's documents folder, plus the mod/<id>.mod descriptor beside it that points at that folder. Paradox games find mods by those descriptor files, not by scanning the folder, which is why this rule writes one. The archive is expected to hold the mod's own files at its root (descriptor.mod, .metadata/ and the content folders); an archive with one extra wrapper folder needs it removed first.",
+    "match": {
+        "extensions": [
+            "zip",
+            "7z"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "mod",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "extract",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "mod/{itemId}"
+                }
+            },
+            {
+                "action": "writeText",
+                "path": {
+                    "root": "gameDir",
+                    "path": "mod/{itemId}.mod"
+                },
+                "content": "name=\"{itemName}\"\npath=\"mod/{itemId}\"\n"
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "mod/{itemId}.mod"
+                }
+            },
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "mod/{itemId}"
+                }
+            }
+        ]
+    }
+}

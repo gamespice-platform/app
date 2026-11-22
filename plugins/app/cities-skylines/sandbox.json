@@ -1,0 +1,69 @@
+{
+    "manifestVersion": 1,
+    "label": "Cities: Skylines sandboxes",
+    "description": "How Cities: Skylines sandboxes deploy, and how to find the game on this machine.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "direct",
+            "supportedStrategies": [
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "Addons/Mods"
+                }
+            ],
+            "notes": [
+                "Point this sandbox at the Colossal Order/Cities_Skylines folder in your local app data, not at the Steam install.",
+                "Mods live in Addons/Mods, one folder each.",
+                "Copying is the default: that folder is usually on a different drive from the staging folder, which hard links cannot cross."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "255710"
+            ],
+            "names": [
+                "Cities: Skylines",
+                "Cities_Skylines"
+            ],
+            "markers": [
+                "Addons/Mods",
+                "Addons"
+            ],
+            "paths": {
+                "windows": [
+                    "<localAppData>/Colossal Order/Cities_Skylines"
+                ],
+                "linux": [
+                    "~/.local/share/Colossal Order/Cities_Skylines"
+                ],
+                "macos": [
+                    "~/Library/Application Support/Colossal Order/Cities_Skylines"
+                ]
+            }
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text"
+            }
+        ]
+    }
+}

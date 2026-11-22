@@ -1,0 +1,59 @@
+{
+    "manifestVersion": 1,
+    "label": "Final Fantasy VII Rebirth sandboxes",
+    "description": "How Final Fantasy VII Rebirth sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "archive",
+                    "relPath": "End/Content/Paks/~Mods"
+                }
+            ],
+            "notes": [
+                "Files load alphabetically, so a numeric prefix on the file name chooses load order.",
+                "DLL-based mods go in End/Binaries/Win64 and are not handled by this rule.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "2909400"
+            ],
+            "names": [
+                "Final Fantasy VII Rebirth"
+            ],
+            "markers": [
+                "End/Binaries/Win64/ff7rebirth_.exe"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

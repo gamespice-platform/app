@@ -1,0 +1,73 @@
+{
+    "manifestVersion": 1,
+    "label": "Star Wars: Knights of the Old Republic mod file",
+    "description": "A loose asset straight into Override, which the engine reads before its own archives.",
+    "match": {
+        "extensions": [
+            "2da",
+            "tga",
+            "mdl",
+            "mdx",
+            "tpc",
+            "utc",
+            "uti",
+            "dds",
+            "wav",
+            "ncs",
+            "nss"
+        ]
+    },
+    "permissions": {
+        "fs": [
+            {
+                "root": "pluginData",
+                "path": "",
+                "write": true
+            },
+            {
+                "root": "gameDir",
+                "path": "Override",
+                "write": true
+            }
+        ]
+    },
+    "manage": {
+        "install": [
+            {
+                "action": "download",
+                "url": "{fileUrl}",
+                "to": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                }
+            },
+            {
+                "action": "mkdir",
+                "path": {
+                    "root": "gameDir",
+                    "path": "Override"
+                }
+            },
+            {
+                "action": "move",
+                "from": {
+                    "root": "pluginData",
+                    "path": "staging/{itemId}/{fileName}"
+                },
+                "to": {
+                    "root": "gameDir",
+                    "path": "Override/{fileName}"
+                }
+            }
+        ],
+        "uninstall": [
+            {
+                "action": "remove",
+                "path": {
+                    "root": "gameDir",
+                    "path": "Override/{fileName}"
+                }
+            }
+        ]
+    }
+}

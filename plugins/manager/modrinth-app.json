@@ -1,0 +1,40 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "modrinth-app",
+        "label": "Modrinth App",
+        "homepage": "https://modrinth.com/app",
+        "notes": [
+            "Each profile is a folder under profiles/ with its own mods folder (app-lib dirs.rs: INSTANCES_FOLDER_NAME = 'profiles', identifier ModrinthApp)."
+        ],
+        "roots": [
+            {
+                "platform": "windows",
+                "base": "appData",
+                "path": "ModrinthApp"
+            },
+            {
+                "platform": "linux",
+                "base": "localData",
+                "path": "ModrinthApp"
+            },
+            {
+                "platform": "macos",
+                "base": "config",
+                "path": "ModrinthApp"
+            }
+        ],
+        "layout": {
+            "modsPath": "profiles/*/mods",
+            "entry": "archive",
+            "ignore": []
+        },
+        "games": [
+            {
+                "dir": "minecraft",
+                "slug": "minecraft",
+                "relPath": "mods"
+            }
+        ]
+    }
+}

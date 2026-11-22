@@ -1,0 +1,83 @@
+{
+    "manifestVersion": 1,
+    "label": "Gunman Contracts - Stand Alone sandboxes",
+    "description": "How Gunman Contracts - Stand Alone sandboxes deploy, and how to find the game on this machine.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "loader_plugin",
+                    "relPath": "BepInEx/plugins"
+                },
+                {
+                    "type": "loader_patcher",
+                    "relPath": "BepInEx/patchers"
+                },
+                {
+                    "type": "loader_config",
+                    "relPath": "BepInEx/config"
+                }
+            ],
+            "notes": [
+                "BepInEx itself is not a mod and this app does not install it. Unpack it into the game folder once - the sandbox's plugins go under the BepInEx/plugins folder it creates.",
+                "Hard links are the default: the loader reads real files, the game folder and the staging folder are almost always the same drive, and nothing is copied twice when two sandboxes share a mod.",
+                "The loader writes each mod's settings into BepInEx/config the first time it runs. Those files belong to the game folder rather than to the sandbox.",
+                "Anti-cheat: if the game ships an anti-cheat that blocks injected loaders, launch it in the mode that disables it before using a sandbox. This rule set was derived from the r2modman and Gale game lists and has not been checked against every title."
+            ]
+        },
+        "detect": {
+            "steamAppIds": [
+                "2421750"
+            ],
+            "names": [
+                "Gunman Contracts - Stand Alone"
+            ],
+            "markers": [
+                "GunmanContracts.exe",
+                "GunmanContracts_Data"
+            ],
+            "paths": {
+                "windows": [
+                    "<programFiles>/Steam/steamapps/common/Gunman Contracts - Stand Alone"
+                ]
+            }
+        },
+        "presets": [
+            {
+                "id": "bepinex",
+                "label": "BepInEx",
+                "description": "The usual setup: mods loaded by the loader at startup.",
+                "environment": "client",
+                "loader": "bepinex"
+            },
+            {
+                "id": "vanilla",
+                "label": "Vanilla",
+                "description": "No loader. Nothing is deployed, which is how you check whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "consoleLog",
+                "label": "Show the BepInEx console",
+                "description": "Opens the loader's console window alongside the game. The first thing to turn on when a mod does not load.",
+                "type": "bool",
+                "default": false
+            },
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell.",
+                "type": "text"
+            }
+        ]
+    }
+}

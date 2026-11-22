@@ -1,0 +1,58 @@
+{
+    "manifestVersion": 1,
+    "label": "Starsector sandboxes",
+    "description": "How Starsector sandboxes deploy, and how to find the game on this machine. Paths: mo2.",
+    "sandbox": {
+        "deploy": {
+            "defaultStrategy": "hardlink",
+            "supportedStrategies": [
+                "hardlink",
+                "symlink",
+                "direct"
+            ],
+            "modTargets": [
+                {
+                    "type": "game_mod",
+                    "relPath": "mods"
+                }
+            ],
+            "notes": [
+                "Enable mods in the Starsector launcher's Mods tab after deploying - being in the folder is not enough.",
+                "Archives are unpacked flat into mods, so the zip must already contain the mod's own folder (with mod_info.json inside it), which is how Starsector mods are normally packaged.",
+                "Saves are in the saves folder of the game directory.",
+                "Hard links are the default: nothing is copied twice when two sandboxes share a mod, and every file is still a real file to the game."
+            ]
+        },
+        "detect": {
+            "names": [
+                "Starsector"
+            ],
+            "markers": [
+                "starsector.exe",
+                "starsector-core"
+            ]
+        },
+        "presets": [
+            {
+                "id": "default",
+                "label": "Modded",
+                "environment": "client"
+            },
+            {
+                "id": "clean",
+                "label": "Clean",
+                "description": "Nothing deployed - the vanilla game, for checking whether a bug is yours.",
+                "environment": "client",
+                "strategy": "direct"
+            }
+        ],
+        "options": [
+            {
+                "key": "launchArgs",
+                "label": "Additional launch arguments",
+                "type": "text",
+                "description": "Passed verbatim. One argument per space; nothing here goes through a shell."
+            }
+        ]
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "manifestVersion": 1,
+    "label": "Home Safety Hotline settings files",
+    "description": "Where MelonLoader keeps the settings each mod writes on first run.",
+    "config": {
+        "locations": [
+            {
+                "label": "Mod settings",
+                "root": "gameDir",
+                "path": "UserData",
+                "extensions": [
+                    "cfg",
+                    "json",
+                    "toml",
+                    "ini"
+                ],
+                "recursive": true
+            }
+        ]
+    }
+}

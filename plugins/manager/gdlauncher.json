@@ -1,0 +1,41 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "gdlauncher",
+        "label": "GDLauncher (legacy)",
+        "homepage": "https://github.com/gorilla-devs/GDLauncher",
+        "notes": [
+            "Covers the legacy Electron GDLauncher (gdlauncher_next data folder), whose instances sit in instances/<name>/mods.",
+            "The current GDLauncher Carbon stores instances elsewhere and is not covered."
+        ],
+        "roots": [
+            {
+                "platform": "windows",
+                "base": "appData",
+                "path": "gdlauncher_next"
+            },
+            {
+                "platform": "linux",
+                "base": "config",
+                "path": "gdlauncher_next"
+            },
+            {
+                "platform": "macos",
+                "base": "config",
+                "path": "gdlauncher_next"
+            }
+        ],
+        "layout": {
+            "modsPath": "instances/*/mods",
+            "entry": "archive",
+            "ignore": []
+        },
+        "games": [
+            {
+                "dir": "minecraft",
+                "slug": "minecraft",
+                "relPath": "mods"
+            }
+        ]
+    }
+}

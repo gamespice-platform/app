@@ -115,6 +115,8 @@ What belongs here instead is the shape of those rules, because it is what the ne
 | --- | --- | --- | --- |
 | Open-world RPGs + script extender | `skyrim`, `skyrim-se`, `skyrim-vr`, `fallout-3`, `fallout-4`, `fallout-new-vegas`, `oblivion`, `starfield`, `morrowind` | `Data/`, plus `Data/<XSE>/Plugins` for the extender's own DLLs | `hardlink` |
 | BepInEx | `valheim`, `vrising`, `sotf` | `BepInEx/plugins`, `patchers`, `config` | `hardlink` |
+| Thunderstore-ecosystem BepInEx games (r2modman/Gale lists) | about 260 more slugs, e.g. `riskofrain2`, `lethal-company` | `BepInEx/plugins`, `patchers`, `config` (a few use MelonLoader, Northstar, GDWeave, ReturnOfModding or similar loader folders) | `hardlink` |
+| Vortex and Mod Organizer 2 game lists | about 140 more slugs, one `game_mod`/`archive`/loader folder each | the folder that game's Vortex extension names | `hardlink` or `direct` |
 | One engine's `custom`/`addons` folder | `tf2`, `gmod` | `tf/custom`, `garrysmod/addons` | `hardlink` |
 | Plain `Mods/` folder | `rimworld`, `stardew-valley`, `mount-and-blade-2`, `witcher-3`, `7-days-to-die`, `palworld`, `kerbal-space-program`, `cyberpunk-2077` | one folder, named by the game | `hardlink` |
 | Instance model | `minecraft` | `mods`, `resourcepacks`, `shaderpacks`, `datapacks`, `config` | `direct` |

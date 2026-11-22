@@ -1,0 +1,83 @@
+{
+    "manifestVersion": 1,
+    "manager": {
+        "id": "gale-shim",
+        "label": "Gale (UE4SS shimloader)",
+        "homepage": "https://github.com/Kesomannen/gale",
+        "notes": [
+            "Reads Gale's profile folders: <data dir>/com.kesomannen.gale/<game>/profiles/<profile>. Nothing is moved.",
+            "Gale names each game folder with its own slug (an explicit one, or the kebab-cased game name), so a few folder names here are derived and worth checking on your machine.",
+            "One descriptor id per mod loader, because a descriptor has a single in-profile mods path.",
+            "Descriptor for games that use UE4SS shimloader: its mods live in shimloader/mod inside each profile."
+        ],
+        "roots": [
+            {
+                "platform": "windows",
+                "base": "appData",
+                "path": "com.kesomannen.gale"
+            },
+            {
+                "platform": "linux",
+                "base": "localData",
+                "path": "com.kesomannen.gale"
+            },
+            {
+                "platform": "macos",
+                "base": "config",
+                "path": "com.kesomannen.gale"
+            }
+        ],
+        "layout": {
+            "modsPath": "{game}/profiles/*/shimloader/mod",
+            "entry": "directory",
+            "ignore": [
+                "_state",
+                "MMHOOK"
+            ]
+        },
+        "games": [
+            {
+                "dir": "astroneer",
+                "slug": "astroneer",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "grain-rot",
+                "slug": "grain-rot",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "palworld",
+                "slug": "palworld",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "panicore",
+                "slug": "panicore",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "rv-there-yet",
+                "slug": "rv-there-yet",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "soulcalibur-vi",
+                "slug": "soulcalibur-vi",
+                "relPath": "shimloader/mod"
+            },
+            {
+                "dir": "windrose",
+                "slug": "windrose",
+                "relPath": "shimloader/mod"
+            }
+        ],
+        "metadata": {
+            "file": "manifest.json",
+            "name": "/name",
+            "version": "/version_number",
+            "author": "/author",
+            "website": "/website_url"
+        }
+    }
+}
