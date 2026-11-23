@@ -29,6 +29,12 @@ The GameSpice App's releases, newest first. A version here is the one in `packag
 - Fixed: `rusqlite` 0.40 to 0.41 (bundled SQLite, `libsqlite3-sys` 0.38 to 0.39), which clears RUSTSEC-2026-0459; the advisory ignore is gone from `audit.toml`.
 - New: `CREDITS.md` names the projects the rules were drafted from.
 
+## 0.5.17
+
+### Fixed
+
+- Android: the app no longer crashes on launch. The first network call needed a certificate verifier that was never set up on Android and aborted the app; it now checks servers against built-in trusted roots (verification stays on).
+
 ## 0.5.16
 
 ### Fixed
