@@ -60,15 +60,19 @@ export default function CreatePartyDialog({
 
             const party = await partyApi.create(built.request)
 
-            // The party stands even if an invite is refused; say so rather than undo it.
-            if (inviteUserIds?.length)
-                await partyApi.invite(party.id, inviteUserIds).catch(() => undefined)
+            // The party stands even if an invite is refused; the party page says so.
+            let inviteFailure: string | null = null
 
-            return party
+            if (inviteUserIds?.length)
+                await partyApi.invite(party.id, inviteUserIds).catch((e: unknown) => {
+                    inviteFailure = messageOf(e)
+                })
+
+            return { party, inviteFailure }
         },
-        () => {
+        ({ inviteFailure }) => {
             onClose()
-            void navigate('/party')
+            void navigate('/party', { state: inviteFailure ? { inviteFailure } : undefined })
         }
     )
 

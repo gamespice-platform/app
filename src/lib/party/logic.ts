@@ -206,3 +206,56 @@ export function mergePages<T extends { id: string }>(shown: T[], next: T[]): T[]
 
     return [...shown, ...next.filter((r) => !seen.has(r.id))]
 }
+
+/**
+ * How a ready-check connect link is opened. `https` goes to the system browser
+ * (`openUrl`, scoped to https); every other scheme (`steam://` and kin) is
+ * handed to Rust by server id, which checks it against `LAUNCH_SCHEMES`.
+ */
+export function connectRoute(href: string): 'web' | 'launch' {
+    return /^https:\/\//i.test(href.trim()) ? 'web' : 'launch'
+}
+
+/**
+ * The viewer's role in the party. Prefers the ready check's own `isMe` row,
+ * then the party roster by the signed-in user id (a hidden roster leaves the
+ * ready view without members, but the party payload still lists the host), and
+ * only then guesses from `canManage`.
+ */
+export function myPartyRole(
+    userId: string | null | undefined,
+    partyMembers: Pick<AppPartyMemberT, 'userId' | 'role'>[],
+    readyMembers: { isMe: boolean; role: string }[] | undefined,
+    canManage: boolean | undefined
+): string {
+    const fromReady = readyMembers?.find((m) => m.isMe)
+
+    if (fromReady) return fromReady.role
+
+    const fromParty = userId ? partyMembers.find((m) => m.userId === userId) : undefined
+
+    if (fromParty) return fromParty.role
+
+    return canManage ? 'CO_HOST' : 'MEMBER'
+}
+
+export type ModerationFlagsT = { hidden: boolean; nsfw: boolean; chatLocked: boolean }
+
+/** A moderation request carrying only the flags the staffer actually changed. */
+export function moderationRequest(
+    id: string,
+    flags: ModerationFlagsT,
+    touched: ReadonlySet<keyof ModerationFlagsT>,
+    end: boolean
+) {
+    const req: { id: string; hidden?: boolean; nsfw?: boolean; chatLocked?: boolean; end?: boolean } = {
+        id: id.trim(),
+    }
+
+    for (const key of ['hidden', 'nsfw', 'chatLocked'] as const)
+        if (touched.has(key)) req[key] = flags[key]
+
+    if (end) req.end = true
+
+    return req
+}

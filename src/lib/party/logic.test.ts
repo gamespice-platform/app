@@ -7,12 +7,15 @@ import {
     canManageRole,
     clampMinutes,
     clock,
+    connectRoute,
     countdownRemaining,
     invitableFriends,
     joinedMembers,
     kdRatio,
     memberPowers,
     mergePages,
+    moderationRequest,
+    myPartyRole,
     readyPercent,
     roleLabel,
     stageLabel,
@@ -162,5 +165,41 @@ describe('misc', () => {
             { id: '2' },
             { id: '3' },
         ])
+    })
+})
+
+describe('connectRoute', () => {
+    it('sends https to the browser and every other scheme to Rust', () => {
+        expect(connectRoute('https://play.example/join')).toBe('web')
+        expect(connectRoute('steam://connect/1.2.3.4:27015')).toBe('launch')
+        expect(connectRoute('http://insecure.example')).toBe('launch')
+    })
+})
+
+describe('myPartyRole', () => {
+    it('prefers the ready view, then the roster by user id, then canManage', () => {
+        const roster = [
+            { userId: 'h', role: 'HOST' },
+            { userId: 'm', role: 'MEMBER' },
+        ]
+
+        expect(myPartyRole('h', roster, [{ isMe: true, role: 'CO_HOST' }], true)).toBe('CO_HOST')
+        // Roster hidden in the ready view: the host is still the host.
+        expect(myPartyRole('h', roster, [], true)).toBe('HOST')
+        expect(myPartyRole('x', roster, undefined, true)).toBe('CO_HOST')
+        expect(myPartyRole(null, roster, undefined, false)).toBe('MEMBER')
+    })
+})
+
+describe('moderationRequest', () => {
+    const flags = { hidden: true, nsfw: false, chatLocked: false }
+
+    it('sends only the touched flags', () => {
+        expect(moderationRequest(' 7 ', flags, new Set(['hidden']), false)).toEqual({ id: '7', hidden: true })
+        expect(moderationRequest('7', flags, new Set(['nsfw']), false)).toEqual({ id: '7', nsfw: false })
+    })
+
+    it('sends none untouched, and end when asked', () => {
+        expect(moderationRequest('7', flags, new Set(), true)).toEqual({ id: '7', end: true })
     })
 })

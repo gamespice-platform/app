@@ -8,3 +8,6 @@ export const CHAT_BADGE_POLL_MS = 15_000
 
 /** A live-chat room (party, server, game). */
 export const LIVE_CHAT_POLL_MS = 4_000
+
+/** Every Nth live-chat poll reads the whole newest page, to pick up edits, deletions and reactions. */
+export const LIVE_CHAT_FULL_EVERY = 8

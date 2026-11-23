@@ -18,7 +18,7 @@ import type { PartyBrowseResponseT } from '~/lib/api/party-schemas'
 import { isUnavailable } from '~/lib/api/unavailable'
 import { useAuth } from '~/lib/auth/provider'
 import { messageOf } from '~/lib/ipc'
-import { stageLabel, typeLabel } from '~/lib/party/logic'
+import { moderationRequest, stageLabel, typeLabel, type ModerationFlagsT } from '~/lib/party/logic'
 import { usePartyMine } from '~/lib/party/use-party'
 
 /**
@@ -215,8 +215,11 @@ function ModerationPanel() {
     const [hidden, setHidden] = useState(false)
     const [nsfw, setNsfw] = useState(false)
     const [chatLocked, setChatLocked] = useState(false)
+    // Only flags the staffer changed are sent: an untouched box is "leave as is",
+    // not "clear", since the current flags are not loaded here.
+    const [touched, setTouched] = useState<ReadonlySet<keyof ModerationFlagsT>>(new Set())
     const act = usePartyAction((end: boolean) =>
-        partyApi.moderate({ id: id.trim(), hidden, nsfw, chatLocked, end: end || undefined })
+        partyApi.moderate(moderationRequest(id, { hidden, nsfw, chatLocked }, touched, end))
     )
     const unavailable = act.error != null && isUnavailable(act.error)
     const valid = /^\d+$/.test(id.trim())
@@ -240,17 +243,25 @@ function ModerationPanel() {
                         <div className="flex flex-wrap gap-4">
                             {(
                                 [
-                                    ['Hidden', hidden, setHidden],
-                                    ['NSFW', nsfw, setNsfw],
-                                    ['Chat locked', chatLocked, setChatLocked],
+                                    ['hidden', 'Hidden', hidden, setHidden],
+                                    ['nsfw', 'NSFW', nsfw, setNsfw],
+                                    ['chatLocked', 'Chat locked', chatLocked, setChatLocked],
                                 ] as const
-                            ).map(([label, value, set]) => (
-                                <label key={label} className="flex items-center gap-1.5">
-                                    <input type="checkbox" checked={value} onChange={(e) => set(e.target.checked)} />
+                            ).map(([key, label, value, set]) => (
+                                <label key={key} className="flex items-center gap-1.5">
+                                    <input
+                                        type="checkbox"
+                                        checked={value}
+                                        onChange={(e) => {
+                                            set(e.target.checked)
+                                            setTouched((t) => new Set(t).add(key))
+                                        }}
+                                    />
                                     {label}
                                 </label>
                             ))}
                         </div>
+                        <p className="text-[11px] text-muted">Only the flags you change are sent.</p>
                         <div className="flex gap-2">
                             <button type="button" className={BTN_PRIMARY} disabled={!valid || act.isPending} onClick={() => act.mutate(false)}>
                                 Apply flags

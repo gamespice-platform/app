@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { compareIds, mergeById, pollDelay } from './poll'
+import { compareIds, mergeById, pollDelay, reconcileNewest } from './poll'
 
 describe('pollDelay', () => {
     it('is the base interval until something fails', () => {
@@ -41,5 +41,35 @@ describe('ids and merging', () => {
         const held = [{ id: '1' }]
 
         expect(mergeById(held, [], (a, b) => compareIds(a.id, b.id))).toBe(held)
+    })
+})
+
+describe('reconcileNewest', () => {
+    const cmp = (a: { id: string }, b: { id: string }) => compareIds(a.id, b.id)
+    const row = (id: string, body = id) => ({ id, body })
+
+    it('replaces changed rows and drops ones deleted inside the page range', () => {
+        const held = [row('1'), row('2'), row('3'), row('4')]
+        const out = reconcileNewest(held, [row('2', 'two!'), row('4')], true, cmp)
+
+        expect(out).toEqual([row('1'), row('2', 'two!'), row('4')])
+    })
+
+    it('keeps older history when the room has more', () => {
+        expect(reconcileNewest([row('1'), row('5'), row('7')], [row('6'), row('8')], true, cmp).map((r) => r.id)).toEqual([
+            '1',
+            '5',
+            '6',
+            '8',
+        ])
+    })
+
+    it('drops everything absent when the page is the whole room', () => {
+        expect(reconcileNewest([row('1'), row('2')], [row('2')], false, cmp)).toEqual([row('2')])
+        expect(reconcileNewest([row('1')], [], false, cmp)).toEqual([])
+    })
+
+    it('keeps held rows when an empty page says there is more', () => {
+        expect(reconcileNewest([row('1')], [], true, cmp)).toEqual([row('1')])
     })
 })

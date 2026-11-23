@@ -17,7 +17,7 @@ import {
     threadTitle,
     unreadLabel,
 } from '~/lib/chat/chat-logic'
-import { useChatConversation, useChatThreads } from '~/lib/chat/use-chat'
+import { useChatConversation, useChatRequestCount, useChatThread, useChatThreads } from '~/lib/chat/use-chat'
 import { messageOf } from '~/lib/ipc'
 
 /**
@@ -49,9 +49,20 @@ function SignedIn() {
     const to = search.get('to')
     const [folder, setFolder] = useState<FolderT>('inbox')
     const threads = useChatThreads({ folder })
-    const requests = useChatThreads({ folder: 'requests' })
+    // The tab badge is the count endpoint; the requests list itself is only polled
+    // while that folder is showing (`threads`), never twice.
+    const requests = useChatRequestCount()
     const open = chatId != null || to != null
-    const requestCount = requests.data?.items.length ?? 0
+    const requestCount = requests.data ?? 0
+    const listed = chatId ? (threads.data?.items.find((t) => t.id === chatId) ?? null) : null
+    // A thread outside the folder on screen (a deep link, a request while on Inbox) is fetched alone.
+    const single = useChatThread(chatId ?? null, chatId != null && listed == null)
+    const thread = listed ?? single.data ?? null
+    const refreshLists = () => {
+        void threads.refresh()
+        void requests.refresh()
+        void single.refresh()
+    }
 
     if (threads.unavailable) return <ChatUnavailable />
 
@@ -86,7 +97,7 @@ function SignedIn() {
                     className={`min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface ${open ? 'flex' : 'hidden min-[860px]:flex'} flex-col`}
                 >
                     {chatId ? (
-                        <Conversation key={chatId} chatId={chatId} thread={findThread(threads.data?.items, requests.data?.items, chatId)} />
+                        <Conversation key={chatId} chatId={chatId} thread={thread} onActed={refreshLists} />
                     ) : to ? (
                         <Draft key={to} toUserId={to} />
                     ) : (
@@ -96,10 +107,6 @@ function SignedIn() {
             </div>
         </div>
     )
-}
-
-function findThread(a: ChatThreadT[] | undefined, b: ChatThreadT[] | undefined, id: string) {
-    return a?.find((t) => t.id === id) ?? b?.find((t) => t.id === id) ?? null
 }
 
 function ThreadList({
@@ -114,6 +121,42 @@ function ThreadList({
     const [extra, setExtra] = useState<ChatThreadT[]>([])
     const [cursor, setCursor] = useState<number | null | undefined>(undefined)
     const [moreError, setMoreError] = useState<string | null>(null)
+    const [pages, setPages] = useState(0)
+
+    // Pages added with "Load more" are not part of the polled first page, so re-read
+    // them (as many as were loaded) whenever the first page refreshes; otherwise a
+    // read, a decline or a new reply would stay stale below the fold.
+    const firstCursor = state.data?.nextCursor ?? null
+
+    useEffect(() => {
+        if (pages === 0 || firstCursor == null) return
+
+        let dead = false
+        const reload = async () => {
+            const all: ChatThreadT[] = []
+            let cur: number | null = firstCursor
+
+            for (let i = 0; i < pages && cur != null; i++) {
+                const p = await chatApi.threads({ folder, cursor: cur })
+
+                all.push(...p.items)
+                cur = p.nextCursor
+            }
+
+            if (!dead) {
+                setExtra(all)
+                setCursor(cur)
+            }
+        }
+
+        void reload().catch(() => undefined)
+
+        return () => {
+            dead = true
+        }
+        // `state.data` changes identity on every poll, which is the trigger.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.data, folder, pages])
 
     if (state.loading) return <p className="p-4 text-xs text-muted">Loading…</p>
     if (state.error)
@@ -166,6 +209,7 @@ function ThreadList({
                                 .then((p) => {
                                     setExtra((cur) => [...cur, ...p.items])
                                     setCursor(p.nextCursor)
+                                    setPages((n) => n + 1)
                                     setMoreError(null)
                                 })
                                 .catch((e: unknown) => setMoreError(messageOf(e)))
@@ -193,14 +237,25 @@ function Header({ title, children }: { title: string; children?: React.ReactNode
     )
 }
 
-function Conversation({ chatId, thread }: { chatId: string; thread: ChatThreadT | null }) {
+function Conversation({
+    chatId,
+    thread,
+    onActed,
+}: {
+    chatId: string
+    thread: ChatThreadT | null
+    onActed: () => void
+}) {
     const convo = useChatConversation(chatId)
     const [acted, setActed] = useState<string | null>(null)
+    const [confirmBlock, setConfirmBlock] = useState(false)
+    const [blocked, setBlocked] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const endRef = useRef<HTMLDivElement>(null)
     const count = convo.messages.length
     const rows = chatRows(convo.messages, (iso) => new Date(iso).toLocaleDateString())
     const other = thread && !thread.isGroup ? thread.others[0] : undefined
+    const otherName = other?.name ?? other?.username ?? 'this member'
 
     useEffect(() => {
         endRef.current?.scrollIntoView?.({ block: 'end' })
@@ -214,23 +269,56 @@ function Conversation({ chatId, thread }: { chatId: string; thread: ChatThreadT 
         try {
             await fn()
             setActed(name)
+            // The thread leaves (or joins) the Requests folder and the badge changes.
+            onActed()
+
+            return true
         } catch (e) {
             setError(messageOf(e))
+
+            return false
         }
     }
 
     return (
         <>
             <Header title={thread ? threadTitle(thread) : 'Conversation'}>
-                {other && (
-                    <button
-                        type="button"
-                        onClick={() => void act('block', () => chatApi.block(other.id))}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted hover:text-danger"
-                    >
-                        <FiSlash className="size-3" aria-hidden /> Block
-                    </button>
-                )}
+                {other &&
+                    (blocked ? (
+                        <button
+                            type="button"
+                            onClick={() =>
+                                void act('unblock', () => chatApi.block(other.id, false)).then((ok) => ok && setBlocked(false))
+                            }
+                            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted hover:text-foreground"
+                        >
+                            <FiSlash className="size-3" aria-hidden /> Unblock
+                        </button>
+                    ) : confirmBlock ? (
+                        <span role="group" aria-label={`Block ${otherName}`} className="flex items-center gap-1 text-[11px]">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setConfirmBlock(false)
+                                    void act('block', () => chatApi.block(other.id)).then((ok) => ok && setBlocked(true))
+                                }}
+                                className="rounded-md bg-danger px-2 py-1 text-white"
+                            >
+                                Block {otherName}
+                            </button>
+                            <button type="button" onClick={() => setConfirmBlock(false)} className="rounded-md border border-border px-2 py-1">
+                                Cancel
+                            </button>
+                        </span>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setConfirmBlock(true)}
+                            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted hover:text-danger"
+                        >
+                            <FiSlash className="size-3" aria-hidden /> Block
+                        </button>
+                    ))}
             </Header>
 
             {thread?.pending && (
@@ -248,7 +336,13 @@ function Conversation({ chatId, thread }: { chatId: string; thread: ChatThreadT 
             {(acted || error) && (
                 <p role={error ? 'alert' : 'status'} className={`px-3 py-1 text-xs ${error ? 'text-danger' : 'text-muted'}`}>
                     {error ??
-                        (acted === 'block' ? 'Blocked. Their messages will stop arriving.' : acted === 'accept' ? 'Request accepted.' : 'Request declined.')}
+                        (acted === 'block'
+                            ? 'Blocked. Their messages will stop arriving.'
+                            : acted === 'unblock'
+                              ? 'Unblocked.'
+                              : acted === 'accept'
+                                ? 'Request accepted.'
+                                : 'Request declined.')}
                 </p>
             )}
 

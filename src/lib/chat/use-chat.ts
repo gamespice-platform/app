@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 import { chatApi } from '~/lib/api/chat'
 import type {
     ChatMessageT,
+    ChatThreadT,
     ChatThreadsResponseT,
     ChatThreadsQueryT,
 } from '~/lib/api/chat-schemas'
@@ -30,6 +31,24 @@ export function useChatThreads(
         intervalMs: CHAT_BADGE_POLL_MS,
         enabled,
         key: `threads:${key}`,
+    })
+}
+
+/** Message requests waiting on an answer, for the Requests tab badge (one number, not a page of threads). */
+export function useChatRequestCount(enabled = true): PollStateT<number> {
+    return usePoll(() => chatApi.requestCount(), {
+        intervalMs: CHAT_BADGE_POLL_MS,
+        enabled,
+        key: 'request-count',
+    })
+}
+
+/** One thread by id, for a conversation opened from outside the listed folder. */
+export function useChatThread(chatId: string | null, enabled = true): PollStateT<ChatThreadT> {
+    return usePoll(() => chatApi.thread(chatId ?? ''), {
+        intervalMs: CHAT_BADGE_POLL_MS,
+        enabled: enabled && chatId != null,
+        key: `thread:${chatId ?? ''}`,
     })
 }
 

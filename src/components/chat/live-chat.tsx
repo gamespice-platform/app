@@ -92,7 +92,7 @@ export function LiveChat({
 
                 <ul className="flex flex-col gap-1.5">
                     {room.messages.map((m) => (
-                        <Line key={m.id} message={m} onReply={setReplyTo} onChanged={room.refresh} />
+                        <Line key={m.id} message={m} onReply={setReplyTo} onChanged={room.refreshFull} onEdit={room.edit} />
                     ))}
                 </ul>
                 <div ref={endRef} />
@@ -122,27 +122,33 @@ function Line({
     message: m,
     onReply,
     onChanged,
+    onEdit,
 }: {
     message: LiveChatMessageT
     onReply: (m: LiveChatMessageT) => void
     onChanged: () => Promise<void>
+    onEdit: (id: string, body: string) => Promise<void>
 }) {
     const [editing, setEditing] = useState(false)
     const [draft, setDraft] = useState(m.body)
     const [picking, setPicking] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const [failure, setFailure] = useState<{ text: string; unavailable: boolean } | null>(null)
     const state = lineState(m)
     const who = m.user?.name ?? m.user?.username ?? m.authorName ?? 'Someone'
 
     const run = async (fn: () => Promise<unknown>) => {
-        setError(null)
+        setFailure(null)
 
         try {
             await fn()
             await onChanged()
         } catch (e) {
-            setError(messageOf(e))
+            setFailure({ text: messageOf(e), unavailable: isUnavailable(e) })
+
+            return false
         }
+
+        return true
     }
 
     if (state.kind === 'deleted')
@@ -176,7 +182,8 @@ function Line({
 
                         const body = sendable(draft)
 
-                        if (body) void run(() => liveChatApi.edit(m.id, body)).then(() => setEditing(false))
+                        if (body)
+                            void run(() => onEdit(m.id, body)).then((ok) => ok && setEditing(false))
                     }}
                     className="flex gap-1"
                 >
@@ -251,9 +258,9 @@ function Line({
                     ))}
             </div>
 
-            {error && (
+            {failure && (
                 <p role="alert" className="text-[11px] text-danger">
-                    {isUnavailable(error) ? 'That action is not available yet.' : error}
+                    {failure.unavailable ? 'That action is not available yet.' : failure.text}
                 </p>
             )}
         </li>

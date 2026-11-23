@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { liveChatApi } from '~/lib/api/live-chat'
 import type {
@@ -7,9 +7,9 @@ import type {
     LiveChatMessageT,
     LiveChatTargetT,
 } from '~/lib/api/chat-schemas'
-import { compareIds, mergeById } from '~/lib/hooks/poll'
+import { compareIds, mergeById, reconcileNewest } from '~/lib/hooks/poll'
 import { usePoll, type PollStateT } from '~/lib/hooks/use-poll'
-import { LIVE_CHAT_POLL_MS } from './poll-intervals'
+import { LIVE_CHAT_FULL_EVERY, LIVE_CHAT_POLL_MS } from './poll-intervals'
 
 type RoomSlotT = {
     id: string
@@ -24,10 +24,16 @@ function foldRoom(
     id: string,
     cur: RoomSlotT,
     page: LiveChatListResponseT,
-    edge: 'poll' | 'older'
+    edge: 'poll' | 'older' | 'full'
 ): RoomSlotT {
     const base = cur.id === id ? cur : { id, ...EMPTY_ROOM }
-    const merged = mergeById(base.held, page.messages, byId)
+    const merged =
+        edge === 'full'
+            ? reconcileNewest(base.held, page.messages, page.hasMore, byId)
+            : mergeById(base.held, page.messages, byId)
+
+    // A full page of an already-seen room must not move the back edge or hasMore.
+    if (edge === 'full' && base.oldest !== null) return { ...base, held: merged }
 
     // The poll only sets the back edge once; paging back moves it.
     if (edge === 'poll' && base.oldest !== null) return { ...base, held: merged }
@@ -43,14 +49,20 @@ export type LiveRoomT = PollStateT<unknown> & {
     channel: LiveChatChannelT | null
     hasMore: boolean
     loadOlder: () => Promise<void>
+    /** Edit a message, fold the result in, and re-read the newest page. */
+    edit: (id: string, body: string) => Promise<void>
+    /** Re-read the whole newest page (not just `after`): after a delete, reaction or edit. */
+    refreshFull: () => Promise<void>
     post: (body: string, replyToId?: string | null) => Promise<void>
 }
 
 /**
  * A live-chat room as a subscription: the newest page first, then only
- * messages `after` the newest one held, every `LIVE_CHAT_POLL_MS`. Edits and
- * deletions to older lines arrive on the next full-page refresh, `refresh()`
- * after a post folds your own in at once.
+ * messages `after` the newest one held, every `LIVE_CHAT_POLL_MS`. Every
+ * `LIVE_CHAT_FULL_EVERY`th poll, and after any action (`refreshFull`), the whole
+ * newest page is read instead and reconciled by id, so edits, deletions,
+ * reactions and moderator hides to older lines show up. A post folds your own
+ * line in at once.
  */
 export function useLiveChat(target: LiveChatTargetT | null): LiveRoomT {
     const id = target ? `${target.scope}:${target.partyId ?? ''}:${target.serverId ?? ''}` : ''
@@ -68,18 +80,29 @@ export function useLiveChat(target: LiveChatTargetT | null): LiveRoomT {
 
     const newest = held.length > 0 ? held[held.length - 1]!.id : null
 
+    const ticks = useRef(0)
+    const wantFull = useRef(false)
+
     const fetcher = useCallback(async () => {
         if (!stable) throw new Error('No room')
 
-        return await liveChatApi.history(stable, newest ? { after: newest } : {})
+        ticks.current += 1
+
+        const full = !newest || wantFull.current || ticks.current % LIVE_CHAT_FULL_EVERY === 0
+
+        wantFull.current = false
+
+        const page = await liveChatApi.history(stable, full ? {} : { after: newest })
+
+        return { page, full }
     }, [stable, newest])
 
     const poll = usePoll(fetcher, {
         intervalMs: LIVE_CHAT_POLL_MS,
         enabled: stable != null,
         key: `live:${id}`,
-        onData: (page) => {
-            setSlot((cur) => foldRoom(id, cur, page, 'poll'))
+        onData: ({ page, full }) => {
+            setSlot((cur) => foldRoom(id, cur, page, full ? 'full' : 'poll'))
         },
     })
 
@@ -93,6 +116,25 @@ export function useLiveChat(target: LiveChatTargetT | null): LiveRoomT {
 
     const refresh = poll.refresh
 
+    const refreshFull = useCallback(async () => {
+        wantFull.current = true
+        await refresh()
+    }, [refresh])
+
+    const edit = useCallback(
+        async (msgId: string, body: string) => {
+            const made = await liveChatApi.edit(msgId, body)
+
+            setSlot((cur) => {
+                const base = cur.id === id ? cur : { id, ...EMPTY_ROOM }
+
+                return { ...base, held: mergeById(base.held, [made], byId) }
+            })
+            await refreshFull()
+        },
+        [id, refreshFull]
+    )
+
     const post = useCallback(
         async (body: string, replyToId?: string | null) => {
             if (!stable) return
@@ -104,9 +146,9 @@ export function useLiveChat(target: LiveChatTargetT | null): LiveRoomT {
 
                 return { ...base, held: mergeById(base.held, [made], byId) }
             })
-            await refresh()
+            await refreshFull()
         },
-        [stable, refresh, id]
+        [stable, refreshFull, id]
     )
 
     // The channel (can I post, and why not) changes rarely; fetch it once per room.
@@ -123,5 +165,5 @@ export function useLiveChat(target: LiveChatTargetT | null): LiveRoomT {
         { intervalMs: 60_000, enabled: stable != null, key: `channel:${id}` }
     )
 
-    return { ...poll, messages: held, channel, hasMore, loadOlder, post }
+    return { ...poll, messages: held, channel, hasMore, loadOlder, edit, refreshFull, post }
 }

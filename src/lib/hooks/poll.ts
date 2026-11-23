@@ -52,3 +52,30 @@ export function compareIds(a: string, b: string): number {
 
     return a < b ? -1 : a > b ? 1 : 0
 }
+
+/**
+ * Fold a full newest page (fetched without `after`) into the held list: rows in
+ * the page replace the held ones, and held rows that fall inside the page's id
+ * range but are absent from it are dropped, which is how a deletion arrives.
+ * Rows older than the page are kept; when the page is the whole room
+ * (`hasMore` false) nothing older exists, so anything absent is dropped.
+ * `page` is oldest first.
+ */
+export function reconcileNewest<T extends { id: string }>(
+    held: readonly T[],
+    page: readonly T[],
+    hasMore: boolean,
+    compare: (a: T, b: T) => number
+): T[] {
+    const ids = new Set(page.map((r) => r.id))
+    const first = page[0]
+    const kept = held.filter((r) => {
+        if (ids.has(r.id)) return false
+        if (!hasMore) return false
+
+        // An empty page that says there is more tells us nothing: keep what we hold.
+        return first === undefined || compare(r, first) < 0
+    })
+
+    return [...kept, ...page].sort(compare)
+}

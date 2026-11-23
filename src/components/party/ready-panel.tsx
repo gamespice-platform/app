@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { FiCheck, FiExternalLink, FiPlay } from 'react-icons/fi'
 
 import { partyApi } from '~/lib/api/party'
 import type { PartyReadyViewT } from '~/lib/api/party-schemas'
 import { messageOf } from '~/lib/ipc'
-import { clock, countdownRemaining, readyPercent, stageLabel } from '~/lib/party/logic'
+import { ipc } from '~/lib/ipc/commands'
+import { clock, connectRoute, countdownRemaining, readyPercent, stageLabel } from '~/lib/party/logic'
 import { BTN_DANGER, BTN_GHOST, BTN_PRIMARY, ErrorLine, Panel, usePartyAction } from './party-ui'
 
 /**
@@ -29,21 +31,61 @@ export default function ReadyPanel({
     const checking = view.stage === 'READY'
 
     useEffect(() => {
-        if (view.countdownSec == null) return
+        const total = view.countdownSec
+
+        if (total == null) return
 
         const began = performance.now()
-        const t = setInterval(() => setTick({ view, ms: performance.now() - began }), 500)
+        let t: ReturnType<typeof setInterval> | undefined
+        const stop = () => {
+            clearInterval(t)
+            t = undefined
+        }
+        const step = () => {
+            const ms = performance.now() - began
 
-        return () => clearInterval(t)
+            setTick({ view, ms })
+            // Nothing left to count: stop rather than re-render twice a second at 0:00.
+            if (ms / 1000 >= total) stop()
+        }
+        const start = () => {
+            if (t === undefined && !document.hidden) t = setInterval(step, 500)
+        }
+        // Hidden windows do not tick; coming back re-syncs at once.
+        const onVisibility = () => {
+            if (document.hidden) return stop()
+
+            step()
+            start()
+        }
+
+        document.addEventListener('visibilitychange', onVisibility)
+        start()
+
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibility)
+            stop()
+        }
     }, [view])
 
     const ready = usePartyAction((next: boolean) => partyApi.setReady(partyId, next), onChanged)
     const start = usePartyAction(() => partyApi.start(partyId, serverId ?? undefined), onChanged)
     const force = usePartyAction(() => partyApi.forceStart(partyId), onChanged)
     const cancel = usePartyAction(() => partyApi.cancelStart(partyId), onChanged)
-    const connected = usePartyAction(() => partyApi.connected(partyId), onChanged)
     const busy = ready.isPending || start.isPending || force.isPending || cancel.isPending
-    const error = ready.error ?? start.error ?? force.error ?? cancel.error ?? connected.error
+    // https opens in the system browser; any other scheme goes through Rust, which
+    // checks it against LAUNCH_SCHEMES (the webview's opener refuses it silently).
+    const connect = usePartyAction(async () => {
+        const c = view.connect
+
+        if (!c?.href) return
+
+        await partyApi.connected(partyId).catch(() => undefined)
+
+        if (connectRoute(c.href) === 'web') await openUrl(c.href)
+        else await ipc.playConnect(c.serverId)
+    }, onChanged)
+    const error = ready.error ?? start.error ?? force.error ?? cancel.error ?? connect.error
     const left = countdownRemaining(view, tick?.view === view ? tick.ms : 0)
     const pct = readyPercent(view)
 
@@ -110,16 +152,15 @@ export default function ReadyPanel({
                             Started on {view.connect.serverName ?? `server ${view.connect.serverId}`}.
                         </span>
                         {view.connect.href && (
-                            <a
+                            <button
+                                type="button"
                                 className={BTN_PRIMARY}
-                                href={view.connect.href}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                onClick={() => connected.mutate()}
+                                disabled={connect.isPending}
+                                onClick={() => connect.mutate()}
                             >
                                 <FiExternalLink className="size-3.5" aria-hidden />
                                 Connect
-                            </a>
+                            </button>
                         )}
                     </div>
                 )}
