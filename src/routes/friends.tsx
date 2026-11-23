@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import {
     FiCheck,
     FiLogOut,
+    FiMessageSquare,
     FiRefreshCw,
     FiServer,
     FiUserMinus,
@@ -286,6 +287,16 @@ function FriendRow({ friend }: { friend: FriendT }) {
                     </p>
                 )}
             </div>
+
+            <Link
+                to={`/messages?to=${encodeURIComponent(friend.userId)}`}
+                title={`Message ${friend.displayName}`}
+                aria-label={`Message ${friend.displayName}`}
+                className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] hover:border-accent"
+            >
+                <FiMessageSquare className="size-3" />
+                Message
+            </Link>
 
             {p.serverId != null && (
                 <Link

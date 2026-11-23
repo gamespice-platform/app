@@ -38,6 +38,13 @@ export const chatApi = {
     /** Total unread across every thread, for the badge. */
     unreadCount: () => get('/chat/unread', ChatUnreadResponse, undefined, true),
 
+    /** Answer a message request: accept opens the thread, decline closes it. Proposed route. */
+    respond: (chatId: string, accept: boolean) =>
+        send('POST', '/chat/request/respond', z.null(), { chatId, accept }),
+
+    /** Block (or unblock) a member: their messages stop arriving. Proposed route. */
+    block: (userId: string, on = true) => send('POST', '/chat/block', z.null(), { userId, on }),
+
     /** Message requests waiting on an answer. */
     requestCount: () => get('/chat/requests/count', ChatUnreadResponse, undefined, true),
 }

@@ -111,6 +111,14 @@ const router = createHashRouter([
             { path: 'discover', element: <DiscoverRoute /> },
             { path: 'apps/:id', element: <GameRoute /> },
             { path: 'friends', element: <FriendsRoute /> },
+            {
+                path: 'messages',
+                lazy: () => import('~/routes/messages').then((m) => ({ Component: m.default })),
+            },
+            {
+                path: 'messages/:chatId',
+                lazy: () => import('~/routes/messages').then((m) => ({ Component: m.default })),
+            },
             { path: 'browse/:kind', element: <BrowseRoute /> },
             { path: 'view/:kind/:id', element: <ViewRoute /> },
             { path: 'join', element: <JoinRoute /> },

@@ -19,6 +19,7 @@ import {
     FiUsers,
     FiBookOpen,
     FiAward,
+    FiMessageSquare,
     FiSmile,
 } from 'react-icons/fi'
 import type { IconType } from 'react-icons'
@@ -49,7 +50,7 @@ export type NavNode = {
      * rail at all: a queue nobody can see from another screen is one people
      * check by opening it, which is the thing a badge exists to save.
      */
-    badge?: 'downloads'
+    badge?: 'downloads' | 'messages'
     /** Children. Their parent is shown softly active while one of them is. */
     items?: NavNode[]
     /**
@@ -256,6 +257,15 @@ export const FRIENDS: NavNode = {
     description: 'Who is online and the party you are in.',
 }
 
+export const MESSAGES: NavNode = {
+    id: 'messages',
+    to: '/messages',
+    label: 'Messages',
+    icon: FiMessageSquare,
+    description: 'Direct messages and message requests.',
+    badge: 'messages',
+}
+
 export const CONSOLE: NavNode = {
     id: 'console',
     to: '/console',
@@ -281,6 +291,7 @@ export const RAIL: NavNode[] = [
     STORE,
     STATS,
     FRIENDS,
+    MESSAGES,
     CONSOLE,
     SETTINGS,
 ]

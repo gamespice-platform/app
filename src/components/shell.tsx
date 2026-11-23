@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { FiChevronRight, FiUser } from 'react-icons/fi'
 
+import { MessagesBadge } from '~/components/chat/unread-badge'
 import { useAuth } from '~/lib/auth/provider'
 import { useDownloads } from '~/lib/downloads/provider'
 import { useDeepLink } from '~/lib/hooks/use-deep-link'
@@ -113,6 +114,7 @@ function RailItem({
             <node.icon className="size-4 shrink-0" />
             <span className="truncate">{node.label}</span>
             {node.badge === 'downloads' && <DownloadsBadge />}
+            {node.badge === 'messages' && <MessagesBadge />}
         </>
     )
 

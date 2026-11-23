@@ -8,6 +8,7 @@ import {
     FiExternalLink,
     FiLayout,
     FiList,
+    FiMessageSquare,
     FiPause,
     FiPlay,
     FiSidebar,
@@ -15,6 +16,7 @@ import {
     FiUsers,
 } from 'react-icons/fi'
 
+import { LiveChat } from '~/components/chat/live-chat'
 import { api } from '~/lib/api/client'
 import type { ContentSummaryT } from '~/lib/api/contract'
 import { ipc, type QueryRequestT } from '~/lib/ipc/commands'
@@ -372,6 +374,7 @@ export default function MonitorRoute() {
             >
                 {showGraph && (
                     <GraphArea
+                        serverId={ident.serverId}
                         samples={feed.samples}
                         range={range}
                         paused={paused}
@@ -703,6 +706,7 @@ function Toolbar({
 // ------------------------------------------------------------------- Graph
 
 function GraphArea({
+    serverId,
     samples,
     range,
     paused,
@@ -711,6 +715,7 @@ function GraphArea({
     details,
     compact,
 }: {
+    serverId: number | null
     samples: MonitorSample[]
     range: RangeId
     paused: boolean
@@ -828,6 +833,7 @@ function GraphArea({
 
             {details && (
                 <SidePanel
+                    serverId={serverId}
                     result={result}
                     summary={summary}
                     paused={paused}
@@ -895,21 +901,24 @@ function StatCards({
 // -------------------------------------------------------------- Side panel
 
 function SidePanel({
+    serverId,
     result,
     summary,
     paused,
     wide,
 }: {
+    /** The site's id for the server; the Chat tab needs it, so it is hidden without. */
+    serverId: number | null
     result: ServerQueryResultT | null
     summary: ContentSummaryT | null
     paused: boolean
     wide: boolean
 }) {
-    const [tab, setTab] = useState<'players' | 'vars' | 'details'>('players')
+    const [tab, setTab] = useState<'players' | 'vars' | 'details' | 'chat'>('players')
     const players = result?.playerList ?? []
     const varCount = Object.keys(result?.rules ?? {}).length
 
-    const tabBtn = (id: 'players' | 'vars' | 'details', label: string, icon: React.ReactNode) => (
+    const tabBtn = (id: 'players' | 'vars' | 'details' | 'chat', label: string, icon: React.ReactNode) => (
         <button
             type="button"
             role="tab"
@@ -939,6 +948,7 @@ function SidePanel({
                     <FiList className="size-3.5" />,
                 )}
                 {tabBtn('details', 'Details', <FiSidebar className="size-3.5" />)}
+                {serverId !== null && tabBtn('chat', 'Chat', <FiMessageSquare className="size-3.5" />)}
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto">
@@ -946,6 +956,12 @@ function SidePanel({
                     <PlayerList players={players} result={result} paused={paused} />
                 ) : tab === 'vars' ? (
                     <VarsList result={result} />
+                ) : tab === 'chat' && serverId !== null ? (
+                    <LiveChat
+                        target={{ scope: 'SERVER', serverId }}
+                        label="Server chat"
+                        className="h-full"
+                    />
                 ) : (
                     <Details result={result} summary={summary} />
                 )}

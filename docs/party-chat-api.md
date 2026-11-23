@@ -57,3 +57,15 @@ Hooks: `usePartyMine`, `usePartyInvites`, `usePartyReady`, `useChatUnread`,
 
 Session-free `/api/app/v1` routes for the proposed paths above, with the
 envelope and string-id/ISO-date conventions the existing party routes use.
+
+## Chat screens
+
+`/messages` (`src/routes/messages.tsx`): inbox, message requests (accept or
+decline), block, conversation with polling; `/messages?to=<userId>` drafts a
+first message (the Friends rows link there). `<LiveChat target={...} />`
+(`src/components/chat/live-chat.tsx`) is the reusable room for party, server
+and game targets; the Monitor side panel mounts it as a Chat tab. Pure rules
+(composer keys, grouping, line states, rate-limit wait) are in
+`src/lib/chat/chat-logic.ts`. `chatApi.respond` and `chatApi.block` are proposed
+routes like the rest. Read receipts are not drawn: the thread payload carries
+no per-message read state.
