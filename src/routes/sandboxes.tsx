@@ -213,11 +213,11 @@ export default function SandboxesRoute() {
                 />
             )}
 
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+            <div className="flex flex-col gap-3">
                 {sandboxes.length > 0 && (
                     <nav
                         aria-label="Your sandboxes"
-                        className="flex flex-col gap-1.5"
+                        className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2"
                     >
                         {sandboxes.map((sandbox) => (
                             <button
