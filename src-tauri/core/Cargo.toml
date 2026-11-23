@@ -111,6 +111,12 @@ md-5 = "0.11"
 # is what makes them deterministic.
 ed25519-dalek = { version = "3", default-features = false }
 
+# Android only: the Mozilla root set compiled in. reqwest's default verifier
+# (rustls-platform-verifier) calls into the JVM and panics at the first TLS
+# handshake unless the app initialised it, which this one does not.
+[target.'cfg(target_os = "android")'.dependencies]
+webpki-roots = "1"
+
 # Stopping a running game. `Sessions::stop` signals by pid rather than through
 # `Child::kill`, because the supervisor thread holds the `&mut Child` for the
 # whole of its `wait` — see the comment there for why that is sound in exactly
