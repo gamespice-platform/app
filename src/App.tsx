@@ -18,6 +18,8 @@ import ConsoleRoute from '~/routes/console'
 import InstalledModsRoute from '~/routes/installed-mods'
 import GameRoute from '~/routes/game'
 import FriendsRoute from '~/routes/friends'
+import PartyRoute from '~/routes/party'
+import PartyBrowseRoute from '~/routes/party-browse'
 import BrowseRoute from '~/routes/browse'
 import JoinRoute from '~/routes/join'
 import LibraryRoute from '~/routes/library'
@@ -119,6 +121,8 @@ const router = createHashRouter([
                 path: 'messages/:chatId',
                 lazy: () => import('~/routes/messages').then((m) => ({ Component: m.default })),
             },
+            { path: 'party', element: <PartyRoute /> },
+            { path: 'party/browse', element: <PartyBrowseRoute /> },
             { path: 'browse/:kind', element: <BrowseRoute /> },
             { path: 'view/:kind/:id', element: <ViewRoute /> },
             { path: 'join', element: <JoinRoute /> },

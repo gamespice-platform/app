@@ -21,6 +21,7 @@ import {
     FiAward,
     FiMessageSquare,
     FiSmile,
+    FiUserPlus,
 } from 'react-icons/fi'
 import type { IconType } from 'react-icons'
 
@@ -255,6 +256,23 @@ export const FRIENDS: NavNode = {
     label: 'Friends',
     icon: FiUsers,
     description: 'Who is online and the party you are in.',
+    collapsible: true,
+    items: [
+        {
+            id: 'party',
+            to: '/party',
+            label: 'Party',
+            icon: FiUserPlus,
+            description: 'Your party, its invites and the ready check.',
+        },
+        {
+            id: 'party-browse',
+            to: '/party/browse',
+            label: 'Find a party',
+            icon: FiUsers,
+            description: 'Open parties, matchmaking and moderation.',
+        },
+    ],
 }
 
 export const MESSAGES: NavNode = {

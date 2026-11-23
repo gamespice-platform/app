@@ -8,6 +8,7 @@ import { GameIcon } from '~/components/game-icon'
 import { LiveLatency } from '~/components/server-live'
 import { requestFor, useLiveServer } from '~/lib/hooks/use-live-query'
 import { appLabel } from '~/lib/api/labels'
+import StartPartyButton from '~/components/party/start-party-button'
 import PlayDialog, { type PlayTargetT } from '~/components/play-dialog'
 import type { ContentSummaryT } from '~/lib/api/contract'
 
@@ -226,6 +227,14 @@ function ServerRow({
             >
                 Join
             </button>
+
+            {server.app && (
+                <StartPartyButton
+                    appId={server.app.id}
+                    appName={server.app.name}
+                    serverId={Number(server.id)}
+                />
+            )}
         </article>
     )
 }

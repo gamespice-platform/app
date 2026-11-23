@@ -43,6 +43,7 @@ import Dependencies from '~/components/dependencies'
 import Gallery from '~/components/gallery'
 import ReportButton from '~/components/report-button'
 import AddFriendButton from '~/components/add-friend-button'
+import StartPartyButton from '~/components/party/start-party-button'
 import Reviews from '~/components/reviews'
 import { LoadError } from '~/components/states'
 
@@ -374,6 +375,14 @@ export default function ViewRoute() {
                                 <FiPlay className="size-4" /> Play
                             </span>
                         </Button>
+                    )}
+
+                    {summary.kind === 'server' && summary.app && (
+                        <StartPartyButton
+                            appId={summary.app.id}
+                            appName={summary.app.name}
+                            serverId={Number(summary.id)}
+                        />
                     )}
 
                     {summary.kind === 'server' &&

@@ -23,6 +23,7 @@ import {
 } from '~/lib/api/social'
 import { useAuth } from '~/lib/auth/provider'
 import { messageOf } from '~/lib/ipc'
+import InviteToPartyButton from '~/components/party/invite-to-party-button'
 
 /**
  * **Friends** — who you play with, where they are, and the party you are in.
@@ -297,6 +298,7 @@ function FriendRow({ friend }: { friend: FriendT }) {
                 <FiMessageSquare className="size-3" />
                 Message
             </Link>
+            <InviteToPartyButton userId={friend.userId} displayName={friend.displayName} />
 
             {p.serverId != null && (
                 <Link
@@ -480,9 +482,9 @@ function PartySection({ party, error }: { party: PartyT | null; error: unknown }
         <Section title="Your party">
             <div className="flex flex-wrap items-center gap-2 p-2.5">
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
+                    <Link to="/party" className="block truncate text-sm font-medium hover:underline">
                         {party.name ?? `Party ${party.id}`}
-                    </p>
+                    </Link>
                     <p className="text-[11px] text-muted">
                         {party.stage.toLowerCase()} · {party.users}
                         {party.maxUsers ? `/${party.maxUsers}` : ''} players
