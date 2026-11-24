@@ -1,6 +1,8 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
-## Unreleased
+## 0.5.18
+
+- Changed: Downloads says what a game row is. An engine update reads "Godot engine 1.2026…" with "Engine update from <old version> · used by <your games>", a game reads "Game install" or "Game update from <old version>", and the expanded details add Version, Previous version, Platform, Used by and whether it was an automatic update or a manual request.
 
 - New: the monitor's Players table sorts by any column (click a header), and a new Vars tab lists every server variable with a filter and sortable Var and Value columns; Rules moved out of Details into it.
 

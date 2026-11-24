@@ -26,3 +26,17 @@ Three guarantees worth naming:
 Bandwidth is a token bucket (`download::rate`), composed as global × per download, both live-adjustable. A request larger than the bucket can hold is served by taking the balance negative rather than refused, because a downloader whose chunk size it does not control would otherwise hang.
 
 The device reports a SNAPSHOT of its queue to `/api/app/v1/downloads` so the website can show it. That row never drives anything — there is deliberately no endpoint that tells a device to pause or cancel — and it carries no URLs and no filesystem paths.
+
+## What a game row says
+
+A game build row is labelled by `games::describe`, from the install itself. The label stays short ("Godot engine 1.20261123.0005"); the rest travels in `meta` and the Downloads screen renders it (`src/lib/download-info.ts`).
+
+| meta key | values |
+| --- | --- |
+| `kind`, `appId` | `game`, the installed app's id |
+| `role` | `engine` when installed games run on this app's build, else `game` |
+| `action` | `update` when an installed row exists, else `install` |
+| `version`, `fromVersion` | the new build, and the one it replaces |
+| `platform` | the platform the build is for |
+| `usedBy` | names of installed games whose engine is this app |
+| `reason` | `automatic` (the update run) or `manual` (the Install button) |
