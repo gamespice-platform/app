@@ -163,7 +163,12 @@ pub async fn run(
         }
 
         match games
-            .install(row.app_id, &row.name, row.slug.as_deref())
+            .install(
+                row.app_id,
+                &row.name,
+                row.slug.as_deref(),
+                super::describe::Trigger::Automatic,
+            )
             .await
         {
             Ok(updated) => report

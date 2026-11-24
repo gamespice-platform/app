@@ -20,6 +20,7 @@ import { type DownloadT } from '~/lib/ipc/schemas'
 import Select from '~/components/select'
 import { ItemThumb } from '~/components/item-thumb'
 import { useLibrary } from '~/lib/library/provider'
+import { downloadInfo } from '~/lib/download-info'
 import SpeedGraph from '~/components/speed-graph'
 
 /**
@@ -177,6 +178,8 @@ function DownloadCard({ download }: { download: DownloadT }) {
     const done = download.status === 'done'
     const running = download.status === 'running'
 
+    const info = downloadInfo(download.meta)
+
     return (
         <article
             className={`rounded-xl border bg-surface p-3 ${
@@ -218,6 +221,15 @@ function DownloadCard({ download }: { download: DownloadT }) {
                             {download.label}
                         </p>
                     </div>
+
+                    {info.subtitle && (
+                        <p
+                            className="mt-0.5 truncate text-[0.7rem]"
+                            title={info.subtitle}
+                        >
+                            {info.subtitle}
+                        </p>
+                    )}
 
                     <p className="mt-0.5 text-[0.7rem] text-muted">
                         <StatusText download={download} />
@@ -327,6 +339,14 @@ function DownloadCard({ download }: { download: DownloadT }) {
                             }
                         />
                         <Detail label="Queued" value={download.queuedAt} />
+                        {info.details.map((d) => (
+                            <Detail
+                                key={d.label}
+                                label={d.label}
+                                value={d.value}
+                                wrap={d.label === 'Used by'}
+                            />
+                        ))}
                     </dl>
 
                     <div className="flex flex-wrap items-center gap-3">

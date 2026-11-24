@@ -59,6 +59,7 @@
 //! engine works on it unchanged — `dir` is a game directory like any other.
 
 pub mod build;
+pub mod describe;
 pub mod platform;
 pub mod updates;
 
@@ -222,6 +223,40 @@ impl Games {
         Ok(Some(build))
     }
 
+    /// Names of the installed games that run on `app_id` as their engine.
+    ///
+    /// Best effort and display only: an unreachable catalogue means the row
+    /// reads as a plain game, never that the install fails.
+    async fn engine_users(&self, app_id: i64) -> Vec<String> {
+        let Ok(installed) = self.installed() else {
+            return Vec::new();
+        };
+
+        let others: Vec<String> = installed
+            .iter()
+            .filter(|g| g.app_id != app_id)
+            .map(|g| g.app_id.to_string())
+            .collect();
+
+        if others.is_empty() {
+            return Vec::new();
+        }
+
+        match self
+            .api
+            .request(
+                Method::GET,
+                &format!("/apps?ids={}&limit={}", others.join(","), others.len()),
+                None,
+                false,
+            )
+            .await
+        {
+            Ok(answer) => describe::users_of(&answer, app_id, &installed),
+            Err(_) => Vec::new(),
+        }
+    }
+
     pub fn installed(&self) -> AppResult<Vec<InstalledGame>> {
         self.db.games()
     }
@@ -247,6 +282,7 @@ impl Games {
         app_id: i64,
         name: &str,
         slug: Option<&str>,
+        trigger: describe::Trigger,
     ) -> AppResult<InstalledGame> {
         let Some(platform) = self.platform() else {
             return Err(AppError::invalid(
@@ -305,22 +341,29 @@ impl Games {
          * deterministic id means a retry is the same row rather than a second
          * writer for one file.
          */
+        let previous = self.get(app_id)?.map(|row| row.version);
+        let used_by = self.engine_users(app_id).await;
+        let (label, meta) = describe::describe(
+            app_id,
+            name,
+            &build.version,
+            platform.as_str(),
+            previous.as_deref(),
+            &used_by,
+            trigger,
+        );
+
         self.downloads
             .run_to_completion(DownloadRequest {
                 id: format!("game:{app_id}:{version}"),
                 url: build.url.clone(),
                 dest: archive.clone(),
-                label: format!("{name} {}", build.version),
+                label,
                 sha256: Some(build.sha256.clone()),
                 size_hint: Some(build.size_bytes),
                 priority: 0,
                 limit_bps: None,
-                meta: [
-                    ("kind".to_string(), "game".to_string()),
-                    ("appId".to_string(), app_id.to_string()),
-                ]
-                .into_iter()
-                .collect(),
+                meta: meta.into_iter().collect(),
             })
             .await?;
 

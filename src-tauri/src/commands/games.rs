@@ -112,7 +112,12 @@ pub async fn game_install(
 
     state
         .games
-        .install(request.app_id, &request.name, request.slug.as_deref())
+        .install(
+            request.app_id,
+            &request.name,
+            request.slug.as_deref(),
+            tmc_core::games::describe::Trigger::Manual,
+        )
         .await
 }
 
