@@ -2,6 +2,14 @@
     "$schema": "../../../schemas/loader-manifest.v1.schema.json",
     "app": "minecraft",
     "artifacts": {
+        "installer": {
+            "description": "The Quilt installer",
+            "platform": "any",
+            "sides": [
+                "server"
+            ],
+            "urlTemplate": "https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer/{var.installerVersion}/quilt-installer-{var.installerVersion}.jar"
+        },
         "profileJson": {
             "description": "Launcher profile JSON, mirrored by the importer",
             "platform": "any",
@@ -11,15 +19,27 @@
             "sourceTemplate": "https://meta.quiltmc.org/v3/versions/loader/{gameVersion}/{loaderVersion}/profile/json"
         }
     },
-    "downloadHosts": [],
+    "downloadHosts": [
+        "maven.quiltmc.org"
+    ],
     "id": "minecraft/loader/quilt",
     "kind": "loader",
     "launch": {
         "vars": [
-            "launchVersionId"
+            "launchVersionId",
+            "serverJar"
         ]
     },
     "loader": "quilt",
+    "requirements": {
+        "runtimes": [
+            {
+                "for": "install",
+                "kind": "java",
+                "major": "{var.javaMajor}"
+            }
+        ]
+    },
     "requires": [
         "minecraft/version"
     ],
@@ -36,11 +56,48 @@
             "when": {
                 "side": "client"
             }
+        },
+        {
+            "action": "download",
+            "artifact": "installer",
+            "to": {
+                "path": "quilt-installer-{var.installerVersion}.jar",
+                "root": "downloads"
+            },
+            "when": {
+                "side": "server"
+            }
+        },
+        {
+            "action": "runInstaller",
+            "args": [
+                "-jar",
+                "{artifact.installer}",
+                "install",
+                "server",
+                "{gameVersion}",
+                "{loaderVersion}",
+                "--download-server",
+                "--install-dir={layerFiles}"
+            ],
+            "cwd": "{layerWork}",
+            "expectFiles": [
+                {
+                    "path": "files/quilt-server-launch.jar",
+                    "root": "layer"
+                }
+            ],
+            "network": true,
+            "program": "{runtime.java}",
+            "timeoutSecs": 1800,
+            "when": {
+                "side": "server"
+            }
         }
     ],
     "title": "Quilt",
     "vars": {
-        "launchVersionId": "quilt-loader-{loaderVersion}-{gameVersion}"
-    },
-    "x-tmc-placeholder": "Quilt servers are installed by quilt-installer 'install server'; needs an exec step and a signed template"
+        "launchVersionId": "quilt-loader-{loaderVersion}-{gameVersion}",
+        "serverJar": "quilt-server-launch.jar"
+    }
 }

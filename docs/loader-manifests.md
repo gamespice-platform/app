@@ -247,17 +247,17 @@ The repository is the source of truth for **templates** (`*.manifest.json`). The
 
 ## What blocks a release
 
-`.github/workflows/release.yml` runs `npm run manifests:check -- --release` in its `manifests` job, and `build`, `android` and `ios` need that job, so a tag whose manifests still carry a placeholder or the test key builds nothing and publishes nothing. On this branch `--release` fails with 12 problems on purpose. The internal Forgejo CI runs the same `--release` check on every push as an informational `manifests` job (it prints `RELEASE GATE: CLOSED` and the problem count without failing the run), so the state is visible before a tag; `release.yml` still enforces it. Every artifact needs the gate, including Android and iOS: `src-tauri/core/build.rs` compiles `manifests/**` and the exec key list into `tmc-core`, which all three build. None of them can be closed from the repository alone, and none is faked:
+`.github/workflows/release.yml` runs `npm run manifests:check -- --release` in its `manifests` job, and `build`, `android` and `ios` need that job, so a tag whose manifests still carry a placeholder or the test key builds nothing and publishes nothing. The manifest blockers are closed:
 
-| Blocker | Where | What closes it |
-| --- | --- | --- |
-| The real exec key | `manifests/keys/exec-keys.json` lists only `tmc-exec-test` (one marker, one `test-key`) | The owner creates the offline Ed25519 exec key, adds its public half and removes the test key. The key file is compiled in, and a plan served by the site is verified against these built-in keys only (`catalog_end_to_end.rs`, `a_served_plan_signed_by_a_foreign_key_is_refused`), so the release binary trusts exactly what this file lists |
-| Re-signing | `forge.manifest.json.sig`, `neoforge.manifest.json.sig` (one marker and one `test-key` each) | `npm run manifests:sign` with the owner's key, after the manifests below are final. Any change to a signed manifest needs this again |
-| Legacy Forge | `forge.manifest.json` `/requirements` | Either a template for the pre-1.13 installer layout, or an accepted statement that only 1.13 and later are built; then the marker goes |
-| Forge server `expectFiles` | `forge.manifest.json` `/steps/4` | A server install of each line from 1.17 to 1.21, confirming `run.sh` (older lines write `forge-*.jar`) |
-| NeoForge installer flags | `neoforge.manifest.json` `/steps/2`, `/steps/4` | `java -jar <installer> --help` on the 20.4, 21.1 and 21.4 lines |
-| NeoForge for 1.20.1 | `neoforge.manifest.json` (top level) | A template for `net/neoforged/forge`, or an accepted statement that 1.20.1 is not built |
-| Quilt server install | `quilt.manifest.json` (top level) | An exec step for `quilt-installer install server`, signed like the others |
+| Was | Closed by |
+| --- | --- |
+| The test exec key | `manifests/keys/exec-keys.json` lists only `tmc-exec-2026`. Its private half is an offline file (`$TMC_EXEC_SIGNING_KEY`), never in the repository |
+| Re-signing | `forge`, `neoforge` and `quilt` `.manifest.json.sig` are signed by `tmc-exec-2026`; any change to those manifests needs `npm run manifests:sign` again |
+| Legacy Forge | Accepted: only Forge 1.13 and later is built (`minGameVersion`) |
+| Forge server `expectFiles` | Verified: server installs of 1.17.1, 1.18.2, 1.19.4, 1.20.1, 1.21.1 and 1.21.4 all write `run.sh` |
+| NeoForge installer flags | Verified with `--help` and real server installs on 20.4.237, 21.1.172 and 21.4.140: `--installClient` and `--installServer` |
+| NeoForge for 1.20.1 | Accepted: 1.20.1 (`net/neoforged/forge`) is not built |
+| Quilt server install | `quilt-installer install server` runs as a signed exec step (verified with installer 0.15.1; writes `quilt-server-launch.jar`) |
 
 Two more block a release and are not checked by any job, because neither can be checked from Linux CI:
 

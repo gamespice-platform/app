@@ -27,8 +27,7 @@
                 "kind": "java",
                 "major": "{var.javaMajor}"
             }
-        ],
-        "x-tmc-placeholder": "legacy Forge before 1.13 uses another installer layout; the importer only creates builds for 1.13 and later"
+        ]
     },
     "requires": [
         "minecraft/version"
@@ -108,8 +107,7 @@
             "timeoutSecs": 1800,
             "when": {
                 "side": "server"
-            },
-            "x-tmc-placeholder": "verify expectFiles across 1.17-1.21 server installs; older ones write a forge-*.jar instead of run.sh"
+            }
         }
     ],
     "title": "Forge",
