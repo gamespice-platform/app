@@ -49,13 +49,13 @@ describe('exec manifest signatures', () => {
     })
 
     for (const loader of ['forge', 'neoforge']) {
-        it(`holds ${loader}'s seed to its test-key signature, which a one-byte edit breaks`, () => {
+        it(`holds ${loader}'s manifest to its real-key signature, which a one-byte edit breaks`, () => {
             const file = path.join(ROOT, `manifests/minecraft/loaders/${loader}.manifest.json`)
             const keys = parse(fs.readFileSync(path.join(ROOT, 'manifests/keys/exec-keys.json'), 'utf8'))
             const text = fs.readFileSync(file, 'utf8')
             const sig = parse(fs.readFileSync(`${file}.sig`, 'utf8'))
-            expect(sig.keyId).toBe(TEST_KEY_ID)
-            expect(sig['x-tmc-placeholder']).toBeTruthy()
+            expect(sig.keyId).toBe('tmc-exec-2026')
+            expect(sig['x-tmc-placeholder']).toBeUndefined()
             expect(verifySignature(parse(text), sig, keys)).toBeNull()
 
             const edited = text.replace('"timeoutSecs": 900', '"timeoutSecs": 901')

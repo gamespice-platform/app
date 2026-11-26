@@ -11,29 +11,10 @@ describe('manifests:check', () => {
         expect(files).toBeGreaterThan(10)
     })
 
-    it('--release lists every placeholder marker and every use of the test key', () => {
+    it('--release passes: the real exec key signs the loader manifests and no placeholder remains', () => {
         const { problems, markers } = checkRepository(undefined, true)
-        expect(problems).toEqual(markers)
-        const where = (code) => problems.filter((p) => p.code === code).map((p) => `${p.file} ${p.where}`)
-        expect(where('test-key').sort()).toEqual([
-            'manifests/keys/exec-keys.json ',
-            'manifests/minecraft/loaders/forge.manifest.json.sig /keyId',
-            'manifests/minecraft/loaders/neoforge.manifest.json.sig /keyId',
-        ])
-        const markerFiles = new Set(where('placeholder-marker').map((w) => w.split(' ')[0]))
-        for (const f of [
-            'manifests/keys/exec-keys.json',
-            'manifests/minecraft/loaders/forge.manifest.json',
-            'manifests/minecraft/loaders/forge.manifest.json.sig',
-            'manifests/minecraft/loaders/neoforge.manifest.json',
-            'manifests/minecraft/loaders/neoforge.manifest.json.sig',
-            'manifests/minecraft/loaders/quilt.manifest.json',
-        ]) {
-            expect(markerFiles).toContain(f)
-        }
-        expect(where('placeholder-marker')).toContain(
-            'manifests/minecraft/loaders/forge.manifest.json /requirements/x-tmc-placeholder',
-        )
+        expect(markers).toEqual([])
+        expect(problems).toEqual([])
     })
 
     it('runs every ok fixture clean and fails every bad one with its own code', () => {
