@@ -157,7 +157,12 @@ export default function ServerTable({
     sort,
     sortDir,
     onSort,
+    padTop = 0,
+    padBottom = 0,
 }: {
+    /** Spacer heights (px) standing in for rows the caller's window left out. */
+    padTop?: number
+    padBottom?: number
     items: ContentSummaryT[]
     sort: BrowseSortT
     sortDir: 'asc' | 'desc'
@@ -351,6 +356,11 @@ export default function ServerTable({
                     </thead>
 
                     <tbody>
+                        {padTop > 0 && (
+                            <tr aria-hidden style={{ height: padTop }} data-spacer>
+                                <td colSpan={99} className="p-0" />
+                            </tr>
+                        )}
                         {items.map((item) => (
                             <ServerRow
                                 key={`${item.kind}-${item.id}`}
@@ -361,6 +371,11 @@ export default function ServerTable({
                                 joinable={canJoin(item)}
                             />
                         ))}
+                        {padBottom > 0 && (
+                            <tr aria-hidden style={{ height: padBottom }} data-spacer>
+                                <td colSpan={99} className="p-0" />
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

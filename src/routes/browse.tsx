@@ -40,6 +40,11 @@ import BrowseFilters from '~/components/browse-filters'
 import Select from '~/components/select'
 import ContentCard from '~/components/content-card'
 import ServerTable from '~/components/server-table'
+import { scrollParent, useListWindow } from '~/lib/hooks/use-list-window'
+import { dedupeById, pageMadeProgress, shouldFetchNext } from '~/lib/paging'
+
+/** Start loading the next page this far (px) before the end, once the user scrolls. */
+const PAGE_MARGIN = 1500
 
 /**
  * The browser, for every content kind.
@@ -471,69 +476,115 @@ export default function BrowseRoute() {
     }, [search, setSearch])
 
     /*
-     * Sentinel-driven paging, so the list loads before the user hits the end.
+     * Paging on real scrolling only.
      *
-     * Two things made this stall when scrolling fast:
-     *   - the observer's root was the viewport, so the 600px margin could not
-     *     reach past the page's own scroll container and the next page was
-     *     only requested once the sentinel was literally on screen;
-     *   - an observer only reports CHANGES, so after a page landed with the
-     *     sentinel still near the edge (or after a failed fetch) nothing ever
-     *     asked again.
-     * So: observe against the real scroll container with a generous margin,
-     * and also re-check on every scroll event and after each page settles.
+     * This used to fetch whenever the sentinel was within 1500px, from an
+     * effect that depended on the whole `listing` object (a new object every
+     * render). Every re-render (live latency ticks, a refetch, each page
+     * landing) re-ran the check, and a page shorter than the margin kept the
+     * sentinel "near", so pages chained with nobody scrolling and thousands of
+     * rows piled up. Now: the effect is keyed on nothing that changes per
+     * render, a fetch needs a user scroll/wheel/touch/key event since the last
+     * one, checks run at most once per frame, and a page that adds no new rows
+     * ends paging instead of retrying (see `shouldFetchNext`).
      */
     const sentinel = useRef<HTMLDivElement>(null)
     const [pageError, setPageError] = useState(false)
+    const paging = useRef({
+        hasNext: false,
+        fetching: false,
+        error: false,
+        rows: 0,
+        stalledAt: -1,
+    })
+
+    const rawRows =
+        listing.data?.pages.reduce((n, pg) => n + pg.items.length, 0) ?? 0
+    const hasNext = !!listing.hasNextPage
+    const fetching = listing.isFetchingNextPage
+
+    useEffect(() => {
+        paging.current.hasNext = hasNext
+        paging.current.fetching = fetching
+        paging.current.error = pageError
+        paging.current.rows = rawRows
+    }, [hasNext, fetching, pageError, rawRows])
+
+    const fetchNextPage = listing.fetchNextPage
+    const filterKey = JSON.stringify(filters)
+
+    // A different query (or a refresh that replaces the list) starts paging afresh.
+    useEffect(() => {
+        paging.current.stalledAt = -1
+    }, [filterKey])
 
     useEffect(() => {
         const node = sentinel.current
 
         if (!node) return
 
-        let root: HTMLElement | null = node.parentElement
+        const root = scrollParent(node)
+        const target: HTMLElement | Window = root ?? window
+        let userScrolled = false
+        let frame = 0
 
-        while (root) {
-            const oy = getComputedStyle(root).overflowY
+        const check = () => {
+            frame = 0
 
-            if (oy === 'auto' || oy === 'scroll') break
-
-            root = root.parentElement
-        }
-
-        const near = () => {
-            const box = node.getBoundingClientRect()
+            const p = paging.current
             const edge = root
                 ? root.getBoundingClientRect().bottom
                 : window.innerHeight
+            const rows = p.rows
 
-            return box.top < edge + 1500
-        }
+            if (
+                !shouldFetchNext({
+                    hasNextPage: p.hasNext,
+                    isFetchingNextPage: p.fetching,
+                    pageError: p.error,
+                    distanceToEnd: node.getBoundingClientRect().top - edge,
+                    margin: PAGE_MARGIN,
+                    userScrolled,
+                    stalled: p.stalledAt === rows,
+                })
+            ) {
+                return
+            }
 
-        const check = () => {
-            if (pageError || !near()) return
-            if (!listing.hasNextPage || listing.isFetchingNextPage) return
+            // One fetch per user gesture; the next needs another scroll.
+            userScrolled = false
+            p.fetching = true
+            fetchNextPage().then(
+                (r) => {
+                    setPageError(r.isError)
 
-            listing.fetchNextPage().then(
-                (r) => setPageError(r.isError),
+                    const after =
+                        r.data?.pages.reduce((n, pg) => n + pg.items.length, 0) ??
+                        rows
+
+                    // Deduped growth is what counts; an empty/repeating page ends paging.
+                    if (!pageMadeProgress(rows, after)) p.stalledAt = p.rows
+                },
                 () => setPageError(true)
             )
         }
 
-        const observer = new IntersectionObserver(check, {
-            root,
-            rootMargin: '1500px',
-        })
+        const onUser = () => {
+            userScrolled = true
 
-        observer.observe(node)
-        ;(root ?? window).addEventListener('scroll', check, { passive: true })
-        check()
+            if (!frame) frame = requestAnimationFrame(check)
+        }
+        const events = ['scroll', 'wheel', 'touchmove', 'keydown'] as const
+
+        for (const e of events)
+            target.addEventListener(e, onUser, { passive: true })
 
         return () => {
-            observer.disconnect()
-            ;(root ?? window).removeEventListener('scroll', check)
+            for (const e of events) target.removeEventListener(e, onUser)
+
+            if (frame) cancelAnimationFrame(frame)
         }
-    }, [listing, pageError])
+    }, [fetchNextPage])
 
     const favRows = useMemo(
         () =>
@@ -584,9 +635,17 @@ export default function BrowseRoute() {
             return (l < r ? -1 : 1) * sign
         })
     }, [favOnly, favRows, sort, sortDir])
-    const fetched = favOnly
-        ? sortedFavs
-        : (listing.data?.pages.flatMap((page) => page.items) ?? [])
+    // Pages can overlap while servers come and go; one row per server id.
+    const fetched = useMemo(
+        () =>
+            favOnly
+                ? sortedFavs
+                : dedupeById(
+                      listing.data?.pages.flatMap((page) => page.items) ?? [],
+                      (row) => `${row.kind}-${row.id}`
+                  ),
+        [favOnly, sortedFavs, listing.data]
+    )
     const total = favOnly ? favRows.length : (listing.data?.pages[0]?.total ?? null)
 
     /*
@@ -615,6 +674,52 @@ export default function BrowseRoute() {
         // and that changes only when a page loads or a measurement lands.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [byPing, fetched.length, listing.dataUpdatedAt, liveVersion, latencyOf])
+
+    // Render only the rows near the viewport; spacers keep the scroll height.
+    const listBox = useRef<HTMLDivElement>(null)
+    const [cols, setCols] = useState(1)
+
+    const hasItems = items.length > 0
+
+    useEffect(() => {
+        const grid = listBox.current?.firstElementChild
+
+        if (view === 'table' || !(grid instanceof HTMLElement)) {
+            setCols(1)
+
+            return
+        }
+
+        const measure = () =>
+            setCols(
+                Math.max(
+                    1,
+                    getComputedStyle(grid)
+                        .gridTemplateColumns.split(' ')
+                        .filter(Boolean).length
+                )
+            )
+        const ro = new ResizeObserver(measure)
+
+        ro.observe(grid)
+        measure()
+
+        return () => ro.disconnect()
+    }, [view, hasItems])
+
+    const win = useListWindow(listBox, items.length, {
+        estimate: view === 'table' ? 60 : 220,
+        perRow: view === 'table' ? 1 : cols,
+        gap: view === 'table' ? 0 : 12,
+        rowSelector:
+            view === 'table'
+                ? 'tbody > tr:not([data-spacer])'
+                : ':scope > div > :not([data-spacer])',
+    })
+    const shown = useMemo(
+        () => items.slice(win.start, win.end),
+        [items, win.start, win.end]
+    )
 
     const chips = useMemo(
         () =>
@@ -905,71 +1010,91 @@ export default function BrowseRoute() {
                         </div>
                     )}
 
-                    {!favOnly && listing.isPending ? (
-                        view === 'table' ? (
-                            <SkeletonTable />
-                        ) : (
-                            <SkeletonGrid />
-                        )
-                    ) : items.length === 0 &&
-                      listing.isError &&
-                      !favOnly ? null : items.length === 0 ? (
-                        <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-muted">
-                            {favOnly && favCount === 0 ? (
-                                <>
-                                    <FiStar className="size-8" aria-hidden />
-                                    <p>
-                                        No favourites yet. Star a server in the list
-                                        to keep it here.
-                                    </p>
-                                    <button
-                                        type="button"
-                                        onClick={() => setParam('fav', null)}
-                                        className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90"
-                                    >
-                                        Browse servers
-                                    </button>
-                                </>
+                    <div ref={listBox}>
+                        {!favOnly && listing.isPending ? (
+                            view === 'table' ? (
+                                <SkeletonTable />
                             ) : (
-                                <>
-                                    <FiSearch className="size-8" aria-hidden />
-                                    <p>Nothing matched.</p>
-                                    {(activeCount > 0 || query) && (
+                                <SkeletonGrid />
+                            )
+                        ) : items.length === 0 &&
+                          listing.isError &&
+                          !favOnly ? null : items.length === 0 ? (
+                            <div className="flex flex-col items-center gap-3 py-16 text-center text-sm text-muted">
+                                {favOnly && favCount === 0 ? (
+                                    <>
+                                        <FiStar className="size-8" aria-hidden />
+                                        <p>
+                                            No favourites yet. Star a server in the
+                                            list to keep it here.
+                                        </p>
                                         <button
                                             type="button"
-                                            onClick={clearFilters}
-                                            className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface-hover"
+                                            onClick={() => setParam('fav', null)}
+                                            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:opacity-90"
                                         >
-                                            Clear filters
+                                            Browse servers
                                         </button>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    ) : view === 'table' ? (
-                        <ServerTable
-                            items={items}
-                            sort={sort}
-                            sortDir={sortDir}
-                            onSort={(key, dir) => {
-                                const next = new URLSearchParams(search)
+                                    </>
+                                ) : (
+                                    <>
+                                        <FiSearch className="size-8" aria-hidden />
+                                        <p>Nothing matched.</p>
+                                        {(activeCount > 0 || query) && (
+                                            <button
+                                                type="button"
+                                                onClick={clearFilters}
+                                                className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface-hover"
+                                            >
+                                                Clear filters
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        ) : view === 'table' ? (
+                            <ServerTable
+                                items={shown}
+                                padTop={win.before}
+                                padBottom={win.after}
+                                sort={sort}
+                                sortDir={sortDir}
+                                onSort={(key, dir) => {
+                                    const next = new URLSearchParams(search)
 
-                                next.set('sort', key)
-                                next.set('dir', dir)
+                                    next.set('sort', key)
+                                    next.set('dir', dir)
 
-                                setSearch(next, { replace: true })
-                            }}
-                        />
-                    ) : (
-                        <div className="grid grid-cols-1 gap-3 xs:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                            {items.map((item) => (
-                                <ContentCard
-                                    key={`${item.kind}-${item.id}`}
-                                    item={item}
-                                />
-                            ))}
-                        </div>
-                    )}
+                                    setSearch(next, { replace: true })
+                                }}
+                            />
+                        ) : (
+                            <div className="grid grid-cols-1 gap-3 xs:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                                {win.before > 0 && (
+                                    <div
+                                        aria-hidden
+                                        data-spacer
+                                        className="col-span-full"
+                                        style={{ height: win.before - 12 }}
+                                    />
+                                )}
+                                {shown.map((item) => (
+                                    <ContentCard
+                                        key={`${item.kind}-${item.id}`}
+                                        item={item}
+                                    />
+                                ))}
+                                {win.after > 0 && (
+                                    <div
+                                        aria-hidden
+                                        data-spacer
+                                        className="col-span-full"
+                                        style={{ height: win.after - 12 }}
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     <div ref={sentinel} className="h-8" />
 
