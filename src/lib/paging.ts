@@ -28,6 +28,14 @@ export function dedupeById<T>(
     return out
 }
 
+/**
+ * How close (px) the list's end must be to the bottom of the view before the
+ * next page loads. Small on purpose: scrolling anywhere in the middle of the
+ * list must not fetch, only reaching the bottom does. (It was 1500, which put
+ * the trigger several screens early, so every scroll loaded servers.)
+ */
+export const PAGE_MARGIN = 120
+
 export interface PageState {
     hasNextPage: boolean
     isFetchingNextPage: boolean

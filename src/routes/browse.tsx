@@ -41,10 +41,13 @@ import Select from '~/components/select'
 import ContentCard from '~/components/content-card'
 import ServerTable from '~/components/server-table'
 import { scrollParent, useListWindow } from '~/lib/hooks/use-list-window'
-import { dedupeById, pageMadeProgress, shouldFetchNext } from '~/lib/paging'
+import {
+    dedupeById,
+    PAGE_MARGIN,
+    pageMadeProgress,
+    shouldFetchNext,
+} from '~/lib/paging'
 
-/** Start loading the next page this far (px) before the end, once the user scrolls. */
-const PAGE_MARGIN = 1500
 
 /**
  * The browser, for every content kind.

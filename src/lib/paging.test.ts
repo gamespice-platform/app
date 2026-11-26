@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
     dedupeById,
     maxRenderedRows,
+    PAGE_MARGIN,
     pageMadeProgress,
     shouldFetchNext,
     windowRange,
@@ -14,12 +15,18 @@ const base: PageState = {
     isFetchingNextPage: false,
     pageError: false,
     distanceToEnd: 100,
-    margin: 1500,
+    margin: PAGE_MARGIN,
     userScrolled: true,
     stalled: false,
 }
 
 describe('shouldFetchNext', () => {
+    /* The regression: scrolling mid-list loaded servers because the trigger sat screens early. */
+    it('does not fetch while the end of the list is still screens away', () => {
+        for (const distanceToEnd of [PAGE_MARGIN + 1, 800, 1400, 5000])
+            expect(shouldFetchNext({ ...base, distanceToEnd })).toBe(false)
+    })
+
     it('fetches when the user has scrolled near the end', () => {
         expect(shouldFetchNext(base)).toBe(true)
     })

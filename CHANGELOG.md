@@ -1,5 +1,9 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.22
+
+- Fixed: the server browser loaded more servers on any scroll, wherever you were in the list, which caused lag. The next page now loads only when you reach the bottom (within about 120 px of the end) instead of 1500 px early.
+
 ## 0.5.20
 
 - Fixed: the server browser pages only when you scroll, no longer lists a server twice, and renders only the rows in view.
