@@ -33,6 +33,7 @@ pub mod downloads;
 pub mod external;
 pub mod fs;
 pub mod games;
+pub mod geo;
 pub mod import;
 pub mod library;
 pub mod logs;

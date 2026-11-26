@@ -20,6 +20,7 @@ import { requestFor, useLiveQuery, useLiveServer } from '~/lib/hooks/use-live-qu
 import FavoriteStar from './favorite-star'
 import { CountryFlag } from './country-flag'
 import { LatencyChart, LatencyValue } from './latency-graph'
+import LatencyEstimate from './latency-estimate'
 import { latencyState } from './server-live'
 
 /**
@@ -503,6 +504,9 @@ function ServerRow({
                                 : undefined
                         }
                     />
+                    <div>
+                        <LatencyEstimate host={item.server?.host} />
+                    </div>
                 </td>
 
                 <td className="max-w-0 px-2 py-2 align-middle">

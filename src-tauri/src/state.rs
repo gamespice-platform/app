@@ -64,6 +64,9 @@ pub struct AppState {
     pub availability: Arc<tmc_core::external::site::AvailabilityCache>,
     pub plugins: Registry,
     pub latency: LatencyStore,
+    /// The opt-in geolocation database and its own http client (no bearer).
+    pub geo: tmc_core::net::geo_store::GeoService,
+    pub geo_http: tmc_core::net::geo_store::HttpClient,
     pub version: String,
 
     /// Platform directories for a launch rule's `execSearch`, resolved once.
@@ -219,6 +222,9 @@ impl AppState {
          */
         let file_http = tmc_core::download::default_client(&version)?;
 
+        let geo_dir = paths.data.join("geoip");
+        let geo_http = tmc_core::download::default_client(&version)?;
+
         let plugins = Registry::load(paths.registry_file(), paths.plugins.clone());
 
         /*
@@ -346,6 +352,8 @@ impl AppState {
             availability: Arc::new(tmc_core::external::site::AvailabilityCache::standard()),
             plugins,
             latency: LatencyStore::new(),
+            geo: tmc_core::net::geo_store::GeoService::new(geo_dir),
+            geo_http,
             version,
             exec_roots: Self::compute_detect_roots(app),
             downloads,

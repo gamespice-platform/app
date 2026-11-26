@@ -1,4 +1,6 @@
 pub mod addr;
+pub mod geo;
+pub mod geo_store;
 pub mod latency;
 pub mod ping;
 pub mod query;

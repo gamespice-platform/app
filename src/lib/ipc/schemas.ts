@@ -88,6 +88,8 @@ export const AppSettingsSchema = z.object({
     updaterEndpoint: z.string().nullable().default(null),
     updaterPubkey: z.string().nullable().default(null),
     liveLatency: z.boolean(),
+    /** Opt-in distance-based latency estimate (local geolocation database). */
+    estimateLatency: z.boolean().default(false),
     latencyIntervalMs: z.number(),
     latencyConcurrency: z.number(),
     /** Closing the window keeps the app running in the system tray. Off by default. */

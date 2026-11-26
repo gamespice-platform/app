@@ -60,6 +60,11 @@ pub struct AppSettings {
     pub updater_pubkey: Option<String>,
     /// Ping servers in the browser as their rows come into view.
     pub live_latency: bool,
+    /// Show a distance-based latency ESTIMATE for servers, from a local
+    /// geolocation database. Off by default: turning it on downloads the
+    /// database and looks addresses up; off, nothing is fetched or resolved.
+    /// The database source and token are NOT settings (see `net::geo_store`).
+    pub estimate_latency: bool,
     /// How often the visible set is re-queried, in milliseconds.
     ///
     /// A second by default: a server browser's whole claim is that its numbers
@@ -174,6 +179,7 @@ impl Default for AppSettings {
             updater_endpoint: None,
             updater_pubkey: None,
             live_latency: true,
+            estimate_latency: false,
             latency_interval_ms: 1_000,
             latency_concurrency: 8,
             minimise_to_tray: false,

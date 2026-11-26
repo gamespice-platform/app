@@ -31,6 +31,7 @@ The index. `CLAUDE.md` in the repository root is the always-loaded summary; this
 
 | File | Subject |
 | --- | --- |
+| [geo-latency.md](geo-latency.md) | the opt-in distance-based latency estimate: IP2Location LITE database, formula, token handling, opt-in gate |
 | [live-queries.md](live-queries.md) | querying game servers from the device: which port, which protocols, parser rules, the registry, latency display and history |
 | [plugins.md](plugins.md) | plugins as data: the four types, the step vocabulary, the defences, approval, signatures, app rules per game |
 | [sandboxes.md](sandboxes.md) | the library database and sync, sandboxes, stage then deploy, the four strategies (USVFS included), the ledger, conflicts, `sandbox.json`, share codes |

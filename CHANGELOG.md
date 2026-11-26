@@ -1,5 +1,11 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.20
+
+- Fixed: the server browser pages only when you scroll, no longer lists a server twice, and renders only the rows in view.
+- New: the monitor has a Notifications tab with per-server alert rules, shown through the system's notifications.
+- New: opt-in estimated latency (Settings, Servers, off by default). Downloads the free IP2Location LITE database (CC BY-SA 4.0, attribution shown) with your own download token and a configurable https source, keeps it in the app data dir with progress, size and last-updated, refreshes it monthly, and shows `~45 ms est.` beside servers using website-city's distance formula. Server and own addresses are looked up locally; off means no download and no lookups, and Delete database removes it. See `docs/geo-latency.md`.
+
 ## 0.5.19
 
 - Fixed: the release gate. The exec manifests are signed by the real exec key, Forge and NeoForge installer flags are verified, and Quilt servers install through a signed exec step. 0.5.18 stopped at the gate and was never built.

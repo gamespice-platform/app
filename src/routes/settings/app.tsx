@@ -11,6 +11,7 @@ import { useIsDesktop } from '~/lib/hooks/use-platform'
 import { Row, Section, Select, Toggle } from '~/components/form'
 import { GsLogo } from '~/components/gs-logo'
 import UpdaterSettings from '~/components/updater-settings'
+import GeoSettings from '~/components/geo-settings'
 
 /**
  * The speed-limit presets, in bytes per second.
@@ -280,6 +281,7 @@ export default function AppSettingsRoute() {
                         />
                     }
                 />
+                <GeoSettings />
                 <Row
                     label="Refresh every"
                     hint="How often the servers on screen are re-measured."

@@ -4,6 +4,7 @@ import { FiRefreshCw, FiUsers } from 'react-icons/fi'
 import type { ContentSummaryT } from '~/lib/api/contract'
 import { requestFor, useLiveQuery } from '~/lib/hooks/use-live-query'
 import type { ServerQueryResultT } from '~/lib/ipc/schemas'
+import LatencyEstimate from './latency-estimate'
 import { LatencyChart, LatencyValue } from './latency-graph'
 
 /**
@@ -158,7 +159,16 @@ export default function ServerPanel({ item }: { item: ContentSummaryT }) {
                     <Detail
                         label="Latency"
                         value={
-                            <LatencyValue rttMs={result.rttMs} state="measured" />
+                            <>
+                                <LatencyValue
+                                    rttMs={result.rttMs}
+                                    state="measured"
+                                />
+                                <LatencyEstimate
+                                    host={item.server?.host}
+                                    className="ml-2"
+                                />
+                            </>
                         }
                     />
                     {result.password != null && (

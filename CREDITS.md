@@ -24,3 +24,9 @@ This app's per-game rules and manager descriptors are written for it, but the fa
 | sevenz-rust2 (dependency, not copied) | https://github.com/hasenbanck/sevenz-rust2 | Apache-2.0 |
 
 Also consulted: Modrinth's [code](https://github.com/modrinth/code) (per-package licenses, see its COPYING.md) and the Mod Organizer 2 `game_bethesda` plugin (no license file in the copy we read, so only facts, nothing else, were taken).
+
+## Data
+
+| Data | Source | License |
+| --- | --- | --- |
+| Estimated latency geolocation (optional download, never bundled) | IP2Location LITE, https://lite.ip2location.com | CC BY-SA 4.0. This product includes IP2Location LITE data available from https://lite.ip2location.com. |
