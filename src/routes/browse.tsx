@@ -487,7 +487,7 @@ export default function BrowseRoute() {
      * landing) re-ran the check, and a page shorter than the margin kept the
      * sentinel "near", so pages chained with nobody scrolling and thousands of
      * rows piled up. Now: the effect is keyed on nothing that changes per
-     * render, a fetch needs a user scroll/wheel/touch/key event since the last
+     * render, a fetch needs a user scroll/wheel/touch/key/resize event since the last
      * one, checks run at most once per frame, and a page that adds no new rows
      * ends paging instead of retrying (see `shouldFetchNext`).
      */
@@ -582,8 +582,24 @@ export default function BrowseRoute() {
         for (const e of events)
             target.addEventListener(e, onUser, { passive: true })
 
+        // Resizing (window or the list's own box) can leave the end of the list
+        // on screen with nothing to scroll; that counts as a gesture, but the
+        // fetch still needs the end within PAGE_MARGIN, so a resize mid-list
+        // loads nothing.
+        window.addEventListener('resize', onUser, { passive: true })
+
+        const ro =
+            root && typeof ResizeObserver !== 'undefined'
+                ? new ResizeObserver(onUser)
+                : undefined
+
+        if (root) ro?.observe(root)
+
         return () => {
             for (const e of events) target.removeEventListener(e, onUser)
+
+            window.removeEventListener('resize', onUser)
+            ro?.disconnect()
 
             if (frame) cancelAnimationFrame(frame)
         }
