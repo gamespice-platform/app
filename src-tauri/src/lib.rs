@@ -385,6 +385,7 @@ pub fn run() {
             notifier::toast_dismiss,
             #[cfg(desktop)]
             notifier::notification_test,
+            #[cfg(desktop)]
             notifier::notification_show,
             #[cfg(desktop)]
             notifier::tray_action,

@@ -207,3 +207,29 @@ jobs:
             - name: Check
               working-directory: src-tauri
               run: cargo check -p tmc-usvfs --target x86_64-pc-windows-gnu
+
+    mobile-crosscheck:
+        # The app crate has desktop-only modules (`#[cfg(desktop)] mod notifier`)
+        # that Linux CI compiles with desktop on, so a handler registered
+        # without its own `#[cfg(desktop)]` passes every other job and only
+        # breaks the Android build in the release workflow (v0.5.20). Type-
+        # checking the lib for the Android target fails the pull request
+        # instead of the tag. `cargo check` needs no NDK linker.
+        name: gamespice-app against aarch64-linux-android
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: ${{ env.RUST_TOOLCHAIN }}
+                  targets: aarch64-linux-android
+
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: src-tauri
+                  key: android-check
+
+            - name: Check
+              working-directory: src-tauri
+              run: cargo check -p gamespice-app --lib --target aarch64-linux-android
