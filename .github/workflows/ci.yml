@@ -230,6 +230,21 @@ jobs:
                   workspaces: src-tauri
                   key: android-check
 
+            # `ring` and friends compile C in their build scripts, so the NDK
+            # clang must be findable even though `check` never links.
+            - name: Android NDK toolchain
+              shell: bash
+              env:
+                  NDK_VERSION: '27.2.12479018'
+              run: |
+                  sdkm="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+                  yes | "$sdkm" --licenses >/dev/null || true
+                  "$sdkm" "ndk;${NDK_VERSION}"
+                  bin="$ANDROID_HOME/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+                  echo "$bin" >> "$GITHUB_PATH"
+                  echo "CC_aarch64_linux_android=$bin/aarch64-linux-android24-clang" >> "$GITHUB_ENV"
+                  echo "AR_aarch64_linux_android=$bin/llvm-ar" >> "$GITHUB_ENV"
+
             - name: Check
               working-directory: src-tauri
               run: cargo check -p gamespice-app --lib --target aarch64-linux-android
