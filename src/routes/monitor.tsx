@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams, useSearchParams } from 'react-router-dom'
 import {
     FiActivity,
+    FiBell,
     FiCheck,
     FiCopy,
     FiExternalLink,
@@ -43,6 +44,8 @@ import {
 import { GameIcon } from '~/components/game-icon'
 import { LatencyValue, latencyTone } from '~/components/latency-graph'
 import TimeChart from '~/components/monitor-chart'
+import { AlertToasts, AlertsPanel, useMonitorAlerts } from '~/components/monitor-alerts-panel'
+import type { Snapshot } from '~/lib/monitor-alerts'
 import { Console, ServerForm } from '~/routes/rcon'
 
 const RANGE_KEY = 'tmc.monitor.range'
@@ -93,6 +96,13 @@ function flag(code: string | null | undefined): string {
 
 // -------------------------------------------------------------------- Feed
 
+/** Player names from a full query, or null when the game does not list them. */
+function namesOf(r: ServerQueryResultT): string[] | null {
+    if (r.playerList.length > 0) return r.playerList.map((p) => p.name)
+
+    return r.players === 0 ? [] : null
+}
+
 /**
  * Probe a server on a loop and keep a rolling history of the answers.
  *
@@ -101,7 +111,12 @@ function flag(code: string | null | undefined): string {
  * while the main window is on another screen. The registry's series is only
  * used once, to seed the left edge so a fresh window is not empty.
  */
-function useFeed(base: QueryRequestT | null, paused: boolean, intervalMs: number) {
+function useFeed(
+    base: QueryRequestT | null,
+    paused: boolean,
+    intervalMs: number,
+    onProbe?: (snap: Snapshot) => void
+) {
     const [live, setLive] = useState<MonitorSample[]>([])
     const [seed, setSeed] = useState<MonitorSample[]>([])
     const [result, setResult] = useState<ServerQueryResultT | null>(null)
@@ -109,6 +124,11 @@ function useFeed(base: QueryRequestT | null, paused: boolean, intervalMs: number
     const [lastAt, setLastAt] = useState<number | null>(null)
 
     const ringRef = useRef<RingBuffer<MonitorSample> | null>(null)
+    const probeRef = useRef(onProbe)
+
+    useEffect(() => {
+        probeRef.current = onProbe
+    })
 
     const key = base ? `${base.host.trim().toLowerCase()}:${base.port}` : null
 
@@ -146,6 +166,7 @@ function useFeed(base: QueryRequestT | null, paused: boolean, intervalMs: number
         let stopped = false
         let n = 0
         let haveFull = false
+        let lastNames: string[] | null = null
 
         const tick = async () => {
             const started = Date.now()
@@ -165,6 +186,18 @@ function useFeed(base: QueryRequestT | null, paused: boolean, intervalMs: number
                     maxPlayers: r?.maxPlayers ?? null,
                 })
 
+                if (r && r.online && wantPlayers) lastNames = namesOf(r)
+
+                probeRef.current?.({
+                    at: Date.now(),
+                    reach: ok ? 'online' : r && !r.online && !out.error ? 'offline' : 'timeout',
+                    rtt: ok && r ? r.rttMs : null,
+                    players: ok ? (r?.players ?? null) : null,
+                    maxPlayers: r?.maxPlayers ?? null,
+                    map: ok ? (r?.map ?? null) : null,
+                    names: ok ? lastNames : null,
+                })
+
                 if (r && r.online) {
                     if (wantPlayers) haveFull = true
 
@@ -180,6 +213,15 @@ function useFeed(base: QueryRequestT | null, paused: boolean, intervalMs: number
                 if (stopped) return
 
                 ring.push({ at: Date.now(), rtt: null, players: null, maxPlayers: null })
+                probeRef.current?.({
+                    at: Date.now(),
+                    reach: 'timeout',
+                    rtt: null,
+                    players: null,
+                    maxPlayers: null,
+                    map: null,
+                    names: null,
+                })
                 setError(messageOf(err))
             }
 
@@ -286,7 +328,13 @@ export default function MonitorRoute() {
         app?.latencyIntervalMs ?? DEFAULT_INTERVAL_MS
     )
 
-    const feed = useFeed(base, paused, intervalMs)
+    const alerts = useMonitorAlerts(
+        ident?.host ?? null,
+        ident?.port ?? null,
+        ident?.name ?? 'Server'
+    )
+
+    const feed = useFeed(base, paused, intervalMs, alerts.feed)
 
     const name = feed.result?.name || ident?.name || 'Server monitor'
 
@@ -330,8 +378,8 @@ export default function MonitorRoute() {
             </Centered>
         )
 
-    const showGraph = layout !== 'rcon'
-    const showRcon = layout !== 'graph'
+    const showGraph = layout === 'graph' || layout === 'split'
+    const showRcon = layout === 'rcon' || layout === 'split'
 
     return (
         <div className="flex h-screen min-h-0 flex-col bg-background text-foreground">
@@ -363,7 +411,10 @@ export default function MonitorRoute() {
                 showDetails={showGraph}
                 intervalMs={intervalMs}
                 lastAt={feed.lastAt}
+                unreadAlerts={alerts.unread}
             />
+
+            <AlertToasts alerts={alerts} />
 
             <main
                 className={`flex min-h-0 flex-1 gap-3 p-3 ${
@@ -383,6 +434,10 @@ export default function MonitorRoute() {
                         details={details}
                         compact={layout === 'split'}
                     />
+                )}
+
+                {layout === 'alerts' && (
+                    <AlertsPanel alerts={alerts} address={`${ident.host}:${ident.port}`} />
                 )}
 
                 {showRcon && (
@@ -604,6 +659,7 @@ function Toolbar({
     showDetails,
     intervalMs,
     lastAt,
+    unreadAlerts,
 }: {
     range: RangeId
     onRange: (r: RangeId) => void
@@ -616,6 +672,7 @@ function Toolbar({
     showDetails: boolean
     intervalMs: number
     lastAt: number | null
+    unreadAlerts: number
 }) {
     const seg =
         'inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition-colors focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent'
@@ -624,11 +681,12 @@ function Toolbar({
         { id: 'graph', label: 'Graph', icon: <FiActivity className="size-3.5" /> },
         { id: 'split', label: 'Split', icon: <FiLayout className="size-3.5" /> },
         { id: 'rcon', label: 'RCON', icon: <FiTerminal className="size-3.5" /> },
+        { id: 'alerts', label: 'Notifications', icon: <FiBell className="size-3.5" /> },
     ]
 
     return (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-2">
-            {layout !== 'rcon' && (
+            {(layout === 'graph' || layout === 'split') && (
                 <div role="group" aria-label="Time range" className="inline-flex overflow-hidden rounded-lg border border-border">
                     {RANGES.map((r) => (
                         <button
@@ -695,6 +753,11 @@ function Toolbar({
                         >
                             {m.icon}
                             <span className="hidden min-[520px]:inline">{m.label}</span>
+                            {m.id === 'alerts' && unreadAlerts > 0 && layout !== 'alerts' && (
+                                <span className="rounded-full bg-accent px-1.5 text-[10px] text-white">
+                                    {unreadAlerts}
+                                </span>
+                            )}
                         </button>
                     ))}
                 </div>

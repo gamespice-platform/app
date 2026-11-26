@@ -613,3 +613,24 @@ pub async fn notification_test(app: AppHandle) {
         },
     );
 }
+
+/// Show a card the app itself raised: the monitor window's alert rules.
+///
+/// Text only; `clean` strips control characters and bounds the length, since
+/// the body can carry a player name from the network. A card raised here has
+/// no link, so a click only brings the app forward.
+#[tauri::command]
+pub async fn notification_show(app: AppHandle, title: String, body: String) {
+    show_card(
+        &app,
+        Notice {
+            id: "monitor-alert".into(),
+            kind: "SYSTEM".into(),
+            title: notify::clean(&title, 80),
+            body: notify::clean(&body, 240),
+            url: None,
+            created_at: String::new(),
+            actor: None,
+        },
+    );
+}

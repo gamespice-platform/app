@@ -176,9 +176,10 @@ describe('window labels', () => {
 })
 
 describe('layout mode', () => {
-    it('accepts the three modes and defaults to the graph', () => {
+    it('accepts the four modes and defaults to the graph', () => {
         expect(parseLayoutMode('split')).toBe('split')
         expect(parseLayoutMode('rcon')).toBe('rcon')
+        expect(parseLayoutMode('alerts')).toBe('alerts')
         expect(parseLayoutMode('x')).toBe('graph')
         expect(parseLayoutMode(null)).toBe('graph')
     })

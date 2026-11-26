@@ -213,6 +213,10 @@ export const ipc = {
     /** Show a sample notification card (desktop only). */
     notificationTest: () => call('notification_test', z.null().or(z.undefined())),
 
+    /** Show a card with this text (desktop only): the monitor's alert rules use it. */
+    notificationShow: (title: string, body: string) =>
+        call('notification_show', z.null().or(z.undefined()), { title, body }),
+
     // --------------------------------------------------------------- Logging
     logRead: (limit?: number, minLevel?: LogLevelT) =>
         call('log_read', z.array(LogEntrySchema), {

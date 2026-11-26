@@ -250,12 +250,12 @@ export const MONITOR_SIZE = {
 
 // ------------------------------------------------------------ Layout mode
 
-export type LayoutMode = 'graph' | 'split' | 'rcon'
+export type LayoutMode = 'graph' | 'split' | 'rcon' | 'alerts'
 
 export const LAYOUT_KEY = 'tmc.monitor.layout'
 
 export function parseLayoutMode(value: unknown): LayoutMode {
-    return value === 'graph' || value === 'split' || value === 'rcon'
+    return value === 'graph' || value === 'split' || value === 'rcon' || value === 'alerts'
         ? value
         : 'graph'
 }

@@ -114,3 +114,7 @@ The ladder lives in `LATENCY_TIERS` /`latencyTone` and the four states in `laten
 Graphs are hand-rolled SVG (`components/latency-graph.tsx`). No chart library: these render once per card in a scrolling grid, and a general-purpose chart's layout pass and scales get paid fifty times for a sixty-point line with no axes. A dropped probe **breaks the line** rather than interpolating across it, and the Y scale has a 40ms floor so a rock-steady server does not render as a mountain range.
 
 "Sort by ping" in the server browser is client-side and could only be: latency is a fact about this device's route, so the API cannot order by it.
+
+## Monitor notifications
+
+The monitor window's Notifications tab holds per-server alert rules (join, leave, map change, online, offline, timeout, high average latency, players below or above N, full, empty). `src/lib/monitor-alerts.ts` is the pure engine: each probe becomes a `Snapshot`, `evaluate` diffs it against the previous one and returns events. Level rules (timeout, latency, counts) fire once per stretch after their sustain time; every rule has a cooldown, and 0 means none. Rules live in the window's local storage under `gs.monitor.alerts.<host>:<port>` and are never sent anywhere. Events show as in-window toasts and a recent list, and as a desktop card through the `notification_show` command (text only, cleaned in Rust) when "Also show a desktop notification" is on. Alerts are evaluated only while the monitor window is open.
