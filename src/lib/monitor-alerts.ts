@@ -227,15 +227,22 @@ function names(list: string[], limit = 5): string {
     return list.length > limit ? `${shown} and ${list.length - limit} more` : shown
 }
 
-/** Players that are in `b` and not in `a`, counting duplicates. */
+/**
+ * Players that are in `b` and not in `a`, counting duplicates. A blank name is
+ * a slot still connecting (Source lists it before the player has a name); it
+ * is neither a join nor a leave, so it is ignored. The named entry that
+ * replaces it a moment later is the join.
+ */
 export function diffNames(a: string[], b: string[]): string[] {
     const left = new Map<string, number>()
 
-    for (const n of a) left.set(n, (left.get(n) ?? 0) + 1)
+    for (const n of a) if (n.trim() !== '') left.set(n, (left.get(n) ?? 0) + 1)
 
     const out: string[] = []
 
     for (const n of b) {
+        if (n.trim() === '') continue
+
         const c = left.get(n) ?? 0
 
         if (c > 0) left.set(n, c - 1)

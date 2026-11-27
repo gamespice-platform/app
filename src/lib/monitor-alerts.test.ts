@@ -42,6 +42,12 @@ function run(cfg: AlertConfig, snaps: Snapshot[]) {
 }
 
 describe('diffNames', () => {
+    it('ignores blank names, which are players still connecting', () => {
+        expect(diffNames(['a'], ['a', '', '  '])).toEqual([])
+        expect(diffNames(['a', ''], ['a'])).toEqual([])
+        expect(diffNames(['a', ''], ['a', 'b'])).toEqual(['b'])
+    })
+
     it('finds additions and counts duplicates', () => {
         expect(diffNames(['a'], ['a', 'b', 'b'])).toEqual(['b', 'b'])
         expect(diffNames(['a', 'a'], ['a'])).toEqual([])

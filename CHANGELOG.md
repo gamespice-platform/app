@@ -1,5 +1,9 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.26
+
+- Fixed: the monitor's chat and alerts showed blank "joined." and "left." entries. They were players still connecting, which servers list without a name. Blank names are ignored; the join shows once the name appears.
+
 ## 0.5.25
 
 - Fixed: the monitor's side panel cut off its Chat tab. The four tabs no longer carry icons, so all of them fit.
