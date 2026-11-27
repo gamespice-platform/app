@@ -9,7 +9,6 @@ import {
     FiExternalLink,
     FiLayout,
     FiList,
-    FiMessageSquare,
     FiPause,
     FiPlay,
     FiSidebar,
@@ -987,14 +986,17 @@ function SidePanel({
             role="tab"
             aria-selected={tab === id}
             onClick={() => setTab(id)}
-            className={`inline-flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+            className={`inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap px-2 py-2 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                 tab === id ? 'border-b-2 border-accent text-accent' : 'text-muted hover:text-foreground'
             }`}
         >
             {icon}
-            {label}
+            <span className="truncate">{label}</span>
         </button>
     )
+
+    // Four tabs in the 18rem panel: icons would push the last one out of view.
+    const chatTab = serverId !== null
 
     return (
         <aside
@@ -1003,15 +1005,15 @@ function SidePanel({
                 wide ? 'min-[860px]:w-72 min-[860px]:shrink-0' : 'max-h-64'
             } flex-1 min-[860px]:flex-none`}
         >
-            <div role="tablist" className="flex border-b border-border">
-                {tabBtn('players', `Players${players.length ? ` (${players.length})` : ''}`, <FiUsers className="size-3.5" />)}
+            <div role="tablist" className="flex overflow-x-auto border-b border-border">
+                {tabBtn('players', `Players${players.length ? ` (${players.length})` : ''}`, chatTab ? null : <FiUsers className="size-3.5" />)}
                 {tabBtn(
                     'vars',
                     `Vars${varCount ? ` (${varCount})` : ''}`,
-                    <FiList className="size-3.5" />,
+                    chatTab ? null : <FiList className="size-3.5" />,
                 )}
-                {tabBtn('details', 'Details', <FiSidebar className="size-3.5" />)}
-                {serverId !== null && tabBtn('chat', 'Chat', <FiMessageSquare className="size-3.5" />)}
+                {tabBtn('details', 'Details', chatTab ? null : <FiSidebar className="size-3.5" />)}
+                {chatTab && tabBtn('chat', 'Chat', null)}
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto">
