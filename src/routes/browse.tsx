@@ -517,8 +517,11 @@ export default function BrowseRoute() {
     const filterKey = JSON.stringify(filters)
 
     // A different query (or a refresh that replaces the list) starts paging afresh.
+    const resetScroll = useRef<() => void>(() => {})
+
     useEffect(() => {
         paging.current.stalledAt = -1
+        resetScroll.current()
     }, [filterKey])
 
     useEffect(() => {
@@ -577,10 +580,46 @@ export default function BrowseRoute() {
 
             if (!frame) frame = requestAnimationFrame(check)
         }
-        const events = ['scroll', 'wheel', 'touchmove', 'keydown'] as const
+        const top = () => (root ? root.scrollTop : window.scrollY)
+        let lastTop = top()
 
-        for (const e of events)
-            target.addEventListener(e, onUser, { passive: true })
+        // A scroll event only counts when the position moved DOWN. Filtering
+        // shrinks the list and the browser clamps the position, which fires a
+        // scroll event nobody caused; that must not page.
+        const onScroll = () => {
+            const now = top()
+            const down = now > lastTop
+
+            lastTop = now
+
+            if (down) onUser()
+        }
+        const onWheel = (e: Event) => {
+            if ((e as WheelEvent).deltaY > 0) onUser()
+        }
+        const handlers: [string, EventListener][] = [
+            ['scroll', onScroll],
+            ['wheel', onWheel],
+            ['touchmove', onUser],
+            ['keydown', onUser],
+        ]
+
+        for (const [e, h] of handlers)
+            target.addEventListener(e, h, { passive: true })
+
+        // A different query starts at the top, so it cannot inherit a position
+        // deep in the previous list.
+        const reset = () => {
+            userScrolled = false
+            lastTop = top()
+        }
+
+        resetScroll.current = () => {
+            if (root) root.scrollTop = 0
+            else window.scrollTo(0, 0)
+
+            reset()
+        }
 
         // Resizing (window or the list's own box) can leave the end of the list
         // on screen with nothing to scroll; that counts as a gesture, but the
@@ -588,16 +627,23 @@ export default function BrowseRoute() {
         // loads nothing.
         window.addEventListener('resize', onUser, { passive: true })
 
+        // The observer reports once on observe(); that first call is not a resize.
+        let roReady = false
         const ro =
             root && typeof ResizeObserver !== 'undefined'
-                ? new ResizeObserver(onUser)
+                ? new ResizeObserver(() => {
+                      if (roReady) onUser()
+
+                      roReady = true
+                  })
                 : undefined
 
         if (root) ro?.observe(root)
 
         return () => {
-            for (const e of events) target.removeEventListener(e, onUser)
+            for (const [e, h] of handlers) target.removeEventListener(e, h)
 
+            resetScroll.current = () => {}
             window.removeEventListener('resize', onUser)
             ro?.disconnect()
 
