@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 
 import { maxRenderedRows, windowRange, type WindowRange } from '~/lib/paging'
 
@@ -47,9 +47,6 @@ export function useListWindow(
     const frame = useRef(0)
     const latest = useRef({ count, perRow, rowHeight })
 
-    useEffect(() => {
-        latest.current = { count, perRow, rowHeight }
-    }, [count, perRow, rowHeight])
 
     const { rowSelector, gap = 0 } = opts
     const run = useRef<() => void>(() => {})
@@ -123,7 +120,11 @@ export function useListWindow(
     }, [box, limit, overscan, rowSelector, gap])
 
     // Re-window whenever the data or the measured row height changes.
+    // The ref must be current BEFORE compute runs: a passive effect would update
+    // it after this layout effect, so a list that grew (a filter widening 1 row
+    // to 5) was windowed with the old count and drew only the old rows.
     useLayoutEffect(() => {
+        latest.current = { count, perRow, rowHeight }
         run.current()
     }, [count, perRow, rowHeight, limit])
 
