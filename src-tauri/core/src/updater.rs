@@ -406,3 +406,41 @@ mod tests {
         assert_eq!(s.channel, "stable", "an unknown channel is stable");
     }
 }
+
+/// The newest published release of this app: its version and its release page.
+///
+/// GitHub's public API, unauthenticated (60 requests an hour per address, and
+/// this runs once per launch). The release page is the download page, so a
+/// phone that cannot update itself still gets one tap to the APK.
+pub async fn latest_release(
+    client: &reqwest::Client,
+) -> crate::error::AppResult<(Option<String>, Option<String>)> {
+    const URL: &str = "https://api.github.com/repos/gamespice-platform/app/releases/latest";
+
+    let body: serde_json::Value = client
+        .get(URL)
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(|e| crate::error::AppError::internal(format!("release check failed: {e}")))?
+        .json()
+        .await
+        .map_err(|e| {
+            crate::error::AppError::internal(format!("release check answered badly: {e}"))
+        })?;
+
+    let latest = body
+        .get("tag_name")
+        .and_then(serde_json::Value::as_str)
+        .map(|t| t.trim().trim_start_matches('v').to_string())
+        .filter(|v| !v.is_empty());
+
+    let download = body
+        .get("html_url")
+        .and_then(serde_json::Value::as_str)
+        .filter(|u| u.starts_with("https://github.com/gamespice-platform/"))
+        .map(str::to_string);
+
+    Ok((latest, download))
+}

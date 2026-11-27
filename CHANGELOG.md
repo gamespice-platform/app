@@ -1,5 +1,10 @@
 The GameSpice App's releases, newest first. A version here is the one in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`; the release workflow refuses a tag that disagrees with `tauri.conf.json`.
 
+## 0.5.28
+
+- Fixed: on Android, Play with no server opened the game's listing page instead of the game. It now opens GameSpice's solo player for that game and starts it on arrival.
+- Fixed: the update check found nothing on a phone, so no notice ever appeared. With the site silent it now asks the app's GitHub releases, and the banner's Get it button opens the release page, where the APK is.
+
 ## 0.5.27
 
 - Fixed: widening a filter (for example unticking a game on the Favourites tab) kept showing the old rows: the header said 5 servers and the table drew 1. The row window now sees the new count straight away.

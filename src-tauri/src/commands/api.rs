@@ -238,23 +238,36 @@ pub async fn update_check(
         }
     }
 
-    let body = state
+    // The site first; its answer names a download page of its own. The site's
+    // `/version` does not exist on every deployment, so an error or an empty
+    // answer falls through to the releases this app is actually published on.
+    let from_site = state
         .api
         .request(tmc_core::api::Method::GET, "/version", None, false)
-        .await?;
+        .await
+        .ok()
+        .map(|body| {
+            let latest = body
+                .get("latest")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .map(str::to_string);
 
-    let latest = body
-        .get("latest")
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
-        .map(str::to_string);
+            let download = body
+                .get("download")
+                .and_then(serde_json::Value::as_str)
+                .filter(|u| u.starts_with("https://"))
+                .map(str::to_string);
 
-    let download = body
-        .get("download")
-        .and_then(serde_json::Value::as_str)
-        .filter(|u| u.starts_with("https://"))
-        .map(str::to_string);
+            (latest, download)
+        })
+        .filter(|(latest, _)| latest.is_some());
+
+    let (latest, download) = match from_site {
+        Some(found) => found,
+        None => tmc_core::updater::latest_release(state.api.raw()).await?,
+    };
 
     let outdated = latest
         .as_deref()

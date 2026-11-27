@@ -23,6 +23,7 @@ import { LaunchDialog } from '~/components/launch-dialog'
 import { LiveLatency } from '~/components/server-live'
 import { requestFor, useLiveServer } from '~/lib/hooks/use-live-query'
 import { useDialog } from '~/components/use-dialog'
+import { canonicalSlug } from '~/lib/gamespice/games'
 import { quickAction } from '~/lib/quick-start'
 import { getConnectNoAsk, setConnectNoAsk } from '~/lib/connect-preference'
 import { installPercent } from '~/lib/install-progress'
@@ -560,7 +561,7 @@ export default function PlayDialog({
                 serverId: server ? Number(server.id) : undefined,
                 options: values,
                 title: app.name,
-                appSlug: app.slug ?? undefined,
+                appSlug: app.slug ? canonicalSlug(app.slug) : undefined,
                 fullscreen,
             })
 
@@ -787,7 +788,7 @@ export default function PlayDialog({
                     serverId: server ? Number(server.id) : undefined,
                     options: values,
                     title: app.name,
-                    appSlug: app.slug ?? undefined,
+                    appSlug: app.slug ? canonicalSlug(app.slug) : undefined,
                     fullscreen,
                 })
                 // Long enough to read the warning.

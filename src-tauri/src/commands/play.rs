@@ -232,12 +232,23 @@ async fn open_web(
  *
  * The window builder's sizing and decoration calls do not exist on Android or iOS
  * (Tauri declares them desktop-only), so the desktop path below does not even
- * compile there. A phone opens the site's own play page for the server in the
- * system browser instead, which launches the game on arrival. Nothing the app
+ * compile there. A phone opens the site's own play page for the server (or, with no
+ * server, GameSpice's solo player) in the system browser instead, which
+ * launches the game on arrival. Nothing the app
  * holds rides along: the page is a public URL built from two ids, and the browser
  * has its own session with the site. Recorded as a hand-off, because nothing of
  * ours can see the browser tab close.
  */
+/// The GameSpice site a phone opens solo play on. Compile-time override only,
+/// the same way the API base is baked into a packaged build.
+#[cfg(mobile)]
+fn gs_site_base() -> &'static str {
+    match option_env!("GS_SITE_BASE") {
+        Some(base) if base.starts_with("https://") => base.trim_end_matches('/'),
+        _ => "https://gamespice.net",
+    }
+}
+
 #[cfg(mobile)]
 fn open_on_site(
     app: &AppHandle,
@@ -258,7 +269,10 @@ fn open_on_site(
 
     let url = match request.server_id {
         Some(server) => format!("{base}/{slug}/s/{server}/play"),
-        None => format!("{base}/{slug}"),
+        // Solo is a browser build, and GameSpice is the site that plays it:
+        // `?solo=1` starts it on arrival. TMC's `/<slug>` is the game's
+        // listing, which is a page about the game, not the game.
+        None => format!("{}/games/{slug}?solo=1", gs_site_base()),
     };
 
     use tauri_plugin_opener::OpenerExt;
