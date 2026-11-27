@@ -74,12 +74,28 @@ function monitorTrace(n = 180) {
     })
 }
 
+/**
+ * A screen that sets `__shotsMonitorLive` (the alerts shot) sees the server change while it watches: a player joins,
+ * another leaves, then the map changes, so the Notifications tab shows real alerts instead of "Test" entries.
+ * Times are wall-clock seconds since the first monitor query of the page.
+ */
+let monitorT0 = 0
+function monitorNow() {
+    const live = (globalThis as { __shotsMonitorLive?: boolean }).__shotsMonitorLive
+    if (!live) return { names: MONITOR_PLAYERS, map: 'c8m3_sewers' }
+    monitorT0 ||= performance.now()
+    const t = (performance.now() - monitorT0) / 1000
+    const names = [...MONITOR_PLAYERS, ...(t >= 6 ? ['Halcyon'] : [])].filter((n) => !(t >= 14 && n === 'Moth'))
+    return { names, map: t >= 22 ? 'c8m4_interior' : 'c8m3_sewers' }
+}
+
 function queryResult(schema: unknown, i: number, host?: string) {
     if (host === MONITOR_HOST) {
+        const { names, map } = monitorNow()
         return one(schema, {
-            online: true, rttMs: 47, protocol: 'A2S', name: 'CORE-SS :: US Coop', map: 'c8m3_sewers', game: 'left4dead2', version: '2.2.4.3',
-            players: 20, maxPlayers: 32, bots: 0, password: false, secure: true,
-            playerList: MONITOR_PLAYERS.map((name, k) => ({ name, score: 0, duration: 3300 - k * 150, ping: 30 + ((k * 37) % 70) })),
+            online: true, rttMs: 47, protocol: 'A2S', name: 'CORE-SS :: US Coop', map, game: 'left4dead2', version: '2.2.4.3',
+            players: names.length, maxPlayers: 32, bots: 0, password: false, secure: true,
+            playerList: names.map((name, k) => ({ name, score: 0, duration: 3300 - k * 150, ping: 30 + ((k * 37) % 70) })),
             rules: MONITOR_RULES,
         })
     }
@@ -114,6 +130,37 @@ const seeds: Record<string, (schema: unknown, a: Record<string, unknown>) => unk
         const p = server(i, SERVERS.map((_, j) => hostOf(j)).find((h) => key.includes(h))).ping
         return { ...(fake(element(schema)) as object), key, samples: trace(p), last: p, min: p - 3, max: p + 6, avg: p + 1, jitter: 2.1, reliability: 100 }
     }),
+    // Library > Stores: the built-in cache plus folders a player made (named, permanent or temporary).
+    storage_list: () => {
+        const GB = 1024 ** 3
+        const store = (id: number, name: string, path: string, kind: 'permanent' | 'temporary', usedGb: number, freeGb: number, extra = {}) => ({
+            id, name, path, kind, isDefault: false, builtin: false, createdAt: '2026-10-02T12:00:00Z', exists: true,
+            usedBytes: Math.round(usedGb * GB), usedTruncated: false, freeBytes: Math.round(freeGb * GB), ...extra,
+        })
+        return [
+            store(1, 'Downloads cache', '~/.cache/gamespice/downloads', 'temporary', 3.4, 212, { builtin: true, createdAt: '2026-09-14T09:00:00Z' }),
+            store(2, 'Games SSD', '/mnt/fast/GameSpice', 'permanent', 48.2, 391, { isDefault: true }),
+            store(3, 'Map archive', '/mnt/archive/maps', 'permanent', 126.7, 1840),
+            store(4, 'LAN party', '~/Games/lan-weekend', 'temporary', 7.9, 212),
+        ]
+    },
+    // Library > Mods: subscribed packs (one with an update waiting) and one imported by hand.
+    library_list: (schema) => rows(schema, PACKS.slice(0, 5).map((p, i) => {
+        const v = ['2.3.0', '1.3.1', '1.2.2', '1.4.3', '1.3.4'][i]
+        const fc = i === 1
+        return {
+            id: `mod:${2 + i}`, kind: 'mod', itemId: 2 + i, name: p.name, description: p.desc, image: art(p.art),
+            webUrl: `https://tmcdev.net/m/${2 + i}`, appId: fc ? 101 : 100, appName: fc ? 'Fatal Contact' : 'Playlot', appSlug: fc ? 'fatal-contact' : 'playlot',
+            autoUpdate: i !== 1, notifyUpdates: true, paused: false, viaCollectionId: null, installable: true,
+            latestReleaseId: 100 + i, latestVersion: v, fileUrl: null, fileName: null, fileSize: (40 + i * 23) * 1024 * 1024, fileSha256: null, updatedAt: iso(60 * (i + 1)),
+            installedReleaseId: 100 + i, installedVersion: fc ? '1.3.0' : v, installedInstallId: i + 1, installedAt: iso(60 * 24 * (i + 2)), installedFiles: [],
+            state: 'installed', lastError: null, updateAvailable: fc, hasRule: true, isContainer: false,
+        }
+    })),
+    local_list: (schema) => rows(schema, [{
+        id: 1, name: 'Ember HUD theme', appId: 101, appSlug: 'fatal-contact', version: '0.9', author: 'Ember', notes: null,
+        origin: 'dropped', originLabel: null, relPath: 'mods/ember-hud', source: null, files: 14, bytes: 18 * 1024 * 1024, addedAt: iso(60 * 24 * 6), updatedAt: iso(60 * 24 * 6),
+    }]),
     ping_server: (_s, a) => ({ host: String(a.host ?? ''), port: Number(a.port ?? 0), rttMs: 18, received: 3, attempts: 3 }),
     download_list: (schema) => {
         const d = (schema as { _zod: { def: { shape: { downloads: unknown } } } })._zod.def.shape.downloads
@@ -169,7 +216,7 @@ const PLAYLOT = { id: 100, name: 'Playlot', url: 'playlot', icon: 'https://tmc-c
 type Obj = Record<string, unknown>
 
 /** API reads the dev site has too little of (or not yet): built on its real shapes. */
-async function apiSeed(a: Obj, real: () => Promise<unknown>): Promise<unknown> {
+async function apiSeed(a: Obj, real: (over?: Obj) => Promise<unknown>): Promise<unknown> {
     const path = String(a.path)
     const q = new Map((a.query as [string, string][] | undefined) ?? [])
     if (path === '/browse' && q.get('kind') === 'mod') {
@@ -196,7 +243,9 @@ async function apiSeed(a: Obj, real: () => Promise<unknown>): Promise<unknown> {
         return { ...r, apps, categories: [], ...(q.get('kind') === 'server' ? { maps: [] } : {}) }
     }
     if (path === '/browse' && q.get('kind') === 'server') {
-        const r = (await real()) as { items: Obj[]; total: number }
+        // The review account has no favourites, so a favourites query fetches the full list for its item template.
+        const fav = ['1', 'true'].includes(q.get('favorites') ?? '')
+        const r = (await real(fav ? { query: [...q].filter(([k]) => k !== 'favorites') } : undefined)) as { items: Obj[]; total: number }
         const t = r.items[0]
         const ts = t.server as Obj
         const FC = { id: 101, name: 'Fatal Contact', url: 'fatal-contact', icon: 'https://tmc-city-dev.s3.us-east-1.amazonaws.com/public/app/arena/icon.webp' }
@@ -206,7 +255,9 @@ async function apiSeed(a: Obj, real: () => Promise<unknown>): Promise<unknown> {
             server: { ...ts, host: hostOf(i), port: 27015, queryPort: 27015, curUsers: d.players, maxUsers: d.max, bots: 0, map: d.map, online: true },
             webUrl: `https://tmcdev.net/s/${slug(d.name)}`,
         }))
-        return { ...r, total: demo.length, nextCursor: null, items: demo }
+        // The account's favourites (Servers > Favourites, and the stars in the full list): three of the six.
+        const items = fav ? demo.filter((_, i) => i % 2 === 0) : demo
+        return { ...r, total: items.length, nextCursor: null, items }
     }
     if (path === '/content/mod/2') {
         const r = (await real()) as Obj
@@ -325,11 +376,13 @@ g.__TAURI_INTERNALS__.invoke = async (cmd, args, opts) => {
             __shots: true, version: 1, uiScale: 1, liveLatency: true, latencyIntervalMs: 30000, latencyConcurrency: 8,
             gameDirs: { 100: '~/Games/Playlot', 101: '~/Games/FatalContact' }, autoUpdateCheck: true, crashReports: true, downloadConcurrency: 3, downloadKeepHistory: true,
             gameCacheKeep: true, gameUseUdp: true, requireSignedPlugins: true, allowConfigEditing: true, minimiseToTray: true,
+            // A screen's own overrides (screens.mjs `init` sets __shotsSettings), e.g. a faster probe for the alerts shot.
+            ...(globalThis as { __shotsSettings?: Record<string, unknown> }).__shotsSettings,
         } : {})
         return theme ? Object.assign(r, { theme }) : r
     }
     if (cmd === 'api_get') {
-        const real = () => inner(cmd, args, opts)
+        const real = (over?: Obj) => inner(cmd, over ? { ...(args as Obj), ...over } : args, opts)
         const seeded = await apiSeed((args ?? {}) as Obj, real)
         return seeded === undefined ? scrub(await real()) : seeded
     }

@@ -33,7 +33,11 @@ npm run shots:marketing -- --site ~/wt/website-gs-shots
 
 `screens.mjs` is the one list: slot, route, what to wait for, an optional action and callouts, and the slide title and caption. `tour` there sets the slide order.
 
-Store and Stats are already in the list with `enabled: false`. They are on branch `gs-app-store-stats`; set `enabled` to true once that branch is on main, and both steps pick them up.
+`enabled: false` keeps a slot in the tour without shooting it. Every screen is enabled today, Store and Stats included. A screen can also set `init` (a script run in the page before the app loads, for localStorage or seed switches) and `settle` (milliseconds to wait after the `wait` selector).
+
+The browser context is shared by every screen, so localStorage one screen writes is still there for the next. The `alerts` shot puts the monitor on its Notifications tab, which is why `monitor` sets the layout back to the graph. `alerts` waits 30 s while `seed.ts` changes the roster and map (`__shotsMonitorLive`), so the alerts it shows are ones the rules really raised.
+
+`favourites` uses the six seeded servers: the favourites query gets three of them (seed.ts fetches the full list for its item template, because the review account has none).
 
 ## Outputs (`out/`, gitignored)
 

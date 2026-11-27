@@ -11,12 +11,15 @@ Shot from the running app in its dark theme, with a demo account on the dev site
 | ![The Workshop pack browser](docs/screenshots/workshop.webp)<br>Workshop: subscribe to content packs | ![The Store](docs/screenshots/store.webp)<br>Store: outfits and packs for each game |
 | ![The server browser](docs/screenshots/server-browser.webp)<br>Server browser: players and latency from your machine | ![The server monitor window for a Left 4 Dead 2 server](docs/screenshots/server-monitor.webp)<br>Server monitor: live latency, players and RCON in one window |
 | ![The sandboxes screen with mod sets](docs/screenshots/sandboxes.webp)<br>Sandboxes: keep mod sets apart | ![The Stats page](docs/screenshots/stats.webp)<br>Stats: playtime and progress across games |
+| ![The server monitor on its Notifications tab, with alert rules and recent alerts](docs/screenshots/server-alerts.webp)<br>Server alerts: rules per server, with desktop notifications | ![The Favourites tab of the server browser](docs/screenshots/favourites.webp)<br>Favourite servers: saved to your account or this device |
+| ![The Stores page with four download folders](docs/screenshots/stores.webp)<br>Stores: named download folders, permanent or temporary | ![The Library with its tabs and game cards](docs/screenshots/library.webp)<br>Library: managed, unmanaged and GameSpice games |
 
 ## What It Does
 ### Mod Management
 - **One-click Install**: Simply click to install or uninstall mods that support installing via the app. The list of [supported games](#supported-games) are at the bottom of this page.
 - **Sandboxes**: Named mod profiles per game, with their own load order and their own deployment method.
   - Switching between them does not re-download anything, and your game folder is recoverable either way!
+- **Import and export**: Import a Modrinth `.mrpack` or a CurseForge pack as a new sandbox, and export a sandbox as `.mrpack`.
 ### Game versions and loaders
 - **Pick a version, then a loader**: A sandbox picks its game version, its mod loader (Fabric, Forge, NeoForge, Quilt for Minecraft) and the loader's build from lists the website keeps up to date. The app caches them, says when a list is out of date, and still works offline from the last copy or the list built into the app.
 - **See what installing does before it happens**: Every download, every program an installer runs (with its full command line) and every licence is listed before you agree. A loader installer that runs a program needs your consent once per plan, and only runs if it is signed by a key built into the app.
@@ -24,6 +27,9 @@ Shot from the running app in its dark theme, with a demo account on the dev site
 ### Server Management
 - **Server Browser**: A full server browser like the one on the website, but with **real-time latency** and **server status** along with latency charts & graphs. You can also filter by game version, mod list, and more.
 - **RCON**: Remote console access to your servers, with a full command history and logging. You can also send commands to multiple servers at once, and even schedule commands to be sent at a later time.
+- **Favourites**: Star a server to keep it on the *Favourites* tab. Signed in, the list is saved to your account and follows you to every machine; signed out, it stays on this device.
+- **Server monitor**: Open any server in its own window: a latency graph, a player chart, and min, average, max, p95, jitter and packet loss for the range you pick. Tabs show the players, server variables, details and chat; RCON can sit beside the graph.
+- **Alerts**: Rules per server for a player joining or leaving, a map change, the server going offline or not answering, latency staying high, or the player count passing a number. Alerts show in the monitor and as desktop notifications, with a list of recent ones.
 - **Connect**: One-click connect to servers that support it, with the ability to save your login credentials for future use.
 - **Console**: The `tmc` command-line tool as a terminal inside the app (desktop). Release builds include `tmc`, so it works with nothing else installed; `TMC_CLI_PATH` points it at another build. See [docs/console.md](docs/console.md).
 ### Gaming Platform
@@ -33,6 +39,9 @@ Shot from the running app in its dark theme, with a demo account on the dev site
 - **Join from a link**: A `gs://play/<host>:<port>` link from the website opens the app on that server, showing which game is running there and the latency measured from *your* machine, with the ways you can actually join it. It never joins on its own.
 - **Find fun games or servers**: Our gaming platform relies on third-party communities creating games and servers. Browse these games and servers right through our app and connect to them with one click!
 - **Assets**: Automatically download and install game assets onto servers where the game supports it (integrated games only).
+- **Library**: Every game in one catalogue, with tabs for the games the app manages, the ones it found on your machine and GameSpice games. *Library → Mods* lists every installed mod.
+- **Workshop**: Browse map and mod packs, subscribe and they stay up to date, or pause one. Edit or remove your own packs from the same page; new uploads happen on the website.
+- **Stores**: Named folders for downloads and installs on any drive. A permanent store is kept, a temporary one is emptied when the app closes, and each shows the space it uses and the space left.
 - **Game pages**: Every game has its own page, play it, see its busiest servers, and browse its **leaderboards** for any stat its servers record, with your own rank and figures beside them.
 - **Friends & parties**: Your friends list with who is online and which game and server they are on (one click to their server), friend requests, "Add friend" on any profile, party invites, and the party you are in, the same friends and parties the games themselves show.
 

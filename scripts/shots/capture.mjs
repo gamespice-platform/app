@@ -61,6 +61,7 @@ for (const theme of wantThemes) {
                 static now() { return RealDate.now() + offset }
             }
         }, theme)
+        if (s.init) await page.addInitScript(s.init)
         await page.setViewportSize(s.size ?? SIZE)
         const route = s.route.replace(/\{(\w+)\}/g, (_, k) => vars[k])
         await page.goto(base + route)

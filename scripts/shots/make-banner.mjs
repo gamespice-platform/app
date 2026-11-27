@@ -11,7 +11,7 @@
  * gradient over it, the mark and name top left, the feature pills along the
  * bottom. Edit PILLS below when the feature list changes.
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
@@ -32,8 +32,8 @@ mkdirSync(join(here, 'out'), { recursive: true })
 
 const BACKGROUND = 'workshop'
 const PILLS = [
-    'Avatar editor', 'Workshop', 'Store', 'Stats', 'Server browser', 'RCON',
-    'Mods and sandboxes', 'Auto-updates',
+    'Avatar editor', 'Workshop', 'Store', 'Stats', 'Server browser', 'Server alerts', 'RCON',
+    'Mods and sandboxes', 'Stores', 'Auto-updates',
     'Windows', 'macOS', 'Linux', 'Android', 'iOS',
 ]
 
@@ -47,6 +47,10 @@ export const SHOTS = [
     ['monitor', 'server-monitor', 'The server monitor window for a Left 4 Dead 2 server', 'Server monitor: live latency, players and RCON'],
     ['sandboxes', 'sandboxes', 'The sandboxes screen with mod sets', 'Sandboxes: keep mod sets apart'],
     ['stats', 'stats', 'The Stats page', 'Stats'],
+    ['alerts', 'server-alerts', 'The server monitor on its Notifications tab, with alert rules and recent alerts', 'Server alerts: rules and desktop notifications'],
+    ['favourites', 'favourites', 'The Favourites tab of the server browser', 'Favourite servers'],
+    ['stores', 'stores', 'The Stores page with four download folders', 'Stores: named download folders'],
+    ['library', 'library', 'The Library with its tabs and game cards', 'Library'],
 ]
 
 async function banner() {
@@ -98,6 +102,11 @@ async function shots() {
         const out = join(docs, 'screenshots', `${file}.webp`)
         // The monitor shot is a real capture of a live server, kept in art/.
         const src = slot === 'monitor' ? join(here, 'art', 'server-monitor-real.png') : join(raw, `${slot}-dark.png`)
+        // A run without the GPU (capture --no-gpu) has no avatar capture: keep the committed file.
+        if (!existsSync(src)) {
+            console.log(`docs/screenshots/${file}.webp kept (no ${slot}-dark.png)`)
+            continue
+        }
         await sharp(src).resize({ width: 1200 }).webp({ quality: 80, effort: 6 }).toFile(out)
         console.log(`docs/screenshots/${file}.webp`)
     }
